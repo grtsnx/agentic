@@ -206,6 +206,7 @@ then reused on every later run. Only fill them in manually if you already have I
 | :-- | :-- | :-- |
 | `ANTHROPIC_VAULT_ID` | The secure vault for your keys | Auto-created (or paste an existing `vlt_…`) |
 | `ANTHROPIC_ENVIRONMENT_ID` | The workspace agents run in | Auto-created (or paste an existing `env_…`) |
+| `ANTHROPIC_MEMORY_STORE_ID` | Persona + cross-session memory | Auto-created (or paste an existing `memstore_…`) |
 
 ### Optional (turn features on)
 
@@ -258,9 +259,10 @@ Want a blank slate? This wipes the whole Managed Agents workspace — **sessions
 `agents.config.json` is cleared:
 
 ```bash
-bun run purge:all                          # DRY RUN — just shows what would be removed
-bun run purge:all --yes                    # actually purge agents + vaults + sessions
+bun run purge:all                            # DRY RUN — just shows what would be removed
+bun run purge:all --yes                      # actually purge agents + vaults + sessions
 bun run purge:all --yes --with-environments  # also delete the environment(s)
+bun run purge:all --yes --with-memory        # also delete the memory store(s) — wipes saved persona
 ```
 
 > ⚠️ **Destructive and irreversible.** It's a dry run by default; nothing is deleted until
@@ -516,13 +518,18 @@ Instead of guessing how to use a UI library, the relevant agents get **live web 
 
 ## 🧠 Memory & persona
 
-"Memory" here is four different things working together:
+"Memory" here is four different things working together — and most of it is handled by the
+**Anthropic platform**, not by hand-rolled code:
 
 1. **Session memory (this build).** Each build runs in an Anthropic **session** that remembers the
    conversation — that's how the *Intent → one question → re-understand* loop works.
-2. **Memory Store (across builds).** A small persistent file store for durable items: your **custom
-   instructions** (`/user-instructions.json` — the main way to set tone/brand "persona"), version
-   history (`/versions/…`), and registered tools/skills. It's always injected into the Orchestrator.
+2. **Memory Store (across builds) — a real managed feature.** The setup provisions a **memory store**
+   (`builder-memory`, ID saved to `.env` as `ANTHROPIC_MEMORY_STORE_ID`). When the runtime app
+   attaches it to a session, Anthropic **mounts it as a folder in the sandbox and automatically adds a
+   note to every agent's system prompt** telling it where to look — so persona/preferences are
+   surfaced *without* any manual prompt injection. Agents read/write it with their normal file tools.
+   It's seeded with a default `persona.md` + `user-instructions.md`; the runtime app overwrites those
+   per user (brand colours, tone, do/don't rules — the way you set "persona").
 3. **KnowledgeBase / RAG (your documents).** Upload PDFs/URLs/markdown → the **KnowledgeBase** agent
    chunks them, creates embeddings, and stores vectors in **InsForge pgvector**. At build time it
    finds the most relevant pieces and feeds them into the Intent + CodeWriter prompts — so the site is
@@ -531,14 +538,20 @@ Instead of guessing how to use a UI library, the relevant agents get **live web 
    that depend on it, never truncated. This is the pipeline's short-term scratchpad.
 
 **Persona** isn't a separate agent — it comes from (a) each agent's fixed role/voice in its prompt,
-(b) your custom instructions injected into the Orchestrator, and (c) the brand signals + assets in
-your request shaping the generated site's look and tone.
+(b) the **memory store** (custom instructions Anthropic auto-surfaces to every agent), and (c) the
+brand signals + assets in your request shaping the generated site's look and tone.
+
+> **Why no custom "MemoryService" that injects prompts?** Because the platform already does it: an
+> attached memory store auto-mounts and auto-notes itself in the system prompt. We provision the store
+> (like the vault + environment) and persist its ID; the **runtime app** attaches it to each session
+> via `resources[]` (with optional per-session `instructions`, ≤4,096 chars). That's the supported,
+> tamper-resistant path — re-implementing it in prompt text would fight the managed feature.
 
 ---
 
 ## 🔐 Vault & environment
 
-Two Anthropic concepts the setup provisions for you — **automatically**:
+Three Anthropic concepts the setup provisions for you — **automatically**:
 
 - **Vault** — a secure box on Anthropic's servers that holds your secret keys (InsForge, Coolify,
   Refero, payment providers…). Agents reference the vault to authenticate to MCPs; the secrets never
@@ -546,12 +559,16 @@ Two Anthropic concepts the setup provisions for you — **automatically**:
   per key you set.
 - **Environment** — the sandboxed workspace the agents run inside. Created by
   `src/pipeline/environment/environment.service.ts`.
+- **Memory store** — persistent persona + preferences that survive across builds. Created (and seeded
+  with a default `persona.md` + `user-instructions.md`) by `src/pipeline/memory/memory-store.service.ts`.
+  The runtime app attaches it to each session so Anthropic auto-surfaces it to every agent.
 
-**You don't pre-create either one.** On the first run, if `ANTHROPIC_VAULT_ID` /
-`ANTHROPIC_ENVIRONMENT_ID` are blank, the setup creates them, then writes the new IDs back into your
-`.env` (via `src/pipeline/lib/env-file.ts`) so every later run reuses the same vault + environment
-instead of making new ones. If you'd rather use IDs you already have, just paste them into `.env` and
-they'll be reused as-is.
+**You don't pre-create any of them.** On the first run, if `ANTHROPIC_VAULT_ID` /
+`ANTHROPIC_ENVIRONMENT_ID` / `ANTHROPIC_MEMORY_STORE_ID` are blank, the setup creates them, then writes
+the new IDs back into your `.env` (via `src/pipeline/lib/env-file.ts`) so every later run reuses the
+same resources instead of making new ones. If you'd rather use IDs you already have, just paste them
+into `.env` and they'll be reused as-is. (Memory provisioning is non-fatal — if it can't be created,
+setup logs a warning and continues; agents still work.)
 
 ---
 
@@ -645,6 +662,8 @@ src/pipeline/
 ├── agents/                 # one file per agent (27 total)
 ├── config/                 # models, tools, and MCP server config
 ├── vault/ · environment/   # vault + environment provisioning
+├── memory/                 # memory-store provisioning (persona + cross-session memory)
+├── lib/                    # helpers (idempotent agents, .env write-back)
 └── output/                 # generated agents.config.json
 doc/instruct.md             # original specification (read-only)
 ```

@@ -6,6 +6,7 @@ import * as path from 'path';
 
 import { VaultService } from './vault/vault.service';
 import { EnvironmentService } from './environment/environment.service';
+import { MemoryStoreService } from './memory/memory-store.service';
 import { enableIdempotentAgents } from './lib/idempotent-agents';
 import { upsertEnvVars } from './lib/env-file';
 import { IntentAgent } from './agents/intent.agent';
@@ -39,6 +40,7 @@ import { OrchestratorAgent } from './agents/orchestrator.agent';
 export interface PipelineConfig {
   vaultId: string;
   environmentId: string;
+  memoryStoreId: string;
   agentIds: Record<string, string>;
 }
 
@@ -50,6 +52,7 @@ export class PipelineService {
     private readonly config: ConfigService,
     private readonly vaultService: VaultService,
     private readonly environmentService: EnvironmentService,
+    private readonly memoryStoreService: MemoryStoreService,
     private readonly intentAgent: IntentAgent,
     private readonly conversationAgent: ConversationAgent,
     private readonly auditAgent: AuditAgent,
@@ -101,16 +104,25 @@ export class PipelineService {
     this.logger.log('\n🌍 Step 2/4: Environment');
     const environmentId = await this.environmentService.getOrCreate(client);
 
-    // Persist the vault + environment IDs back to .env so they are created
-    // exactly once and automatically reused on every subsequent run.
+    // ── Step 2b: Memory store (persona + cross-session memory) ──
+    // Anthropic auto-mounts an attached memory store and adds a note to each
+    // agent's system prompt, so persona/preferences are surfaced without any
+    // hand-rolled injection. The runtime app attaches this store to every
+    // session via resources[]; here we just provision it and share its ID.
+    this.logger.log('\n🧠 Step 2b: Memory store');
+    const memoryStoreId = await this.memoryStoreService.getOrCreate(client);
+
+    // Persist the vault + environment + memory IDs back to .env so they are
+    // created exactly once and automatically reused on every subsequent run.
     const { written, path: envPath } = upsertEnvVars({
       ANTHROPIC_VAULT_ID: vaultId,
       ANTHROPIC_ENVIRONMENT_ID: environmentId,
+      ANTHROPIC_MEMORY_STORE_ID: memoryStoreId,
     });
     if (written.length) {
       this.logger.log(`   📝 Saved ${written.join(' + ')} to ${envPath}`);
     } else {
-      this.logger.log('   📝 .env already has vault + environment IDs');
+      this.logger.log('   📝 .env already has vault + environment + memory IDs');
     }
 
     // ── Step 3: Agents (in dependency order) ──────────────
@@ -209,6 +221,7 @@ export class PipelineService {
     const outputConfig: PipelineConfig = {
       vaultId,
       environmentId,
+      memoryStoreId,
       agentIds,
     };
     const outputPath = path.join(__dirname, 'output', 'agents.config.json');
@@ -220,6 +233,7 @@ export class PipelineService {
     this.logger.log('  ✅ Pipeline setup complete!');
     this.logger.log(`  Vault:       ${vaultId}`);
     this.logger.log(`  Environment: ${environmentId}`);
+    this.logger.log(`  Memory:      ${memoryStoreId || '(skipped)'}`);
     this.logger.log(`  Agents:      ${Object.keys(agentIds).length}`);
     this.logger.log(`  Config:      ${outputPath}`);
     this.logger.log('═══════════════════════════════════════\n');

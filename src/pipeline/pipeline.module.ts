@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import { PipelineService } from './pipeline.service';
 import { VaultService } from './vault/vault.service';
 import { EnvironmentService } from './environment/environment.service';
+import { MemoryStoreService } from './memory/memory-store.service';
 
 import { IntentAgent } from './agents/intent.agent';
 import { ConversationAgent } from './agents/conversation.agent';
@@ -39,6 +40,7 @@ import { OrchestratorAgent } from './agents/orchestrator.agent';
     PipelineService,
     VaultService,
     EnvironmentService,
+    MemoryStoreService,
     IntentAgent,
     ConversationAgent,
     AuditAgent,
