@@ -16,6 +16,25 @@ export const TOOLS = {
     },
   ],
 
+  // Full code toolset + live web access (for pulling current library docs,
+  // e.g. shadcn/ui and HeroUI, while generating code).
+  CODE_WEB: [
+    {
+      type: 'agent_toolset_20260401',
+      default_config: { enabled: false },
+      configs: [
+        { name: 'bash', enabled: true },
+        { name: 'read', enabled: true },
+        { name: 'write', enabled: true },
+        { name: 'edit', enabled: true },
+        { name: 'glob', enabled: true },
+        { name: 'grep', enabled: true },
+        { name: 'web_search', enabled: true },
+        { name: 'web_fetch', enabled: true },
+      ],
+    },
+  ],
+
   READ: [
     {
       type: 'agent_toolset_20260401',

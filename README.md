@@ -282,6 +282,23 @@ a domain you've verified with Resend.
 
 ---
 
+## 🎨 Component library (shadcn / HeroUI)
+
+The generated site uses a real component library, chosen **per project** by the Design Agent
+and written by the CodeWriter:
+
+- **shadcn/ui** (default) — marketing sites, landing pages, content-heavy and highly
+  custom/animated designs.
+- **HeroUI** — app-like UIs: dashboards, admin panels, SaaS app shells, data-dense tools.
+
+To write correct, current code the CodeWriter is given **live web access** (it reads the
+official shadcn/HeroUI docs while generating) and uses the **shadcn CLI** (`npx shadcn add`)
+to install real components instead of guessing. It does **not** use the editor's local
+shadcn/HeroUI MCP servers or Cursor skills — those are IDE tools and can't run inside the
+deployed Anthropic agents, which only support remote URL MCPs and the built-in toolset.
+
+---
+
 ## 👩‍💻 For developers
 
 This is a [NestJS](https://nestjs.com/) project.

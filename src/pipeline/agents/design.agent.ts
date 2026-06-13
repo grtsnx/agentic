@@ -50,6 +50,7 @@ nothing useful.
 
 Output ONLY valid JSON — the complete DesignSpec:
 {
+  "componentLibrary": "shadcn|heroui",
   "palette": {
     "primary": string,
     "secondary": string,
@@ -166,7 +167,7 @@ Output ONLY valid JSON — the complete DesignSpec:
       "m-\\\\[\\\\d+px\\\\]"
     ],
     "minContrastRatio": 4.5,
-    "requireShadcnForInteractive": true,
+    "requireComponentLibraryForInteractive": true,
     "allowedTextSizes": [
       "text-xs","text-sm","text-base","text-lg",
       "text-xl","text-2xl","text-3xl","text-4xl",
@@ -174,6 +175,16 @@ Output ONLY valid JSON — the complete DesignSpec:
     ]
   }
 }
+
+Component library selection (set "componentLibrary"):
+- "shadcn" (DEFAULT) — marketing sites, landing pages, content/editorial, portfolios,
+  and any highly bespoke, animation-heavy visual where you want full control of every
+  element and copy-pasted, fully-owned components.
+- "heroui" — app-like product UIs: dashboards, admin panels, SaaS app shells, internal
+  tools, data-dense interfaces with many forms, tables, modals, menus, and date/number
+  inputs. Pick HeroUI when IntentSpec indicates appType=webapp/dashboard/admin or the
+  sitemap is dominated by interactive app surfaces rather than marketing sections.
+- When in doubt, choose "shadcn". Never mix both libraries in one project.
 
 Hard rules:
 - 8px grid is LAW — all spacing must be multiples of 8
