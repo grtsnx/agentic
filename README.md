@@ -310,14 +310,31 @@ bun run setup:pipeline     # provision (or update) the 27 agents  ← main comma
 bun run archive:duplicates # archive duplicate agents from old runs
 bun run start:dev          # run the Nest app in watch mode
 bun run test               # run unit tests
+bun run smoke              # boot the full DI graph (no network / no API key)
+bun audit --audit-level=high  # scan dependencies for known CVEs
 ```
+
+### Continuous integration
+
+Every push and pull request to `main` runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml),
+which fans out into four independent jobs:
+
+| Job | Command | What it guards |
+| --- | --- | --- |
+| 🔍 **Audit** | `bun audit --audit-level=high` | Fails on high/critical dependency CVEs |
+| 🏗 **Build** | `bun run build` | Compiles + type-checks the whole project |
+| 🧪 **Test** | `bun run test:ci` | Runs the Jest unit suite |
+| 💨 **Smoke** | `bun run smoke` | Boots the 27-agent DI graph — no network, no secrets |
+
+The smoke job catches broken wiring (missing providers, circular deps) without
+ever calling the Anthropic API, so it stays fast and needs no credentials.
 
 **Project layout**
 
 ```text
 src/pipeline/
 ├── pipeline.service.ts     # orchestrates the whole setup
-├── agents/                 # one file per agent (26 total)
+├── agents/                 # one file per agent (27 total)
 ├── config/                 # models, tools, and MCP server config
 ├── vault/ · environment/   # vault + environment provisioning
 └── output/                 # generated agents.config.json
