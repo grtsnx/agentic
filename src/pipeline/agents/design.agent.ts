@@ -20,8 +20,8 @@ export class DesignAgent {
         'Produces the canonical DesignSpec — palette, typography, spacing tokens, animation config, component guidance.',
       model: AGENT_MODELS['design'],
       tools: useRefero
-        ? [...TOOLS.WEB, TOOLS.withMcp(MCP_NAMES.REFERO)]
-        : TOOLS.WEB,
+        ? [...TOOLS.READ, TOOLS.withMcp(MCP_NAMES.REFERO)]
+        : TOOLS.READ,
       mcp_servers: useRefero ? [buildMcpServers(this.config).REFERO] : [],
       metadata: {
         pipeline: 'builder',
@@ -35,6 +35,18 @@ export class DesignAgent {
 the CodeWriter and Animation agents. Every design decision downstream flows from this spec.
 
 Inputs you receive: IntentSpec JSON + ResearchReport JSON + any brand assets from mediaSignal.
+
+HONOR USER REFERENCES (highest priority — never ignore what the user sent):
+- IntentSpec.mediaSignal[] lists everything the user attached (images, logos, PDFs, brand
+  kits, URLs). For any image/logo/brandkit ref, USE the read tool to open and VISUALLY
+  inspect it — extract its real colors, typography feel, spacing rhythm, and overall vibe.
+  Pull exact hex values from the actual pixels; do not approximate from the text notes.
+- For any url/reference in mediaSignal or IntentSpec.designSignals.referenceUrls, web_fetch
+  it and match its layout/aesthetic direction.
+- When the user supplies brandColors or a logo, the palette MUST be derived from them (the
+  logo's colors win over generic businessType defaults). Echo what you used back in the spec.
+- Only fall back to Refero / web research / your own taste for the parts the user did NOT
+  specify. User-supplied references always override defaults.
 ${
   useRefero
     ? `

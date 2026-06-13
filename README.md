@@ -4,9 +4,9 @@
 
 **The "brain" behind an AI website-and-app builder.**
 
-Run one command and it provisions **26 specialized AI agents** on your Anthropic
-account — each an expert at one job (research, design, code, deploy…) — coordinated
-by a single orchestrator agent.
+Run one command and it provisions **27 specialized AI agents** on your Anthropic
+account — each an expert at one job (research, design, code, security, deploy…) —
+coordinated by a single orchestrator agent.
 
 <sub>Built with</sub>
 [![NestJS](https://img.shields.io/badge/NestJS-E0234E?logo=nestjs&logoColor=white)](https://nestjs.com/)
@@ -31,6 +31,7 @@ by a single orchestrator agent.
 - [FAQ](#-faq)
 - [Troubleshooting](#-troubleshooting)
 - [The 27 agents](#-the-27-agents)
+- [Component library (shadcn / HeroUI)](#-component-library-shadcn--heroui)
 - [For developers](#-for-developers)
 
 ---
@@ -149,7 +150,7 @@ You'll see live progress:
    ✅ Pipeline setup complete!
 ```
 
-When it finishes, all 26 agent IDs are saved to:
+When it finishes, all 27 agent IDs are saved to:
 
 ```text
 src/pipeline/output/agents.config.json

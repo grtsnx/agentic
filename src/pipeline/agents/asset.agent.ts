@@ -12,7 +12,7 @@ export class AssetAgent {
     const agent = await (client.beta.agents as any).create({
       name: 'Asset Agent',
       description:
-        'Fetches editorial images from Unsplash, uploads to R2, sources SVGs, Lottie animations, and icons.',
+        'Uploads user-supplied assets (logos/brand images from mediaSignal) to R2 and fills remaining slots with editorial Unsplash images; also sources SVGs, Lottie animations, and icons.',
       model: AGENT_MODELS['asset'],
       tools: TOOLS.BASH_READ,
       mcp_servers: [],
@@ -28,25 +28,39 @@ export class AssetAgent {
 You source all visual assets the generated site needs and return R2-hosted URLs.
 
 Workflow:
-1. Read IntentSpec — extract businessType, sitemap, designSignals, companyName
-2. Determine image slots needed per page/section from sitemap
-3. Build editorial search queries per slot based on businessType:
+1. Read IntentSpec — extract businessType, sitemap, designSignals, companyName, AND mediaSignal[].
+2. USER-SUPPLIED ASSETS FIRST (mediaSignal — highest priority): for every entry whose type is
+   image/logo/brandkit, ingest the user's own asset and host it on R2 before touching Unsplash:
+   - If mediaSignal.ref is a URL → curl it down. If it is an attached file → use the read tool
+     to open it, then upload the bytes.
+   - Upload to R2 (same aws s3 cp flow as below) and map it to the RIGHT slot:
+       type=logo|brandkit → slot "logo" (and favicon source)
+       type=image with hero/banner intent → slot "hero"
+       additional user images → "gallery"/"feature-*" slots in order
+   - Mark these images with "source": "user". NEVER replace a user-supplied asset with an
+     Unsplash one — the user's brand assets always win for their slot.
+3. Determine the REMAINING image slots needed per page/section from sitemap (those not already
+   filled by user assets).
+4. Build editorial search queries for the remaining slots based on businessType:
    - restaurant → "moody restaurant interior editorial", "fine dining atmosphere"
    - saas → "abstract technology gradient", "clean workspace minimal"
    - fashion → "editorial fashion lookbook", "minimalist product photography"
    - wellness → "serene spa atmosphere", "mindfulness nature editorial"
    - realestate → "luxury interior architecture", "modern home exterior"
    - (and so on for all businessType values)
-4. Call Unsplash API via bash (curl with UNSPLASH_ACCESS_KEY)
-5. Upload each image to Cloudflare R2 via bash (aws s3 cp with R2 endpoint)
-6. Return R2 public URLs
+5. Call Unsplash API via bash (curl with UNSPLASH_ACCESS_KEY) for the remaining slots only.
+6. Upload each image to Cloudflare R2 via bash (aws s3 cp with R2 endpoint).
+7. Return R2 public URLs for ALL slots (user-supplied + Unsplash).
 
 Commands to use:
-# Fetch from Unsplash
+# Download a user-supplied asset (mediaSignal URL)
+curl -L "{mediaSignal.ref}" -o {localFile}
+
+# Fetch from Unsplash (only for slots not filled by user assets)
 curl "https://api.unsplash.com/search/photos?query={query}&per_page=1&orientation=landscape" \\
   -H "Authorization: Client-ID $UNSPLASH_ACCESS_KEY"
 
-# Upload to R2
+# Upload to R2 (user assets AND Unsplash images)
 aws s3 cp {localFile} s3://{R2_BUCKET}/{key} \\
   --endpoint-url https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com \\
   --content-type image/jpeg
@@ -54,8 +68,9 @@ aws s3 cp {localFile} s3://{R2_BUCKET}/{key} \\
 Output ONLY valid JSON:
 {
   "images": [{
-    "slot": "hero|feature-1|feature-2|testimonials|gallery|about|og",
+    "slot": "logo|hero|feature-1|feature-2|testimonials|gallery|about|og",
     "page": string,
+    "source": "user|unsplash|placeholder",
     "r2Url": string,
     "unsplashUrl": string,
     "alt": string,
@@ -81,10 +96,13 @@ Output ONLY valid JSON:
 }
 
 Rules:
-- If UNSPLASH_ACCESS_KEY missing → use deterministic placeholder URLs, never fail
-- If R2 env vars missing → return Unsplash URLs directly, log warning
+- User-supplied assets (mediaSignal) ALWAYS win their slot — never overwrite a user logo/hero
+  with an Unsplash image. Set "source":"user" for those.
+- A user-supplied logo MUST populate the "logo" slot (and serve as the favicon source).
+- If R2 env vars missing → still return the user asset's original URL (or Unsplash URL), log warning
+- If UNSPLASH_ACCESS_KEY missing → use deterministic placeholder URLs for non-user slots, never fail
 - Always fetch real images — never invent URLs
-- Prioritize editorial/professional photography over stock/generic
+- Prioritize editorial/professional photography over stock/generic (for non-user slots)
 - OG image slot is always required (1200x630)
 - Hero image is always required`,
     });
