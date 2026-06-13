@@ -19,10 +19,7 @@ async function bootstrap() {
   const title = aiName ? `${aiName} — AI Builder` : 'AI Builder';
   const config = new DocumentBuilder()
     .setTitle(title)
-    .setDescription(
-      'Runtime API for the 27-agent website/app builder pipeline. ' +
-        'Start builds, stream orchestrator events (SSE), and approve deploys.',
-    )
+    .setDescription('AI Builder')
     .setVersion('1.0')
     .addTag('builds', 'Run and observe builds')
     .build();

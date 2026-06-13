@@ -226,6 +226,9 @@ then reused on every later run. Only fill them in manually if you already have I
 | `R2_*` keys | File / image storage | [Cloudflare → R2 → API Tokens](https://dash.cloudflare.com/?to=/:account/r2/api-tokens) |
 | `RESEND_API_KEY` | Sending emails | [Resend → API Keys](https://resend.com/api-keys) |
 | `EMAIL_DOMAIN` | Your verified send domain — emails go out as `{name}@EMAIL_DOMAIN` | [Resend → Domains](https://resend.com/domains) |
+| `AI_NAME` | *Optional* — your builder's brand name, shown in the API docs title as `{AI_NAME} — AI Builder` (defaults to `AI Builder` when blank) | — |
+| `PORT` | *Optional* — port the runtime API listens on (defaults to `3000`) | — |
+| `CORS_ORIGIN` | *Optional* — comma-separated allowed origin(s) for your frontend (defaults to `*` for local dev) | — |
 | `STRIPE_SECRET_KEY` | Payments (Stripe) | [Stripe → API keys](https://dashboard.stripe.com/apikeys) |
 | `LEMONSQUEEZY_API_KEY` | Payments (Lemon Squeezy) | [Lemon Squeezy → API](https://app.lemonsqueezy.com/settings/api) |
 | `PADDLE_API_KEY` | Payments (Paddle) | [Paddle → Authentication](https://vendors.paddle.com/authentication-v2) |
@@ -498,6 +501,13 @@ If an MCP's key is missing, that power is simply not attached and the agent work
 The **Higgsfield** MCP is attached to the Video agent only when `HIGGSFIELD_API_KEY` is set — it
 prefers the MCP tools and falls back to Higgsfield's REST API if a tool call fails.
 
+**Video source selection (Higgsfield vs Pexels).** The Video agent chooses its source by business
+type: real-world/physical-venue sites (restaurant, real-estate, hospitality, travel, fitness,
+wellness, events, automotive, construction, agriculture) **prefer authentic Pexels stock footage**
+(when `PEXELS_API_KEY` is set) even if Higgsfield is available; abstract/digital sites (saas, tech,
+gaming, crypto, fintech) keep **Higgsfield AI** generation. With only one key set it uses that one,
+and the agent is skipped only when **both** `HIGGSFIELD_API_KEY` and `PEXELS_API_KEY` are missing.
+
 > **Why not a shadcn/HeroUI MCP?** Those are **local** plug-ins meant for code editors (they run on
 > your own machine via `npx shadcn@latest mcp`). The deployed cloud agents can only use **remote**
 > MCPs, so component-library knowledge is delivered a different way — see the next section.
@@ -648,8 +658,21 @@ Orchestrator into an HTTP + streaming service your own frontend (in a separate r
 Start it:
 
 ```bash
-bun run start        # or: bun run start:dev  (watch mode)
+bun run start:dev    # development — auto-restarts on file changes (recommended)
+bun run start        # one-shot run, no watching
 ```
+
+On startup it prints the live URLs straight to the terminal:
+
+```
+[Bootstrap] 🚀 Runtime API ready at http://localhost:3000
+[Bootstrap] 📘 Swagger UI       → http://localhost:3000/docs
+[Bootstrap] 🔮 Scalar reference → http://localhost:3000/reference
+[Bootstrap] 🧩 OpenAPI JSON     → http://localhost:3000/docs-json
+```
+
+> The docs **title** comes from `AI_NAME` (e.g. `AI_NAME=Jax` → "Jax — AI Builder"). `.env` is not
+> watched, so after changing it, restart the server (or save a `.ts` file to trigger a reload).
 
 It reads `src/pipeline/output/agents.config.json`, opens an Anthropic **session** on the
 Orchestrator, mounts your vault / environment / memory store, and exposes four endpoints:
