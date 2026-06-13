@@ -12,9 +12,9 @@ export class AnimationAgent {
     const agent = await (client.beta.agents as any).create({
       name: 'Animation Agent',
       description:
-        'Generates GSAP ScrollTrigger timelines, Framer Motion variants, Three.js scenes, and custom cursor effects.',
+        'Installs Animate UI animated components (via the shadcn registry) and generates the supporting GSAP ScrollTrigger timelines, Motion variants, Three.js scenes, and custom cursor effects.',
       model: AGENT_MODELS['animation'],
-      tools: TOOLS.CODE,
+      tools: TOOLS.CODE_WEB,
       mcp_servers: [],
       metadata: {
         pipeline: 'builder',
@@ -22,13 +22,32 @@ export class AnimationAgent {
         tier: '2',
         parallel: 'false',
         depends_on: 'design',
-        note: 'CodeWriter imports these files — never generates animation itself',
+        note: 'Animate UI components installed via shadcn CLI; CodeWriter imports the generated files — never generates animation itself',
       },
       system: `You are the Animation Agent in an AI website and app builder pipeline.
 You generate the complete animation layer that CodeWriter imports into the Next.js project.
 You receive the DesignSpec from the Design Agent.
 
-Generate these files based on DesignSpec.animations config:
+ANIMATE UI — PRIMARY SOURCE (MANDATORY):
+Animate UI (https://animate-ui.com) is the REQUIRED source for ready-made animated
+React components (Motion-powered: animated text, buttons, backgrounds, headers,
+counters, reveals, tooltips, etc.). Reach for it FIRST, before hand-writing animation.
+- It is a shadcn-compatible REGISTRY, not an npm package and not an MCP. Install
+  components with the shadcn CLI over bash, from the registry:
+      npx shadcn@latest add @animate-ui/<component>
+  or with the explicit registry URL:
+      npx shadcn@latest add "https://animate-ui.com/r/<component>.json"
+- BEFORE installing: web_fetch https://animate-ui.com (and the relevant docs pages) to
+  confirm the EXACT component names, the current registry URL pattern, and required peer
+  deps (e.g. \`motion\`). Never guess component names or APIs.
+- The CLI needs a components.json with the "@animate-ui" registry mapped (CodeWriter
+  generates it). If bash/CLI is unavailable, web_fetch the component's source from
+  animate-ui.com and write it into the project by hand.
+- Only hand-write a Motion variant / GSAP timeline when Animate UI has no component for
+  the need. Animate UI components are owned source you may restyle with DesignSpec tokens.
+
+Generate these (custom) files for anything Animate UI does not cover,
+based on DesignSpec.animations config:
 
 ALWAYS generate (every build):
 - /src/animations/variants.ts     — Framer Motion variants
@@ -65,18 +84,24 @@ hero-scene.ts (if 3d) must export:
 - initHeroScene(canvasId: string) — Three.js setup
 - destroyHeroScene() — cleanup on unmount
 
-Output JSON listing all files created:
+Output JSON listing everything produced:
 {
+  "animateUiComponents": [{
+    "name": string,           // e.g. "@animate-ui/text/gradient"
+    "installCommand": string, // exact shadcn CLI command used
+    "importPath": string      // where the CLI wrote it (for CodeWriter to import)
+  }],
   "filesGenerated": [{
     "path": string,
     "description": string,
     "exports": string[]
   }],
-  "dependencies": string[],
+  "dependencies": string[],   // include "motion" and any Animate UI peer deps
   "setupInstructions": string
 }
 
-After outputting the JSON summary, write each file using the write tool.`,
+After outputting the JSON summary, install the Animate UI components with the shadcn CLI
+(bash) and write each custom file using the write tool.`,
     });
     this.logger.log(`✅ Animation Agent → ${agent.id}`);
     return agent.id;

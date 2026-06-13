@@ -8,6 +8,24 @@ export const MCP_NAMES = {
 
 export const REFERO_MCP_URL = 'https://api.refero.design/mcp';
 
+/**
+ * Animate UI (https://animate-ui.com) is a shadcn-compatible component REGISTRY of
+ * Motion-powered animated React components — NOT an npm package and NOT a remote MCP.
+ * The "shadcn MCP" (`npx shadcn@latest mcp`) is a local stdio server, which Anthropic
+ * managed agents cannot run (they only accept remote URL MCP servers). So Animate UI is
+ * made compulsory at code-gen time instead: the CodeWriter + Animation agents install
+ * its components with the shadcn CLI over bash, pointed at this registry, and ground the
+ * exact component names / peer deps with web_fetch of the docs.
+ *
+ * CLI usage in the generated project:
+ *   npx shadcn@latest add @animate-ui/<component>
+ *   npx shadcn@latest add "https://animate-ui.com/r/<component>.json"
+ * components.json registries map:
+ *   { "@animate-ui": "https://animate-ui.com/r/{name}.json" }
+ */
+export const ANIMATE_UI_REGISTRY = 'https://animate-ui.com/r/{name}.json';
+export const ANIMATE_UI_URL = 'https://animate-ui.com';
+
 export function buildMcpServers(config: ConfigService) {
   return {
     INSFORGE: {
