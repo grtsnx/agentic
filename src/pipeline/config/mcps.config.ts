@@ -26,6 +26,16 @@ export const REFERO_MCP_URL = 'https://api.refero.design/mcp';
 export const ANIMATE_UI_REGISTRY = 'https://animate-ui.com/r/{name}.json';
 export const ANIMATE_UI_URL = 'https://animate-ui.com';
 
+/**
+ * React Bits (https://reactbits.dev) — another shadcn-compatible registry of animated/
+ * creative React components. Same constraints as Animate UI (registry + CLI, not an MCP).
+ * components.json registries map:
+ *   { "@react-bits": "https://reactbits.dev/r/{name}.json" }
+ * CLI usage: npx shadcn@latest add @react-bits/<component>
+ */
+export const REACT_BITS_REGISTRY = 'https://reactbits.dev/r/{name}.json';
+export const REACT_BITS_URL = 'https://reactbits.dev';
+
 export function buildMcpServers(config: ConfigService) {
   return {
     INSFORGE: {

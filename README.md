@@ -291,17 +291,19 @@ and written by the CodeWriter:
   custom/animated designs.
 - **HeroUI** — app-like UIs: dashboards, admin panels, SaaS app shells, data-dense tools.
 
-For motion, **[Animate UI](https://animate-ui.com)** is used on **every** build (alongside
-whichever library above is picked). The Animation + CodeWriter agents install its animated
-components through the **shadcn CLI registry** (`npx shadcn@latest add @animate-ui/<component>`)
-rather than hand-rolling animation code.
+For motion, two animated-component registries are used on **every** build (alongside
+whichever library above is picked): **[Animate UI](https://animate-ui.com)** (primary) and
+**[React Bits](https://reactbits.dev)**. The Animation + CodeWriter agents install their
+components through the **shadcn CLI registry**
+(`npx shadcn@latest add @animate-ui/<component>` / `@react-bits/<component>`) rather than
+hand-rolling animation code.
 
 To write correct, current code the CodeWriter is given **live web access** (it reads the
-official shadcn/HeroUI/Animate UI docs while generating) and uses the **shadcn CLI**
+official shadcn/HeroUI/Animate UI/React Bits docs while generating) and uses the **shadcn CLI**
 (`npx shadcn add`) to install real components instead of guessing. It does **not** use the
-editor's local shadcn/HeroUI/Animate UI MCP servers or Cursor skills — those are IDE tools
-(the `npx shadcn@latest mcp` config is a **local stdio** server) and can't run inside the
-deployed Anthropic agents, which only support remote URL MCPs and the built-in toolset.
+editor's local shadcn/HeroUI/Animate UI/React Bits MCP servers or Cursor skills — those are
+IDE tools (the `npx shadcn@latest mcp` config is a **local stdio** server) and can't run
+inside the deployed Anthropic agents, which only support remote URL MCPs and the built-in toolset.
 
 ---
 
