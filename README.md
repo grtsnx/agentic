@@ -23,6 +23,7 @@ coordinated by a single orchestrator agent.
 
 ## 📑 Contents
 
+**Getting started**
 - [What it does](#-what-it-does)
 - [Quick start](#-quick-start)
 - [Step-by-step guide](#-step-by-step-guide)
@@ -30,8 +31,23 @@ coordinated by a single orchestrator agent.
 - [Re-running & cleanup](#-re-running--cleanup)
 - [FAQ](#-faq)
 - [Troubleshooting](#-troubleshooting)
-- [The 27 agents](#-the-27-agents)
-- [Component library (shadcn / HeroUI)](#-component-library-shadcn--heroui)
+
+**How it works (technical deep-dive)**
+- [The big picture](#-the-big-picture)
+- [How a website gets built — the 10 phases](#-how-a-website-gets-built--the-10-phases)
+- [Parallelism: what runs at the same time](#-parallelism-what-runs-at-the-same-time)
+- [The 27 agents (full reference)](#-the-27-agents-full-reference)
+- [Brains: the 3 AI models](#-brains-the-3-ai-models)
+- [Hands: the tools each agent can use](#-hands-the-tools-each-agent-can-use)
+- [MCP servers (external superpowers)](#-mcp-servers-external-superpowers)
+- [Component libraries & skills](#-component-libraries--skills)
+- [Memory & persona](#-memory--persona)
+- [Vault & environment](#-vault--environment)
+- [Security gate & auto-fix loop](#-security-gate--auto-fix-loop)
+- [How your images & links are respected](#-how-your-images--links-are-respected)
+- [Token budget](#-token-budget)
+
+**Reference**
 - [For developers](#-for-developers)
 
 ---
@@ -64,11 +80,11 @@ flowchart LR
 
 ## ⚡ Quick start
 
-> Already have Bun and your three Anthropic values? Do this:
+> Already have Bun and your Anthropic API key? Do this:
 
 ```bash
 bun install
-cp .env.example .env        # then fill in the 3 required values
+cp .env.example .env        # then fill in ANTHROPIC_API_KEY (vault + env auto-create)
 bun run setup:pipeline
 ```
 
@@ -97,15 +113,19 @@ Close and reopen your terminal, then confirm it works:
 bun --version   # a version number like 1.3.14 means you're good
 ```
 
-### 2. Get your 3 Anthropic values
+### 2. Get your Anthropic API key
 
-Everything you need comes from the **[Anthropic Console](https://console.anthropic.com)**.
+You only need **one** value to start — your API key, from the
+**[Anthropic Console](https://console.anthropic.com)**.
 
 | Value | Where to get it |
 | :-- | :-- |
 | `ANTHROPIC_API_KEY` | **API Keys** → *Create Key* (starts with `sk-ant-…`) |
-| `ANTHROPIC_ENVIRONMENT_ID` | **Managed Agents → Environments** → create one → copy its ID (`env_…`) |
-| `ANTHROPIC_VAULT_ID` | **Managed Agents → Vaults** → create one → copy its ID (`vlt_…`) |
+
+> [!TIP]
+> The **vault** and **environment** are created for you automatically on the first run and
+> written back into your `.env` — you don't need to create them in the console. (If you already
+> have IDs, paste them in and they'll be reused instead.)
 
 > [!WARNING]
 > Treat your API key like a password. Never share it or commit it publicly.
@@ -118,18 +138,17 @@ bun install           # install dependencies
 cp .env.example .env  # create your settings file
 ```
 
-### 4. Add your values to `.env`
+### 4. Add your key to `.env`
 
-Open `.env` in any text editor and fill in the three **required** values:
+Open `.env` in any text editor and fill in the **one required** value:
 
 ```ini
 ANTHROPIC_API_KEY=sk-ant-your-key-here
-ANTHROPIC_ENVIRONMENT_ID=env_your-environment-id
-ANTHROPIC_VAULT_ID=vlt_your-vault-id
 ```
 
-Everything else is **optional** — see [Environment variables](#-environment-variables).
-Save the file.
+Leave `ANTHROPIC_VAULT_ID` and `ANTHROPIC_ENVIRONMENT_ID` **blank** — the setup creates them on
+the first run and fills them in for you. Everything else is **optional** — see
+[Environment variables](#-environment-variables). Save the file.
 
 ### 5. Run it 🚀
 
@@ -141,7 +160,10 @@ You'll see live progress:
 
 ```text
 📦 Step 1/4: Vault
+   Vault created → vlt_01...
 🌍 Step 2/4: Environment
+   Environment created → env_01...
+   📝 Saved ANTHROPIC_VAULT_ID + ANTHROPIC_ENVIRONMENT_ID to /your/project/.env
 🤖 Step 3/4: Agents
    ✅ Intent Agent  → agent_01EU...
    ✅ Design Agent  → agent_01Wv...
@@ -149,6 +171,9 @@ You'll see live progress:
 💾 Step 4/4: Saving agents.config.json
    ✅ Pipeline setup complete!
 ```
+
+On the **first** run the vault and environment are created and their IDs written into your `.env`;
+every later run sees those IDs and **reuses** them (no duplicates).
 
 When it finishes, all 27 agent IDs are saved to:
 
@@ -162,17 +187,25 @@ src/pipeline/output/agents.config.json
 
 ## 🔑 Environment variables
 
-There are **3 required** values (all from the Anthropic Console). Everything else is
-optional: leave an optional key blank and the project simply skips that feature with a
-friendly `Skipping…` note instead of failing.
+There is only **1 required** value — your API key. Everything else is optional: leave an
+optional key blank and the project simply skips that feature with a friendly `Skipping…` note
+instead of failing.
 
 ### Required
 
 | Key | What it's for | Where to get it |
 | :-- | :-- | :-- |
 | `ANTHROPIC_API_KEY` | Talking to Anthropic's AI | [Console → API Keys](https://console.anthropic.com/settings/keys) |
-| `ANTHROPIC_ENVIRONMENT_ID` | The workspace agents run in | [Console](https://console.anthropic.com) → Managed Agents → Environments |
-| `ANTHROPIC_VAULT_ID` | The secure vault for your keys | [Console](https://console.anthropic.com) → Managed Agents → Vaults |
+
+### Auto-created (leave blank)
+
+These are **created for you** on the first `bun run setup:pipeline` and written back into `.env`,
+then reused on every later run. Only fill them in manually if you already have IDs you want to reuse.
+
+| Key | What it's for | Source |
+| :-- | :-- | :-- |
+| `ANTHROPIC_VAULT_ID` | The secure vault for your keys | Auto-created (or paste an existing `vlt_…`) |
+| `ANTHROPIC_ENVIRONMENT_ID` | The workspace agents run in | Auto-created (or paste an existing `env_…`) |
 
 ### Optional (turn features on)
 
@@ -278,54 +311,298 @@ a domain you've verified with Resend.
 
 ---
 
-## 🧩 The 27 agents
+## 🗺 The big picture
 
-<details>
-<summary><strong>See all agents, grouped by pipeline stage</strong></summary>
+Think of this as a **digital software company staffed entirely by AI**.
 
-| Stage | Agents |
-| :-- | :-- |
-| 🧠 Understand the request | Intent · Conversation · Audit |
-| 🎨 Look & content | Research · Design · Asset · Video · Animation |
-| 🗄️ Data & features | Schema · CMS · Email · Payments · i18n |
-| 🏗️ Build the app | CodeWriter |
-| ✅ Quality & security checks | QAS · Security · Accessibility · Performance |
-| 🚀 Run, fix & ship | RunDev · AutoFix · Testing · Preview · Deploy · Version |
-| 🔌 Extras | CustomMCP · KnowledgeBase |
-| 🎯 The conductor | Orchestrator (coordinates everything above) |
+- There are **27 agents**. 26 of them are *workers*, each an expert at exactly one job.
+- The 27th is the **Orchestrator** — the *project manager*. It doesn't write code itself;
+  it decides **who works when**, **who can work at the same time**, and **what to skip**.
+- Every worker speaks the same language: it reads some **JSON** (structured notes) from the
+  workers before it, does its one job, and hands **JSON** to the workers after it.
 
-</details>
+Technically, the Orchestrator is created as a **multi-agent “coordinator”** that holds the IDs
+of all 26 workers. When you ask for a website, the coordinator runs them in a fixed recipe of
+**10 phases** (below). Some phases are a single worker; others fire several workers **at the
+same time** to save time.
+
+> One-liner: *Idea in → 27 specialists collaborate in phases → live website out.*
 
 ---
 
-## 🎨 Component library (shadcn / HeroUI)
+## 🏭 How a website gets built — the 10 phases
 
-The generated site uses a real component library, chosen **per project** by the Design Agent
-and written by the CodeWriter:
+This is the recipe the Orchestrator follows for every build. “Sequential” means one-at-a-time;
+“parallel” means several agents work simultaneously.
 
-- **shadcn/ui** (default) — marketing sites, landing pages, content-heavy and highly
-  custom/animated designs.
-- **HeroUI** — app-like UIs: dashboards, admin panels, SaaS app shells, data-dense tools.
+| Phase | Name | What happens | Mode |
+| :--: | :-- | :-- | :-- |
+| 1 | **Intake** | `intent` understands your request → `conversation` asks **one** question *only if* it's unclear → `audit` security-scans the prompt | Sequential |
+| 2 | **Research & design** | `research`, `design`, `asset`, `video` all start together | **Parallel** |
+| 3 | **Animation** | `animation` builds motion files (needs the design first) | Sequential |
+| 4 | **Backend** | `schema`, `cms`, `email`, `payments`, `i18n` start together (each skipped if not needed) | **Parallel** |
+| 5 | **Generation** | `codewriter` writes the entire Next.js app, using everything above | Sequential |
+| 6 | **Quality gates** | `qas`, `security`, `accessibility`, `performance` all check the code together | **Parallel** |
+| 7 | **Build** | `audit` runs again on the real code → `rundev` installs deps + builds it | Sequential |
+| 8 | **Testing** | `testing` runs end-to-end + unit tests | Sequential |
+| 9 | **Preview** | `preview` deploys a temporary site, then **pauses for your approval** | Sequential |
+| 10 | **Publish** | *(only when you click publish)* `deploy` goes live → `version` saves a snapshot | Sequential |
 
-For motion, two animated-component registries are used on **every** build (alongside
-whichever library above is picked): **[Animate UI](https://animate-ui.com)** (primary) and
-**[React Bits](https://reactbits.dev)**. The Animation + CodeWriter agents install their
-components through the **shadcn CLI registry**
-(`npx shadcn@latest add @animate-ui/<component>` / `@react-bits/<component>`) rather than
-hand-rolling animation code.
+**Two background agents** (`custommcp`, `knowledgebase`) run **outside** this flow whenever you
+register a tool or upload a document — they never block the build.
 
-For one-off decorative flourishes (fancy loaders, glass cards, novelty CTAs), the CodeWriter
-can also pull from **[Uiverse](https://uiverse.io)** — but Uiverse is **copy-paste only**
-(no CLI, no registry, no MCP), so the agent fetches the element, converts it to TSX, and
-**re-tokenizes** it to the project's `DesignSpec` (palette + spacing). It's a supplementary
-visual source — form controls still come from shadcn/HeroUI.
+**Self-healing loops** are built in:
+- If **build fails** → `autofix` (build mode) patches the code → back to `rundev`. Up to **3 tries**.
+- If **security/quality finds something critical** → `autofix` (fix mode) patches it → re-scan.
+  Up to **3 tries**. If a critical issue still can't be fixed, **publishing is blocked** and you're told why.
 
-To write correct, current code the CodeWriter is given **live web access** (it reads the
-official shadcn/HeroUI/Animate UI/React Bits docs while generating) and uses the **shadcn CLI**
-(`npx shadcn add`) to install real components instead of guessing. It does **not** use the
-editor's local shadcn/HeroUI/Animate UI/React Bits MCP servers or Cursor skills — those are
-IDE tools (the `npx shadcn@latest mcp` config is a **local stdio** server) and can't run
-inside the deployed Anthropic agents, which only support remote URL MCPs and the built-in toolset.
+---
+
+## ⚡ Parallelism: what runs at the same time
+
+Running independent agents together is what makes the pipeline fast. Here are the **3 parallel
+groups** (everything else is one-at-a-time):
+
+```text
+GROUP A — after the prompt is understood (Phase 2):
+   research  ┐
+   design    ├─ all run together
+   asset     │
+   video     ┘
+
+GROUP B — after the design is ready (Phase 4):
+   schema    ┐
+   cms       ├─ all run together (each skipped if your site doesn't need it)
+   email     │
+   payments  │
+   i18n      ┘
+
+GROUP C — after the code is written (Phase 6):
+   qas           ┐
+   security      ├─ all run together
+   accessibility │
+   performance   ┘
+```
+
+Each agent carries a `parallel: true/false` flag in its metadata, and the Orchestrator uses it to
+decide grouping. The “conductor” waits for **all** agents in a group to finish before moving on.
+
+---
+
+## 🧩 The 27 agents (full reference)
+
+Every agent, what it does in plain English, the AI model it uses, the tools it's allowed to use,
+whether it runs in a parallel group, and the condition that decides if it runs at all.
+
+| # | Agent | Plain-English job | Model | Tools | Parallel? | Runs only if… |
+| :--: | :-- | :-- | :-- | :-- | :--: | :-- |
+| 1 | **Intent** | Understands your prompt + attachments, writes the master spec | 🔴 Opus | read + web | — | always (entry point) |
+| 2 | **Conversation** | Asks **one** clarifying question | 🟢 Haiku | none (pure thinking) | — | the request is unclear (`confidence < 0.7`) |
+| 3 | **Audit** | Security-scans the prompt, then later the generated code | 🟢 Haiku | shell + read | — | always (runs **twice**) |
+| 4 | **Research** | Studies the industry, competitors, content ideas | 🟡 Sonnet | read + web (+Refero) | ✅ A | always |
+| 5 | **Design** | Picks colors, fonts, spacing, component library → `DesignSpec` | 🟡 Sonnet | read + web (+Refero) | ✅ A | always |
+| 6 | **Asset** | Hosts your images + finds stock photos, uploads to storage | 🟡 Sonnet | shell + read | ✅ A | always |
+| 7 | **Video** | Generates AI background videos | 🟡 Sonnet | code | ✅ A | `HIGGSFIELD_API_KEY` is set |
+| 8 | **Animation** | Builds the motion layer (GSAP / Motion / Three.js) | 🟡 Sonnet | code + web | — | always (waits for Design) |
+| 9 | **Schema** | Designs the database + security rules | 🟡 Sonnet | code + InsForge | ✅ B | site needs a database or login |
+| 10 | **CMS** | Sets up editable content collections | 🟡 Sonnet | code + InsForge | ✅ B | site needs a CMS |
+| 11 | **Email** | Builds transactional emails + contact-form handling | 🟡 Sonnet | code | ✅ B | needs email **or** has a contact form |
+| 12 | **Payments** | Wires Stripe / Paystack / Paddle / etc. | 🟡 Sonnet | code | ✅ B | site takes payments |
+| 13 | **i18n** | Adds multi-language translation files | 🟢 Haiku | code | ✅ B | site needs translations |
+| 14 | **CodeWriter** | Writes the **entire** Next.js app — the main event | 🔴 Opus | code + web | — | always (waits for everyone above) |
+| 15 | **QAS** | Quality + light security scan of the code | 🟢 Haiku | shell + read | ✅ C | always |
+| 16 | **Security** | Deep scan: dependency CVEs + code vulnerabilities (SAST) | 🟡 Sonnet | shell + read | ✅ C | always |
+| 17 | **Accessibility** | Checks WCAG 2.1 AA (screen-reader friendliness) | 🟢 Haiku | shell + read | ✅ C | always |
+| 18 | **Performance** | Checks Core Web Vitals + Lighthouse speed | 🟢 Haiku | shell + read | ✅ C | always |
+| 19 | **RunDev** | Installs dependencies + builds the app in a sandbox | 🟡 Sonnet | code | — | always |
+| 20 | **AutoFix** | Fixes build errors **and** security findings | 🟡 Sonnet | code | — | a build fails or a critical issue is found |
+| 21 | **Testing** | Runs end-to-end (Playwright) + unit (Vitest) tests | 🟡 Sonnet | code | — | always (after a clean build) |
+| 22 | **Preview** | Deploys a temporary site for you to review | 🟡 Sonnet | shell + Coolify | — | always |
+| 23 | **Deploy** | Publishes the production site | 🟡 Sonnet | shell + Coolify | — | **you** click publish |
+| 24 | **Version** | Saves a git snapshot + version record | 🟢 Haiku | shell | — | after a publish |
+| 25 | **CustomMCP** | Lets you register your own tools/skills | 🟡 Sonnet | code | bg | you register an MCP |
+| 26 | **KnowledgeBase** | Ingests your documents for retrieval (RAG) | 🟡 Sonnet | code + InsForge | bg | you upload a document |
+| 0 | **Orchestrator** | The conductor — coordinates all 26 above | 🔴 Opus | coordinator | — | always |
+
+*A / B / C* = the parallel group from the section above. *bg* = background (never blocks the build).
+
+---
+
+## 🧠 Brains: the 3 AI models
+
+Each agent is matched to the **cheapest model that can do its job well** — fast/cheap for simple
+checks, powerful/expensive only where it really matters. This keeps builds fast and affordable.
+
+| Badge | Model | Speed & cost | Used for | Agents |
+| :--: | :-- | :-- | :-- | :-- |
+| 🟢 | **Haiku** (`claude-haiku-4-5`) | Fastest, cheapest | Quick checks & simple writing | Conversation, Audit, i18n, QAS, Accessibility, Performance, Version |
+| 🟡 | **Sonnet** (`claude-sonnet-4-6`) | Balanced | Most real work | Research, Design, Animation, Asset, Video, Schema, CMS, Email, Payments, RunDev, AutoFix, Testing, Preview, Deploy, Security, CustomMCP, KnowledgeBase |
+| 🔴 | **Opus** (`claude-opus-4-8`) | Most powerful | The hardest thinking | Intent, CodeWriter, Orchestrator |
+
+> Defined in `src/pipeline/config/models.config.ts`. Change one line to re-assign an agent's brain.
+
+---
+
+## 🖐 Hands: the tools each agent can use
+
+An agent can only touch what its **toolset** allows — a safety feature so, say, the Performance
+checker can read files but never *write* them. Toolsets live in `src/pipeline/config/tools.config.ts`.
+
+| Toolset | What the agent can do | Plain English |
+| :-- | :-- | :-- |
+| `NONE` | nothing | Pure reasoning only (e.g. Conversation just thinks of a question) |
+| `READ` | read · web_search · web_fetch | **Look & browse** — open files/images (vision) + read the live web |
+| `BASH` | bash | **Run commands** in a terminal |
+| `BASH_READ` | bash · read · glob · grep | **Inspect** — run commands + read/search files, but **not** edit them |
+| `CODE` | bash · read · write · edit · glob · grep | **Full developer** — read, write, edit files + run commands |
+| `CODE_WEB` | CODE + web_search · web_fetch | **Developer + live docs** — everything in CODE plus reading current documentation |
+| `withMcp(x)` | adds an MCP server | **Plug in a superpower** (database, hosting, design search) — see below |
+
+This is why, for example, the **CodeWriter** uses `CODE_WEB` (it must write code *and* read the
+latest shadcn/HeroUI docs), while **Security** uses `BASH_READ` (it must inspect and run scanners
+but should never modify your code — that's AutoFix's job).
+
+---
+
+## 🔌 MCP servers (external superpowers)
+
+An **MCP** (Model Context Protocol) server is a **secure plug-in** that gives an agent an ability
+it doesn't have on its own — like talking to a database or a hosting platform. Anthropic agents can
+only connect to **remote URL** MCP servers, and they authenticate using a token kept in your
+**vault** (never in the code). Configured in `src/pipeline/config/mcps.config.ts`.
+
+| MCP | Gives agents the power to… | Used by | Needs |
+| :-- | :-- | :-- | :-- |
+| **InsForge** | Create databases, tables, auth, storage, vector search | Schema, CMS, KnowledgeBase | `INSFORGE_API_KEY` |
+| **Coolify** | Deploy preview + production sites | Preview, Deploy | `COOLIFY_API_TOKEN` |
+| **Refero** | Search real product/UI screenshots for design inspiration | Design, Research | `REFERO_API_KEY` (Refero Pro) — *optional* |
+
+If an MCP's key is missing, that power is simply not attached and the agent works without it
+(Refero is fully optional; InsForge/Coolify power the data + deploy features).
+
+> **Why not a shadcn/HeroUI MCP?** Those are **local** plug-ins meant for code editors (they run on
+> your own machine via `npx shadcn@latest mcp`). The deployed cloud agents can only use **remote**
+> MCPs, so component-library knowledge is delivered a different way — see the next section.
+
+---
+
+## 🎨 Component libraries & skills
+
+Instead of guessing how to use a UI library, the relevant agents get **live web access** and use the
+**shadcn command-line tool** to install real, current components. The Design Agent picks the library
+**per project**; the CodeWriter builds with it.
+
+**Main libraries** (one is chosen per build):
+- **[shadcn/ui](https://ui.shadcn.com)** *(default)* — marketing sites, landing pages, highly custom/animated designs.
+- **[HeroUI](https://heroui.com)** — app-like UIs: dashboards, admin panels, SaaS shells, data-dense tools.
+
+**Animated component registries** (used on **every** build, alongside the main library):
+- **[Animate UI](https://animate-ui.com)** *(primary)* and **[React Bits](https://reactbits.dev)** —
+  ready-made motion components. The Animation + CodeWriter agents install them with the shadcn CLI
+  (`npx shadcn@latest add @animate-ui/<component>` / `@react-bits/<component>`) instead of hand-writing
+  animation. These are **registries**, not MCPs.
+
+**Supplementary decoration:**
+- **[Uiverse](https://uiverse.io)** — ~4,400 MIT-licensed CSS/Tailwind elements (fancy loaders, glass
+  cards, novelty buttons). It's **copy-paste only** (no CLI, no registry, no MCP), so the CodeWriter
+  fetches an element, converts it to a TSX component, and **re-tokenizes** it to the project's palette +
+  spacing. Used for flourishes only — never for form controls (those stay shadcn/HeroUI).
+
+> **How the agents "know" the libraries:** distilled rules in their prompts + `web_search`/`web_fetch`
+> for the *current* official docs + the shadcn CLI to install real code. They do **not** use the
+> editor's local shadcn/HeroUI MCPs or Cursor skills (those can't run inside cloud agents).
+
+---
+
+## 🧠 Memory & persona
+
+"Memory" here is four different things working together:
+
+1. **Session memory (this build).** Each build runs in an Anthropic **session** that remembers the
+   conversation — that's how the *Intent → one question → re-understand* loop works.
+2. **Memory Store (across builds).** A small persistent file store for durable items: your **custom
+   instructions** (`/user-instructions.json` — the main way to set tone/brand "persona"), version
+   history (`/versions/…`), and registered tools/skills. It's always injected into the Orchestrator.
+3. **KnowledgeBase / RAG (your documents).** Upload PDFs/URLs/markdown → the **KnowledgeBase** agent
+   chunks them, creates embeddings, and stores vectors in **InsForge pgvector**. At build time it
+   finds the most relevant pieces and feeds them into the Intent + CodeWriter prompts — so the site is
+   grounded in *your* real content.
+4. **Working memory (within a build).** Every agent's full JSON output is passed forward to the agents
+   that depend on it, never truncated. This is the pipeline's short-term scratchpad.
+
+**Persona** isn't a separate agent — it comes from (a) each agent's fixed role/voice in its prompt,
+(b) your custom instructions injected into the Orchestrator, and (c) the brand signals + assets in
+your request shaping the generated site's look and tone.
+
+---
+
+## 🔐 Vault & environment
+
+Two Anthropic concepts the setup provisions for you — **automatically**:
+
+- **Vault** — a secure box on Anthropic's servers that holds your secret keys (InsForge, Coolify,
+  Refero, payment providers…). Agents reference the vault to authenticate to MCPs; the secrets never
+  appear in the code. Created by `src/pipeline/vault/vault.service.ts`, which then adds one credential
+  per key you set.
+- **Environment** — the sandboxed workspace the agents run inside. Created by
+  `src/pipeline/environment/environment.service.ts`.
+
+**You don't pre-create either one.** On the first run, if `ANTHROPIC_VAULT_ID` /
+`ANTHROPIC_ENVIRONMENT_ID` are blank, the setup creates them, then writes the new IDs back into your
+`.env` (via `src/pipeline/lib/env-file.ts`) so every later run reuses the same vault + environment
+instead of making new ones. If you'd rather use IDs you already have, just paste them into `.env` and
+they'll be reused as-is.
+
+---
+
+## 🛡 Security gate & auto-fix loop
+
+Security is enforced as a **gate before publishing**, not an afterthought:
+
+1. The **Audit** agent scans your prompt up front (Phase 1) **and** the generated code (Phase 7).
+2. In the quality gate (Phase 6), the **Security** agent runs two scans:
+   - **Dependency CVEs** — checks your packages against known-vulnerability databases.
+   - **SAST** — reads the code for injection, XSS, SSRF, secret exposure, broken auth/access rules.
+3. Any **critical** finding is routed to **AutoFix** (fix mode), which patches the *fixable* ones.
+4. The scanner **re-runs** to verify. This repeats up to **3 times**.
+5. If a critical issue still can't be fixed → **publishing is blocked** and you get a clear explanation.
+
+The same **AutoFix** agent also runs in *build mode* to repair compile errors in the RunDev loop — so
+it has two jobs: fix broken builds, and fix security/quality findings.
+
+---
+
+## 🖼 How your images & links are respected
+
+When you attach images, a logo, a brand kit, or reference URLs, they're honored end-to-end:
+
+- The **Intent** agent records them in `mediaSignal` (and `referenceUrls`).
+- The **Orchestrator** explicitly forwards these to **Design** and **Asset**.
+- **Design** has *vision* — it opens your images directly to pull the **real** colors and typography,
+  and fetches your reference URLs to match their style. Your brand colors/logo **override** defaults.
+- **Asset** downloads your supplied images/logos, hosts them in storage, and uses them in their proper
+  slots (logo, hero, gallery) — stock photos only fill the **leftover** slots. Your assets are never
+  overwritten.
+
+---
+
+## 💰 Token budget
+
+Every build has a **200,000-token** budget that the Orchestrator divides across the phases, so a single
+agent can't burn the whole allowance. The lion's share goes to the **CodeWriter** (100k) since it writes
+the whole app. If an agent goes over its slice, the Orchestrator emits a warning and continues with
+slightly reduced output — it only aborts if the **total** 200k is exceeded.
+
+| Stage | Budget | | Stage | Budget |
+| :-- | --: | --- | :-- | --: |
+| Intent + conversation | 5,000 | | CodeWriter | **100,000** |
+| Audit (×2) | 3,000 | | QAS + security + a11y + perf | 9,000 |
+| Research | 8,000 | | RunDev + autofix (×3) | 20,000 |
+| Design | 6,000 | | Testing | 10,000 |
+| Animation | 8,000 | | Preview + deploy | 5,000 |
+| Asset + video | 4,000 | | Version | 2,000 |
+| Schema + CMS | 10,000 | | Orchestration overhead | 3,000 |
+| Email + payments + i18n | 10,000 | | **Total** | **200,000** |
 
 ---
 

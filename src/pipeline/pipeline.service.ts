@@ -7,6 +7,7 @@ import * as path from 'path';
 import { VaultService } from './vault/vault.service';
 import { EnvironmentService } from './environment/environment.service';
 import { enableIdempotentAgents } from './lib/idempotent-agents';
+import { upsertEnvVars } from './lib/env-file';
 import { IntentAgent } from './agents/intent.agent';
 import { ConversationAgent } from './agents/conversation.agent';
 import { AuditAgent } from './agents/audit.agent';
@@ -99,6 +100,18 @@ export class PipelineService {
     // ── Step 2: Environment ────────────────────────────────
     this.logger.log('\n🌍 Step 2/4: Environment');
     const environmentId = await this.environmentService.getOrCreate(client);
+
+    // Persist the vault + environment IDs back to .env so they are created
+    // exactly once and automatically reused on every subsequent run.
+    const { written, path: envPath } = upsertEnvVars({
+      ANTHROPIC_VAULT_ID: vaultId,
+      ANTHROPIC_ENVIRONMENT_ID: environmentId,
+    });
+    if (written.length) {
+      this.logger.log(`   📝 Saved ${written.join(' + ')} to ${envPath}`);
+    } else {
+      this.logger.log('   📝 .env already has vault + environment IDs');
+    }
 
     // ── Step 3: Agents (in dependency order) ──────────────
     this.logger.log('\n🤖 Step 3/4: Agents');
