@@ -30,7 +30,7 @@ by a single orchestrator agent.
 - [Re-running & cleanup](#-re-running--cleanup)
 - [FAQ](#-faq)
 - [Troubleshooting](#-troubleshooting)
-- [The 26 agents](#-the-26-agents)
+- [The 27 agents](#-the-27-agents)
 - [For developers](#-for-developers)
 
 ---
@@ -43,7 +43,7 @@ Running the setup command **once** will:
 | :--: | :-- |
 | 1️⃣ | **Loads your vault** — a secure box on Anthropic's servers that holds your API keys |
 | 2️⃣ | **Uses your environment** — the workspace the agents run inside |
-| 3️⃣ | **Creates 26 agents** — the AI workers (see [the full list](#-the-26-agents)) |
+| 3️⃣ | **Creates 27 agents** — the AI workers (see [the full list](#-the-27-agents)) |
 | 4️⃣ | **Saves the results** — writes every agent ID to a file other apps can read |
 
 It's a **one-time provisioning step**, not something that runs all day.
@@ -54,7 +54,7 @@ flowchart LR
     B --> C[Research · Design · Asset · Video]
     C --> D[Schema · CMS · Email · Payments · i18n]
     D --> E[CodeWriter]
-    E --> F[QA · Accessibility · Performance]
+    E --> F[QA · Security · Accessibility · Performance]
     F --> G[RunDev → Test → Preview → Deploy]
     G --> H([🚀 Live app])
 ```
@@ -262,7 +262,7 @@ a domain you've verified with Resend.
 
 ---
 
-## 🧩 The 26 agents
+## 🧩 The 27 agents
 
 <details>
 <summary><strong>See all agents, grouped by pipeline stage</strong></summary>
@@ -273,7 +273,7 @@ a domain you've verified with Resend.
 | 🎨 Look & content | Research · Design · Asset · Video · Animation |
 | 🗄️ Data & features | Schema · CMS · Email · Payments · i18n |
 | 🏗️ Build the app | CodeWriter |
-| ✅ Quality checks | QAS · Accessibility · Performance |
+| ✅ Quality & security checks | QAS · Security · Accessibility · Performance |
 | 🚀 Run, fix & ship | RunDev · AutoFix · Testing · Preview · Deploy · Version |
 | 🔌 Extras | CustomMCP · KnowledgeBase |
 | 🎯 The conductor | Orchestrator (coordinates everything above) |
@@ -306,7 +306,7 @@ This is a [NestJS](https://nestjs.com/) project.
 ```bash
 bun install                # install dependencies
 bun run build              # type-check / compile
-bun run setup:pipeline     # provision (or update) the 26 agents  ← main command
+bun run setup:pipeline     # provision (or update) the 27 agents  ← main command
 bun run archive:duplicates # archive duplicate agents from old runs
 bun run start:dev          # run the Nest app in watch mode
 bun run test               # run unit tests

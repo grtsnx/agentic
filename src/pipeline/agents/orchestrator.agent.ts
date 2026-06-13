@@ -18,7 +18,7 @@ export class OrchestratorAgent {
     const agent = await (client.beta.agents as any).create({
       name: 'Orchestrator Agent',
       description:
-        'Coordinates the full 25-agent JAX builder pipeline. Manages execution order, parallel groups, skipping logic, and token budget.',
+        'Coordinates the full 26-agent JAX builder pipeline. Manages execution order, parallel groups, skipping logic, and token budget.',
       model: AGENT_MODELS['orchestrator'],
       tools: [
         { type: 'agent_toolset_20260401', default_config: { enabled: false } },
@@ -32,11 +32,11 @@ export class OrchestratorAgent {
         pipeline: 'builder',
         order: '0',
         tier: '0',
-        note: 'Must be created last — requires all 25 agent IDs',
+        note: 'Must be created last — requires all 26 agent IDs',
         agentCount: String(Object.keys(agentIds).length),
       },
       system: `You are the Orchestrator — coordinator of the JAX AI website and app builder pipeline.
-You manage 25 specialized agents and coordinate them in the correct order.
+You manage 26 specialized agents and coordinate them in the correct order.
 
 YOUR AGENT ROSTER:
 ${Object.entries(agentIds)
@@ -70,16 +70,24 @@ PHASE 5 — GENERATION (sequential, waits for ALL phases above):
 7. codewriter   → complete Next.js 15 project — consumes ALL prior agent outputs
 
 PHASE 6 — PARALLEL QUALITY GATES (all fire simultaneously after codewriter):
-8a. qas           → quality + security scan
-8b. accessibility → WCAG 2.1 AA compliance
-8c. performance   → Core Web Vitals + Lighthouse
+8a. qas           → quality + light security scan
+8b. security      → vulnerability scan (dependency CVEs + SAST: injection, XSS, SSRF,
+                    secret exposure, broken authz/RLS)
+8c. accessibility → WCAG 2.1 AA compliance
+8d. performance   → Core Web Vitals + Lighthouse
+
+  IF security (or qas) reports CRITICAL findings:
+    → autofix (scan-remediation mode) → patch fixable findings
+    → re-run security/qas to verify → repeat, max 3 attempts
+    → criticals that remain unfixable after 3 attempts → surface to user and BLOCK deploy
+    → never proceed to deploy while any critical security finding is open
 
 PHASE 7 — BUILD (sequential):
 9.  audit   → SECOND RUN on generated code — BLOCK on critical security findings
 10. rundev  → pnpm install + next build in Daytona
 
   IF build fails:
-    → autofix → regex pre-fixes + AI patches → loop back to rundev
+    → autofix (build mode) → regex pre-fixes + AI patches → loop back to rundev
     → max 3 autofix attempts
     → if all 3 fail → surface error to user with clear explanation
 
@@ -120,7 +128,8 @@ Key data flows:
 - VideoManifest → codewriter (R2 URLs or skipped=true)
 - SchemaResult + CMSSchema + EmailManifest + PaymentManifest + i18nManifest → codewriter
 - ResearchReport → design, codewriter
-- QAS/Accessibility/Performance findings → autofix (if critical)
+- QAS/Security/Accessibility/Performance findings → autofix (if critical), then re-scan
+- Security critical findings gate deploy: must reach zero open criticals before publish
 - RunDev errors → autofix
 - Deploy result → version
 
@@ -136,7 +145,7 @@ Allocation:
   schema + cms:            10,000
   email + payments + i18n: 10,000
   codewriter:              100,000  ← main spend
-  qas + a11y + perf:       6,000
+  qas + security + a11y + perf: 9,000
   rundev + autofix (x3):   20,000
   testing:                 10,000
   preview + deploy:        5,000
@@ -160,6 +169,7 @@ Emit agent-level events:
 
 ERROR HANDLING:
 - Audit blocks (critical) → surface to user immediately, do not continue
+- Security critical (unfixable after autofix) → surface to user, BLOCK deploy
 - Agent error (non-critical) → log, skip that agent, continue pipeline
 - Build failure → autofix loop, max 3 attempts, surface if all fail
 - Deploy failure → retry 3x with backoff, surface if all fail

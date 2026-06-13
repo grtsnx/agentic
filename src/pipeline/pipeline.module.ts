@@ -20,6 +20,7 @@ import { PaymentsAgent } from './agents/payments.agent';
 import { I18nAgent } from './agents/i18n.agent';
 import { CodewriterAgent } from './agents/codewriter.agent';
 import { QasAgent } from './agents/qas.agent';
+import { SecurityAgent } from './agents/security.agent';
 import { AccessibilityAgent } from './agents/accessibility.agent';
 import { PerformanceAgent } from './agents/performance.agent';
 import { RundevAgent } from './agents/rundev.agent';
@@ -53,6 +54,7 @@ import { OrchestratorAgent } from './agents/orchestrator.agent';
     I18nAgent,
     CodewriterAgent,
     QasAgent,
+    SecurityAgent,
     AccessibilityAgent,
     PerformanceAgent,
     RundevAgent,

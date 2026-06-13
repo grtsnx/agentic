@@ -22,6 +22,7 @@ import { PaymentsAgent } from './agents/payments.agent';
 import { I18nAgent } from './agents/i18n.agent';
 import { CodewriterAgent } from './agents/codewriter.agent';
 import { QasAgent } from './agents/qas.agent';
+import { SecurityAgent } from './agents/security.agent';
 import { AccessibilityAgent } from './agents/accessibility.agent';
 import { PerformanceAgent } from './agents/performance.agent';
 import { RundevAgent } from './agents/rundev.agent';
@@ -63,6 +64,7 @@ export class PipelineService {
     private readonly i18nAgent: I18nAgent,
     private readonly codewriterAgent: CodewriterAgent,
     private readonly qasAgent: QasAgent,
+    private readonly securityAgent: SecurityAgent,
     private readonly accessibilityAgent: AccessibilityAgent,
     private readonly performanceAgent: PerformanceAgent,
     private readonly rundevAgent: RundevAgent,
@@ -146,14 +148,19 @@ export class PipelineService {
     );
     agentIds['codewriter'] = await this.codewriterAgent.create(client);
 
-    // PARALLEL — QAS, Accessibility, Performance
-    this.logger.log('\n  [Parallel] QAS + Accessibility + Performance...');
-    const [qasId, accessibilityId, performanceId] = await Promise.all([
-      this.qasAgent.create(client),
-      this.accessibilityAgent.create(client),
-      this.performanceAgent.create(client),
-    ]);
+    // PARALLEL — QAS, Security, Accessibility, Performance
+    this.logger.log(
+      '\n  [Parallel] QAS + Security + Accessibility + Performance...',
+    );
+    const [qasId, securityId, accessibilityId, performanceId] =
+      await Promise.all([
+        this.qasAgent.create(client),
+        this.securityAgent.create(client),
+        this.accessibilityAgent.create(client),
+        this.performanceAgent.create(client),
+      ]);
     agentIds['qas'] = qasId;
+    agentIds['security'] = securityId;
     agentIds['accessibility'] = accessibilityId;
     agentIds['performance'] = performanceId;
 
@@ -178,7 +185,7 @@ export class PipelineService {
     agentIds['knowledgebase'] = knowledgeBaseId;
 
     // ORCHESTRATOR — must be last, needs all IDs
-    this.logger.log('\n  [Last] Orchestrator (wires all 25 agents)...');
+    this.logger.log('\n  [Last] Orchestrator (wires all 26 agents)...');
     agentIds['orchestrator'] = await this.orchestratorAgent.create(
       client,
       agentIds,

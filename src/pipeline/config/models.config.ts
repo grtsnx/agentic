@@ -20,6 +20,7 @@ export const AGENT_MODELS: Record<string, string> = {
   i18n: MODELS.FAST,
   codewriter: MODELS.POWERFUL,
   qas: MODELS.FAST,
+  security: MODELS.BALANCED,
   accessibility: MODELS.FAST,
   performance: MODELS.FAST,
   rundev: MODELS.BALANCED,

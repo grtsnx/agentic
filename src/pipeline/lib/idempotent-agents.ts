@@ -6,7 +6,7 @@ const logger = new Logger('IdempotentAgents');
 /**
  * Makes agent provisioning idempotent.
  *
- * The pipeline creates 26 agents by calling `client.beta.agents.create(...)`.
+ * The pipeline creates 27 agents by calling `client.beta.agents.create(...)`.
  * Run twice, that would stack duplicate agents on the Anthropic account because
  * the API has no native upsert. This wraps `create` once so that, when an agent
  * with the same `name` already exists, it is updated in place (full-config
