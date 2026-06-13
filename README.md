@@ -217,6 +217,21 @@ bun run archive:duplicates
 This keeps one agent per name (preferring the IDs in `agents.config.json`) and archives the
 rest. Agents with a unique name are never touched.
 
+### Start completely fresh (purge everything)
+
+Want a blank slate? This wipes the whole Managed Agents workspace — **sessions** and
+**vaults** are permanently deleted, **agents** are archived, and the local
+`agents.config.json` is cleared:
+
+```bash
+bun run purge:all                          # DRY RUN — just shows what would be removed
+bun run purge:all --yes                    # actually purge agents + vaults + sessions
+bun run purge:all --yes --with-environments  # also delete the environment(s)
+```
+
+> ⚠️ **Destructive and irreversible.** It's a dry run by default; nothing is deleted until
+> you add `--yes`. After purging, run `bun run setup:pipeline` to provision everything fresh.
+
 ---
 
 ## ❓ FAQ
@@ -322,6 +337,7 @@ bun install                # install dependencies
 bun run build              # type-check / compile
 bun run setup:pipeline     # provision (or update) the 27 agents  ← main command
 bun run archive:duplicates # archive duplicate agents from old runs
+bun run purge:all          # wipe agents+vaults+sessions for a fresh start (dry run; --yes to apply)
 bun run start:dev          # run the Nest app in watch mode
 bun run test               # run unit tests
 bun run smoke              # boot the full DI graph (no network / no API key)
