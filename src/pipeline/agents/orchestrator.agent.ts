@@ -6,13 +6,44 @@ import { AGENT_MODELS } from '../config/models.config';
 export class OrchestratorAgent {
   private readonly logger = new Logger(OrchestratorAgent.name);
 
+  /**
+   * Agents invoked OUT-OF-BAND (by the app layer or by other agents), not directly by
+   * the coordinator. Excluded from the coordinator roster because Anthropic caps a
+   * coordinator at 20 directly-delegatable sub-agents. These agents are still created
+   * and still listed in the system-prompt roster for context — they're just triggered
+   * outside the coordinator's agent toolset:
+   *   - conversation  → intake clarification loop, routed by the app
+   *   - video         → optional; triggered only when HIGGSFIELD_API_KEY is present
+   *   - i18n          → optional; triggered only when requiresi18n
+   *   - version       → post-deploy git/Memory snapshot, app-triggered
+   *   - custommcp     → background, user-registers custom MCPs
+   *   - knowledgebase → background, user uploads docs for RAG
+   */
+  private static readonly OUT_OF_BAND_AGENTS = new Set([
+    'conversation',
+    'video',
+    'i18n',
+    'version',
+    'custommcp',
+    'knowledgebase',
+  ]);
+
   async create(
     client: Anthropic,
     agentIds: Record<string, string>,
   ): Promise<string> {
     this.logger.log('Creating Orchestrator Agent...');
+
+    // Anthropic limits a coordinator to ≤20 directly-delegatable sub-agents. Wire the
+    // build-critical agents into the coordinator roster and leave the background/optional
+    // agents to be invoked out-of-band (see OUT_OF_BAND_AGENTS above).
+    const coordinatorIds = Object.entries(agentIds)
+      .filter(([name]) => !OrchestratorAgent.OUT_OF_BAND_AGENTS.has(name))
+      .map(([, id]) => id);
     this.logger.log(
-      `Wiring ${Object.keys(agentIds).length} agents into roster...`,
+      `Wiring ${coordinatorIds.length} agents into coordinator roster ` +
+        `(${Object.keys(agentIds).length} total; ` +
+        `${OrchestratorAgent.OUT_OF_BAND_AGENTS.size} run out-of-band)...`,
     );
 
     const agent = await (client.beta.agents as any).create({
@@ -26,7 +57,7 @@ export class OrchestratorAgent {
       mcp_servers: [],
       multiagent: {
         type: 'coordinator',
-        agents: Object.values(agentIds).map((id) => id),
+        agents: coordinatorIds,
       },
       metadata: {
         pipeline: 'builder',
@@ -34,14 +65,31 @@ export class OrchestratorAgent {
         tier: '0',
         note: 'Must be created last — requires all 26 agent IDs',
         agentCount: String(Object.keys(agentIds).length),
+        coordinatorCount: String(coordinatorIds.length),
       },
       system: `You are the Orchestrator — coordinator of the JAX AI website and app builder pipeline.
 You manage 26 specialized agents and coordinate them in the correct order.
 
 YOUR AGENT ROSTER:
 ${Object.entries(agentIds)
-  .map(([name, id]) => `- ${name}: ${id}`)
+  .map(
+    ([name, id]) =>
+      `- ${name}: ${id}${
+        OrchestratorAgent.OUT_OF_BAND_AGENTS.has(name)
+          ? '  (out-of-band — invoked by the app layer or another agent, NOT via your agent toolset)'
+          : ''
+      }`,
+  )
   .join('\n')}
+
+DELEGATION NOTE:
+You can directly delegate (via your agent toolset) to every agent EXCEPT the six marked
+"out-of-band": conversation, video, i18n, version, custommcp, knowledgebase. Anthropic caps a
+coordinator at 20 directly-delegatable sub-agents, so those six are triggered outside your
+toolset — the app routes conversation (intake clarification) and version (post-deploy snapshot),
+fires video/i18n only when their feature flags are set, and runs custommcp/knowledgebase in the
+background. Still plan the pipeline around all of them; just don't attempt a direct agent-tool
+hand-off to those six.
 
 PIPELINE EXECUTION ORDER:
 

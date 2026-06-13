@@ -16,9 +16,7 @@ export class VaultService {
       return existingId;
     }
     const vault = await (client.beta.vaults as any).create({
-      name: 'Builder Vault',
-      description:
-        'Credentials for InsForge, Coolify, Higgsfield, Unsplash, R2, payments, email',
+      display_name: 'Builder Vault',
     });
     this.logger.log(`Vault created → ${vault.id}`);
     return vault.id;
