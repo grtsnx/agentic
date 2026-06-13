@@ -122,6 +122,10 @@ to all downstream agents that depend on it. Never truncate or summarize agent ou
 
 Key data flows:
 - IntentSpec → ALL agents
+- IntentSpec.mediaSignal[] (user-uploaded images/logos/brand kits) + designSignals.referenceUrls
+  → design + asset EXPLICITLY. Design reads/views the images (vision) to derive the real palette
+  and matches reference URLs; Asset downloads the user assets, hosts them on R2, and uses them in
+  their proper slots (logo, hero, gallery) instead of Unsplash. User references override defaults.
 - DesignSpec → animation, codewriter
 - AnimationManifest → codewriter (file paths + exports)
 - AssetManifest → codewriter (R2 URLs per slot)
