@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import Anthropic from '@anthropic-ai/sdk';
 import { AGENT_MODELS } from '../config/models.config';
 import { TOOLS } from '../config/tools.config';
@@ -7,8 +8,11 @@ import { TOOLS } from '../config/tools.config';
 export class EmailAgent {
   private readonly logger = new Logger(EmailAgent.name);
 
+  constructor(private readonly config: ConfigService) {}
+
   async create(client: Anthropic): Promise<string> {
     this.logger.log('Creating Email Agent...');
+    const emailDomain = this.config.get<string>('EMAIL_DOMAIN', 'example.com');
     const agent = await (client.beta.agents as any).create({
       name: 'Email Agent',
       description:
@@ -67,10 +71,10 @@ Each API route must:
 - Return { success: boolean, messageId?: string, error?: string }
 - Check RESEND_API_KEY exists before attempting send
 - Rate limit: max 1 email per 60s per email address (use in-memory map for MVP)
-- Send from the verified domain "snapblock.app". The "from" address must follow the
-  pattern {custom}@snapblock.app, where {custom} is a purpose-specific local part
-  (e.g. noreply@snapblock.app, hello@snapblock.app, support@snapblock.app, billing@snapblock.app).
-  Never invent a different sending domain — snapblock.app is the only verified Resend domain.
+- Send from the verified domain "${emailDomain}". The "from" address must follow the
+  pattern {custom}@${emailDomain}, where {custom} is a purpose-specific local part
+  (e.g. noreply@${emailDomain}, hello@${emailDomain}, support@${emailDomain}, billing@${emailDomain}).
+  Never invent a different sending domain — ${emailDomain} is the only verified Resend domain.
 
 Also generate:
 - /lib/email/resend.ts    — Resend client singleton
@@ -83,7 +87,7 @@ Output ONLY valid JSON:
   "apiRoutesGenerated": string[],
   "helpersGenerated": string[],
   "provider": "resend",
-  "fromEmail": "noreply@snapblock.app"
+  "fromEmail": "noreply@${emailDomain}"
 }`,
     });
     this.logger.log(`✅ Email Agent → ${agent.id}`);

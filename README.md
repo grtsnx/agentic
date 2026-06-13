@@ -1,4 +1,4 @@
-# SnapBlock AI Builder — Agent Setup
+# AI Builder — Agent Setup
 
 This project sets up the "brain" behind an AI website-and-app builder. When you run
 it once, it creates **26 specialized AI agents** on your Anthropic account. Each agent
@@ -141,6 +141,7 @@ of failing.
 | `UNSPLASH_ACCESS_KEY` | Optional | Stock photos |
 | `R2_*` keys | Optional | File/image storage |
 | `RESEND_API_KEY` | Optional | Sending emails |
+| `EMAIL_DOMAIN` | Optional | Your verified email domain (e.g. `example.com`). Emails are sent from `{name}@EMAIL_DOMAIN` |
 | `STRIPE_SECRET_KEY` | Optional | Payments via Stripe |
 | `LEMONSQUEEZY_API_KEY` | Optional | Payments via Lemon Squeezy |
 | `PADDLE_API_KEY` | Optional | Payments via Paddle |
