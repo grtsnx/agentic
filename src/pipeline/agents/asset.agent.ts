@@ -12,9 +12,9 @@ export class AssetAgent {
     const agent = await (client.beta.agents as any).create({
       name: 'Asset Agent',
       description:
-        'Uploads user-supplied assets (logos/brand images from mediaSignal) to R2 and fills remaining slots with editorial Unsplash images; also sources SVGs, Lottie animations, and icons.',
+        'Uploads user-supplied assets (logos/brand images from mediaSignal) to R2, then fills remaining slots with editorial Unsplash images — or, when no Unsplash key is set, finds relatable royalty-free images online (keyless APIs + web search) or generates on-brand SVG art. Also sources SVGs, Lottie animations, and icons.',
       model: AGENT_MODELS['asset'],
-      tools: TOOLS.BASH_READ,
+      tools: TOOLS.CODE_WEB,
       mcp_servers: [],
       metadata: {
         pipeline: 'builder',
@@ -48,19 +48,43 @@ Workflow:
    - wellness → "serene spa atmosphere", "mindfulness nature editorial"
    - realestate → "luxury interior architecture", "modern home exterior"
    - (and so on for all businessType values)
-5. Call Unsplash API via bash (curl with UNSPLASH_ACCESS_KEY) for the remaining slots only.
-6. Upload each image to Cloudflare R2 via bash (aws s3 cp with R2 endpoint).
-7. Return R2 public URLs for ALL slots (user-supplied + Unsplash).
+5. Source a real image for each remaining slot. Pick the FIRST source that works,
+   in this order (echo "$UNSPLASH_ACCESS_KEY" to check whether the key is set):
+   a. UNSPLASH (preferred) — only if UNSPLASH_ACCESS_KEY is non-empty.
+   b. NO KEY? FIND ONE ONLINE — do NOT fall back to grey placeholders. Use a keyless
+      royalty-free source and/or web_search to get a real, downloadable photo URL:
+        • Openverse (keyless, CC-licensed real photos):
+          GET https://api.openverse.org/v1/images/?q={query}&page_size=3&license_type=all-cc,commercial
+          → read .results[0].url (the direct image URL), capture .creator + .license for attribution.
+        • Wikimedia Commons (keyless): search + fetch the file's original URL.
+        • web_search for "{query} royalty free photo", then web_fetch a result page to
+          extract a real, hotlinkable image URL (must end in .jpg/.png/.webp and return 200).
+      Verify the URL actually returns image bytes (curl -I → 200, content-type image/*)
+      before using it. Set "source":"online" and fill photographer/license from the source.
+   c. GENERATE IT YOURSELF (last resort, only if no real image can be sourced) — produce a
+      clean, on-brand SVG: a tasteful gradient/geometric composition using the palette from
+      designSignals (and an optional label/word-mark). Inline it in the "svgs" array AND, for
+      image slots, render it to the slot via a data: URL or by uploading the .svg to R2.
+      Set "source":"generated". Never emit a generic grey box.
+6. Download the chosen image (curl -L "{url}" -o {localFile}) and upload to Cloudflare R2
+   via bash (aws s3 cp with R2 endpoint). If R2 env vars are missing, return the source URL directly.
+7. Return R2 public URLs (or source URLs) for ALL slots (user-supplied + sourced + generated).
 
 Commands to use:
-# Download a user-supplied asset (mediaSignal URL)
-curl -L "{mediaSignal.ref}" -o {localFile}
+# Download a user-supplied asset (mediaSignal URL) or any sourced image
+curl -L "{url}" -o {localFile}
 
-# Fetch from Unsplash (only for slots not filled by user assets)
+# Preferred: Unsplash (only when UNSPLASH_ACCESS_KEY is set, for slots not filled by user assets)
 curl "https://api.unsplash.com/search/photos?query={query}&per_page=1&orientation=landscape" \\
   -H "Authorization: Client-ID $UNSPLASH_ACCESS_KEY"
 
-# Upload to R2 (user assets AND Unsplash images)
+# Keyless fallback when no Unsplash key: Openverse returns real CC-licensed photos
+curl -s "https://api.openverse.org/v1/images/?q={query}&page_size=3&license_type=all-cc,commercial"
+
+# Verify any sourced URL is a real image before using it
+curl -sI "{url}"   # expect HTTP 200 and Content-Type: image/*
+
+# Upload to R2 (user assets, sourced images, generated SVGs)
 aws s3 cp {localFile} s3://{R2_BUCKET}/{key} \\
   --endpoint-url https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com \\
   --content-type image/jpeg
@@ -70,12 +94,13 @@ Output ONLY valid JSON:
   "images": [{
     "slot": "logo|hero|feature-1|feature-2|testimonials|gallery|about|og",
     "page": string,
-    "source": "user|unsplash|placeholder",
+    "source": "user|unsplash|online|generated",
     "r2Url": string,
-    "unsplashUrl": string,
+    "sourceUrl": string,
     "alt": string,
     "photographer": string,
     "photographerUrl": string,
+    "license": string,
     "width": number,
     "height": number
   }],
@@ -99,9 +124,14 @@ Rules:
 - User-supplied assets (mediaSignal) ALWAYS win their slot — never overwrite a user logo/hero
   with an Unsplash image. Set "source":"user" for those.
 - A user-supplied logo MUST populate the "logo" slot (and serve as the favicon source).
-- If R2 env vars missing → still return the user asset's original URL (or Unsplash URL), log warning
-- If UNSPLASH_ACCESS_KEY missing → use deterministic placeholder URLs for non-user slots, never fail
-- Always fetch real images — never invent URLs
+- If R2 env vars missing → still return the source's original URL, log warning
+- If UNSPLASH_ACCESS_KEY missing → DO NOT use grey placeholders. Source a real relatable image
+  online (keyless Openverse/Wikimedia or web_search), and only if that truly fails, GENERATE an
+  on-brand SVG. Never fail and never emit a generic placeholder box.
+- Always use REAL images you actually fetched (verified 200 + image/*), or art you generated —
+  never invent or hallucinate URLs.
+- Respect licensing: only use royalty-free / CC / commercially-usable images, and record the
+  "license" + photographer for attribution.
 - Prioritize editorial/professional photography over stock/generic (for non-user slots)
 - OG image slot is always required (1200x630)
 - Hero image is always required`,
