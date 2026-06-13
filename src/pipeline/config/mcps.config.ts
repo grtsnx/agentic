@@ -36,6 +36,19 @@ export const ANIMATE_UI_URL = 'https://animate-ui.com';
 export const REACT_BITS_REGISTRY = 'https://reactbits.dev/r/{name}.json';
 export const REACT_BITS_URL = 'https://reactbits.dev';
 
+/**
+ * Uiverse (https://uiverse.io) — a community library of ~4,400 MIT-licensed UI elements
+ * (fancy buttons, loaders, toggles, checkboxes, glass cards) made with plain CSS / Tailwind.
+ *
+ * UNLIKE Animate UI / React Bits, Uiverse is COPY-PASTE only: there is NO shadcn registry,
+ * NO `/r/{name}.json` endpoint, NO CLI, and NO MCP — each element page just exposes "copy as
+ * HTML/CSS · Tailwind · React · Figma". So it CANNOT go in components.json `registries`.
+ * It is consumed at code-gen time via web_fetch of uiverse.io, then the snippet is converted
+ * to a tokenized JSX component (colors → DesignSpec palette, spacing → allowed scale). Used as
+ * a SUPPLEMENTARY decorative source, not for form controls (those stay shadcn/HeroUI).
+ */
+export const UIVERSE_URL = 'https://uiverse.io';
+
 export function buildMcpServers(config: ConfigService) {
   return {
     INSFORGE: {

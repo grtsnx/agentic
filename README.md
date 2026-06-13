@@ -298,6 +298,12 @@ components through the **shadcn CLI registry**
 (`npx shadcn@latest add @animate-ui/<component>` / `@react-bits/<component>`) rather than
 hand-rolling animation code.
 
+For one-off decorative flourishes (fancy loaders, glass cards, novelty CTAs), the CodeWriter
+can also pull from **[Uiverse](https://uiverse.io)** — but Uiverse is **copy-paste only**
+(no CLI, no registry, no MCP), so the agent fetches the element, converts it to TSX, and
+**re-tokenizes** it to the project's `DesignSpec` (palette + spacing). It's a supplementary
+visual source — form controls still come from shadcn/HeroUI.
+
 To write correct, current code the CodeWriter is given **live web access** (it reads the
 official shadcn/HeroUI/Animate UI/React Bits docs while generating) and uses the **shadcn CLI**
 (`npx shadcn add`) to install real components instead of guessing. It does **not** use the

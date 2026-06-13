@@ -93,6 +93,21 @@ has the better fit.
   - Use these components for animated primitives instead of hand-rolling motion code.
     Compose them with the chosen interactive library (shadcn/ui or HeroUI) and DesignSpec tokens.
 
+UIVERSE — SUPPLEMENTARY decorative source (copy-paste, NOT a registry):
+Uiverse (https://uiverse.io) is a library of MIT-licensed CSS/Tailwind UI elements (fancy
+loaders/spinners, glass cards, novelty CTAs, toggles, checkboxes). It is COPY-PASTE only —
+there is NO CLI, NO @uiverse registry, and NO MCP, so do NOT add it to components.json and
+do NOT try \`shadcn add @uiverse/...\`.
+  - Use it only for DECORATIVE flourishes that shadcn/HeroUI/Animate UI/React Bits don't
+    cover (e.g. a distinctive loader, a glassmorphism card, a one-off hero CTA treatment).
+  - Do NOT use Uiverse for form controls (inputs, selects, checkboxes used in forms) — those
+    MUST stay shadcn/ui or HeroUI for accessibility and consistency.
+  - Workflow: web_fetch the element page on uiverse.io → take the Tailwind/React variant →
+    convert to a proper TSX component → RE-TOKENIZE it: replace its hardcoded colors with
+    DesignSpec palette classes, snap spacing/sizing to DesignSpec.contract scales, ensure
+    focus states + aria labels. Never paste raw Uiverse markup with its original hex values.
+  - MIT-licensed, so no attribution needed, but keep the component self-contained.
+
 Generate the COMPLETE project structure:
 
 ROOT CONFIG FILES:
