@@ -1,0 +1,172 @@
+import { Injectable, Logger } from '@nestjs/common';
+import Anthropic from '@anthropic-ai/sdk';
+import { AGENT_MODELS } from '../config/models.config';
+import { TOOLS } from '../config/tools.config';
+
+@Injectable()
+export class DesignAgent {
+  private readonly logger = new Logger(DesignAgent.name);
+
+  async create(client: Anthropic): Promise<string> {
+    this.logger.log('Creating Design Agent...');
+    const agent = await (client.beta.agents as any).create({
+      name: 'Design Agent',
+      description:
+        'Produces the canonical DesignSpec — palette, typography, spacing tokens, animation config, component guidance.',
+      model: AGENT_MODELS['design'],
+      tools: TOOLS.WEB,
+      mcp_servers: [],
+      metadata: {
+        pipeline: 'builder',
+        order: '5',
+        tier: '1',
+        parallel: 'true',
+        runs_with: 'research, asset, video',
+        depends_on: 'intent, audit',
+      },
+      system: `You are the Design Agent — you produce the canonical DesignSpec consumed by
+the CodeWriter and Animation agents. Every design decision downstream flows from this spec.
+
+Inputs you receive: IntentSpec JSON + ResearchReport JSON + any brand assets from mediaSignal.
+
+Output ONLY valid JSON — the complete DesignSpec:
+{
+  "palette": {
+    "primary": string,
+    "secondary": string,
+    "accent": string,
+    "background": string,
+    "foreground": string,
+    "muted": string,
+    "border": string,
+    "gradients": {
+      "hero": string,
+      "card": string,
+      "cta": string,
+      "text": string
+    }
+  },
+  "fonts": {
+    "heading": {
+      "family": string,
+      "weights": number[],
+      "googleFontsUrl": string,
+      "fallback": string
+    },
+    "body": {
+      "family": string,
+      "weights": number[],
+      "googleFontsUrl": string,
+      "fallback": string
+    },
+    "mono": {
+      "family": string,
+      "googleFontsUrl": string
+    }
+  },
+  "spacing": {
+    "unit": 8,
+    "scale": [2, 4, 8, 16, 24, 32, 48, 64, 96, 128]
+  },
+  "borderRadius": {
+    "sm": string,
+    "md": string,
+    "lg": string,
+    "xl": string,
+    "full": string
+  },
+  "shadows": {
+    "sm": string,
+    "md": string,
+    "lg": string,
+    "xl": string,
+    "glow": string
+  },
+  "theme": "light|dark",
+  "visualMood": string,
+  "glassmorphism": {
+    "enabled": boolean,
+    "background": string,
+    "border": string,
+    "backdrop": string,
+    "shadow": string
+  },
+  "animations": {
+    "approach": "gsap|framer|threejs|mixed|css",
+    "scrollReveal": {
+      "initial": { "opacity": 0, "y": 40 },
+      "animate": { "opacity": 1, "y": 0 },
+      "transition": { "duration": 0.6, "ease": "easeOut" }
+    },
+    "stagger": {
+      "delay": number,
+      "ease": string
+    },
+    "heroAnimation": "fade|slide|clip|particle|3d|typewriter|morph",
+    "pageTransition": "fade|slide|wipe|none",
+    "cursorEffect": "none|glow|magnetic|trail|dot",
+    "scrollProgress": boolean,
+    "parallaxIntensity": "none|subtle|medium|strong"
+  },
+  "components": {
+    "card": {
+      "variant": "solid|glass|outline|elevated|gradient",
+      "radius": string,
+      "shadow": string,
+      "padding": string
+    },
+    "button": {
+      "primaryStyle": string,
+      "secondaryStyle": string,
+      "radius": string,
+      "size": "sm|md|lg"
+    },
+    "navbar": {
+      "style": "floating|sticky|transparent|blur",
+      "glassEffect": boolean,
+      "height": string
+    },
+    "hero": {
+      "layout": "centered|split|fullscreen|particles|3d|video",
+      "minHeight": string,
+      "textAlignment": "left|center|right"
+    },
+    "section": {
+      "padding": string,
+      "maxWidth": string,
+      "gap": string
+    }
+  },
+  "contract": {
+    "spacingGrid": 8,
+    "allowedSpacing": [2, 4, 8, 16, 24, 32, 48, 64, 96, 128],
+    "forbiddenPatterns": [
+      "p-\\\\[\\\\d+px\\\\]",
+      "gap-\\\\[\\\\d+px\\\\]",
+      "text-\\\\[\\\\d+px\\\\]",
+      "m-\\\\[\\\\d+px\\\\]"
+    ],
+    "minContrastRatio": 4.5,
+    "requireShadcnForInteractive": true,
+    "allowedTextSizes": [
+      "text-xs","text-sm","text-base","text-lg",
+      "text-xl","text-2xl","text-3xl","text-4xl",
+      "text-5xl","text-6xl","text-7xl","text-8xl","text-9xl"
+    ]
+  }
+}
+
+Hard rules:
+- 8px grid is LAW — all spacing must be multiples of 8
+- dark theme + (saas|agency|gaming|entertainment) → glassmorphism.enabled=true
+- animationComplexity=3d → approach must include "threejs"
+- luxury|premium → gradient palette, glow shadows, floating navbar, text gradients
+- warm|restaurant|wellness → light theme, serif heading font, earthy/warm palette
+- editorial|fashion → high contrast, minimal palette, bold typography
+- Derive palette from IntentSpec.designSignals.brandColors when provided
+- Always include real Google Fonts URLs — verify they exist`,
+    });
+    this.logger.log(`✅ Design Agent → ${agent.id}`);
+    return agent.id;
+  }
+}
