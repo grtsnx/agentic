@@ -131,24 +131,24 @@ Only **`ANTHROPIC_API_KEY`** is required. Everything else is optional — if you
 blank, the project simply skips that feature and prints a friendly "Skipping…" note instead
 of failing.
 
-| Key | Required? | What it's for |
-| --- | --- | --- |
-| `ANTHROPIC_API_KEY` | ✅ **Required** | Talking to Anthropic's AI |
-| `ANTHROPIC_ENVIRONMENT_ID` | Pre-filled | Reuses an existing workspace (leave as-is) |
-| `ANTHROPIC_VAULT_ID` | Pre-filled | Reuses an existing vault (leave as-is) |
-| `INSFORGE_API_KEY` | Optional | Database features |
-| `COOLIFY_API_TOKEN` | Optional | Deploying/previewing websites |
-| `UNSPLASH_ACCESS_KEY` | Optional | Stock photos |
-| `R2_*` keys | Optional | File/image storage |
-| `RESEND_API_KEY` | Optional | Sending emails |
-| `EMAIL_DOMAIN` | Optional | Your verified email domain (e.g. `example.com`). Emails are sent from `{name}@EMAIL_DOMAIN` |
-| `STRIPE_SECRET_KEY` | Optional | Payments via Stripe |
-| `LEMONSQUEEZY_API_KEY` | Optional | Payments via Lemon Squeezy |
-| `PADDLE_API_KEY` | Optional | Payments via Paddle |
-| `PAYSTACK_SECRET_KEY` | Optional | Payments via Paystack |
-| `PAYPAL_CLIENT_SECRET` | Optional | Payments via PayPal |
-| `HIGGSFIELD_API_KEY` | Optional | AI video (video agent is skipped without it) |
-| `DAYTONA_*` keys | Optional | Sandboxed dev environments |
+| Key | Required? | What it's for | Where to get it |
+| --- | --- | --- | --- |
+| `ANTHROPIC_API_KEY` | ✅ **Required** | Talking to Anthropic's AI | [Anthropic Console → API Keys](https://console.anthropic.com/settings/keys) |
+| `ANTHROPIC_ENVIRONMENT_ID` | Pre-filled | Reuses an existing workspace (leave as-is) | Created automatically by the setup |
+| `ANTHROPIC_VAULT_ID` | Pre-filled | Reuses an existing vault (leave as-is) | Created automatically by the setup |
+| `INSFORGE_API_KEY` | Optional | Database features | Your [InsForge](https://insforge.dev) dashboard → API Keys |
+| `COOLIFY_API_TOKEN` | Optional | Deploying/previewing websites | Your [Coolify](https://coolify.io) instance → Keys & Tokens → API tokens |
+| `UNSPLASH_ACCESS_KEY` | Optional | Stock photos | [Unsplash Developers](https://unsplash.com/developers) → Your apps |
+| `R2_*` keys | Optional | File/image storage | [Cloudflare Dashboard → R2 → API Tokens](https://dash.cloudflare.com/?to=/:account/r2/api-tokens) |
+| `RESEND_API_KEY` | Optional | Sending emails | [Resend → API Keys](https://resend.com/api-keys) |
+| `EMAIL_DOMAIN` | Optional | Your verified email domain (e.g. `example.com`). Emails are sent from `{name}@EMAIL_DOMAIN` | [Resend → Domains](https://resend.com/domains) (must be verified) |
+| `STRIPE_SECRET_KEY` | Optional | Payments via Stripe | [Stripe Dashboard → API keys](https://dashboard.stripe.com/apikeys) |
+| `LEMONSQUEEZY_API_KEY` | Optional | Payments via Lemon Squeezy | [Lemon Squeezy → Settings → API](https://app.lemonsqueezy.com/settings/api) |
+| `PADDLE_API_KEY` | Optional | Payments via Paddle | [Paddle → Developer Tools → Authentication](https://vendors.paddle.com/authentication-v2) |
+| `PAYSTACK_SECRET_KEY` | Optional | Payments via Paystack | [Paystack → Settings → API Keys & Webhooks](https://dashboard.paystack.com/#/settings/developers) |
+| `PAYPAL_CLIENT_SECRET` | Optional | Payments via PayPal | [PayPal Developer → Apps & Credentials](https://developer.paypal.com/dashboard/applications) |
+| `HIGGSFIELD_API_KEY` | Optional | AI video (video agent is skipped without it) | [Higgsfield](https://higgsfield.ai) → API access |
+| `DAYTONA_*` keys | Optional | Sandboxed dev environments | [Daytona Dashboard → Keys](https://app.daytona.io/dashboard/keys) |
 
 Add an optional key later only if you want that specific feature switched on.
 
