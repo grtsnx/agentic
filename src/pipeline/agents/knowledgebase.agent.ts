@@ -1,12 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import Anthropic from '@anthropic-ai/sdk';
 import { AGENT_MODELS } from '../config/models.config';
 import { TOOLS } from '../config/tools.config';
-import { MCP_NAMES } from '../config/mcps.config';
+import { MCP_NAMES, buildMcpServers } from '../config/mcps.config';
 
 @Injectable()
 export class KnowledgeBaseAgent {
   private readonly logger = new Logger(KnowledgeBaseAgent.name);
+
+  constructor(private readonly config: ConfigService) {}
 
   async create(client: Anthropic): Promise<string> {
     this.logger.log('Creating KnowledgeBase Agent...');
@@ -16,7 +19,7 @@ export class KnowledgeBaseAgent {
         'Ingests user documents — PDFs, URLs, markdown — chunks, embeds via InsForge pgvector, and retrieves relevant context for generation.',
       model: AGENT_MODELS['knowledgebase'],
       tools: [...TOOLS.CODE, TOOLS.withMcp(MCP_NAMES.INSFORGE)],
-      mcp_servers: [],
+      mcp_servers: [buildMcpServers(this.config).INSFORGE],
       metadata: {
         pipeline: 'builder',
         order: '25',

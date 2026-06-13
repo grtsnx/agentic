@@ -1,12 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import Anthropic from '@anthropic-ai/sdk';
 import { AGENT_MODELS } from '../config/models.config';
 import { TOOLS } from '../config/tools.config';
-import { MCP_NAMES } from '../config/mcps.config';
+import { MCP_NAMES, buildMcpServers } from '../config/mcps.config';
 
 @Injectable()
 export class DeployAgent {
   private readonly logger = new Logger(DeployAgent.name);
+
+  constructor(private readonly config: ConfigService) {}
 
   async create(client: Anthropic): Promise<string> {
     this.logger.log('Creating Deploy Agent...');
@@ -16,7 +19,7 @@ export class DeployAgent {
         'User-triggered production deployment to Coolify. Polls until live, retries transient failures, returns production URL.',
       model: AGENT_MODELS['deploy'],
       tools: [...TOOLS.BASH, TOOLS.withMcp(MCP_NAMES.COOLIFY)],
-      mcp_servers: [],
+      mcp_servers: [buildMcpServers(this.config).COOLIFY],
       metadata: {
         pipeline: 'builder',
         order: '22',
