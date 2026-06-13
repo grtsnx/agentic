@@ -1,21 +1,28 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import Anthropic from '@anthropic-ai/sdk';
 import { AGENT_MODELS } from '../config/models.config';
 import { TOOLS } from '../config/tools.config';
+import { MCP_NAMES, buildMcpServers, referoEnabled } from '../config/mcps.config';
 
 @Injectable()
 export class DesignAgent {
   private readonly logger = new Logger(DesignAgent.name);
 
+  constructor(private readonly config: ConfigService) {}
+
   async create(client: Anthropic): Promise<string> {
     this.logger.log('Creating Design Agent...');
+    const useRefero = referoEnabled(this.config);
     const agent = await (client.beta.agents as any).create({
       name: 'Design Agent',
       description:
         'Produces the canonical DesignSpec — palette, typography, spacing tokens, animation config, component guidance.',
       model: AGENT_MODELS['design'],
-      tools: TOOLS.WEB,
-      mcp_servers: [],
+      tools: useRefero
+        ? [...TOOLS.WEB, TOOLS.withMcp(MCP_NAMES.REFERO)]
+        : TOOLS.WEB,
+      mcp_servers: useRefero ? [buildMcpServers(this.config).REFERO] : [],
       metadata: {
         pipeline: 'builder',
         order: '5',
@@ -28,6 +35,18 @@ export class DesignAgent {
 the CodeWriter and Animation agents. Every design decision downstream flows from this spec.
 
 Inputs you receive: IntentSpec JSON + ResearchReport JSON + any brand assets from mediaSignal.
+${
+  useRefero
+    ? `
+Before deciding the visual direction, research first with the Refero MCP: search its
+curated library of real product screens and user flows by the businessType, aesthetic
+direction, and page type from the IntentSpec. Ground palette, typography, spacing, and
+component choices in what real, shipping products actually use — never invent a look in
+a vacuum. Treat Refero as your primary reference; fall back to web search if it returns
+nothing useful.
+`
+    : ''
+}
 
 Output ONLY valid JSON — the complete DesignSpec:
 {

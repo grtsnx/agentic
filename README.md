@@ -192,6 +192,7 @@ friendly `Skipping…` note instead of failing.
 | `PAYSTACK_SECRET_KEY` | Payments (Paystack) | [Paystack → API Keys](https://dashboard.paystack.com/#/settings/developers) |
 | `PAYPAL_CLIENT_SECRET` | Payments (PayPal) | [PayPal → Apps & Credentials](https://developer.paypal.com/dashboard/applications) |
 | `HIGGSFIELD_API_KEY` | AI video (video agent skipped without it) | [Higgsfield](https://higgsfield.ai) → API access |
+| `REFERO_API_KEY` | Design research — grounds the Design & Research agents in real product screens via [Refero MCP](https://api.refero.design/mcp) (needs Refero Pro) | [Refero → MCP](https://refero.design/mcp) |
 | `DAYTONA_*` keys | Sandboxed dev environments | [Daytona → Keys](https://app.daytona.io/dashboard/keys) |
 
 </details>
