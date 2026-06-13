@@ -8,4 +8,5 @@
 - NestJS provisioning pipeline lives under `src/pipeline/`; it creates a Vault, an Environment, and 26 Claude Managed Agents on the Anthropic beta Managed Agents API and writes their IDs to `output/`.
 - Run the pipeline with `bun run setup:pipeline` (maps to `bun src/pipeline/pipeline.command.ts`).
 - In `.env`, payment provider keys (Stripe, LemonSqueezy, Paddle, Paystack, PayPal) and `HIGGSFIELD_API_KEY` are optional; the pipeline skips those features when the keys are missing (e.g. video agent is skipped without Higgsfield).
-- Email "from" address follows the `{custom}@snapblock.app` pattern (domain `snapblock.app`).
+- Email "from" address domain is configured via the `EMAIL_DOMAIN` env var (the Email Agent interpolates it as `{custom}@${EMAIL_DOMAIN}`); do not hardcode a brand/domain name in code or README.
+- Reruns of `setup:pipeline` are idempotent (agents are matched by name and updated in place); `bun run archive:duplicates` cleans up duplicate agents from earlier runs.

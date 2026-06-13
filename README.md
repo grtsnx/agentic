@@ -160,9 +160,17 @@ Add an optional key later only if you want that specific feature switched on.
 No. It's a one-time setup. Run it, it creates the agents, it stops.
 
 **Can I run it again?**
-Yes, but heads-up: each run creates a **fresh set** of agents on your Anthropic account,
-so running it twice gives you duplicates. The newest IDs are always the ones saved in
-`agents.config.json`, so the older ones just sit unused.
+Yes — it's safe. The setup is **idempotent**: re-running finds each agent by name and
+**updates it in place** instead of creating a duplicate. So you can tweak an agent and
+re-run `bun run setup:pipeline` to push the change.
+
+**I have leftover duplicate agents from an early run — how do I clean them up?**
+Run:
+```bash
+bun run archive:duplicates
+```
+This keeps one agent per name (preferring the ones in `agents.config.json`) and archives
+the rest. Agents with a unique name are never touched.
 
 **It said "Skipping … not in env" — did something break?**
 No. That's normal. It just means you didn't fill in an optional key, so that feature was
@@ -172,8 +180,9 @@ skipped on purpose.
 Into `src/pipeline/output/agents.config.json` after a successful run.
 
 **Emails are sent from where?**
-From the `snapblock.app` domain, using addresses like `noreply@snapblock.app` or
-`hello@snapblock.app`.
+From whatever domain you set in `EMAIL_DOMAIN` in your `.env`, using addresses like
+`noreply@your-domain.com` or `hello@your-domain.com`. It must be a domain you've verified
+with Resend.
 
 ---
 
@@ -210,11 +219,12 @@ Grouped roughly by the order they run in:
 This is a [NestJS](https://nestjs.com/) project. Common commands:
 
 ```bash
-bun install            # install dependencies
-bun run build          # type-check / compile
-bun run setup:pipeline # provision the 26 agents (main command)
-bun run start:dev      # run the Nest app in watch mode
-bun run test           # run unit tests
+bun install              # install dependencies
+bun run build            # type-check / compile
+bun run setup:pipeline   # provision (or update) the 26 agents (main command)
+bun run archive:duplicates # archive duplicate agents from old runs
+bun run start:dev        # run the Nest app in watch mode
+bun run test             # run unit tests
 ```
 
 Key locations:
