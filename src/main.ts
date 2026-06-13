@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { apiReference } from '@scalar/nestjs-api-reference';
@@ -41,5 +42,12 @@ async function bootstrap() {
 
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
+
+  const base = `http://localhost:${port}`;
+  const log = new Logger('Bootstrap');
+  log.log(`🚀 Runtime API ready at ${base}`);
+  log.log(`📘 Swagger UI       → ${base}/docs`);
+  log.log(`🔮 Scalar reference → ${base}/reference`);
+  log.log(`🧩 OpenAPI JSON     → ${base}/docs-json`);
 }
 bootstrap();
