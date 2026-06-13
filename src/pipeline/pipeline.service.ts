@@ -6,6 +6,7 @@ import * as path from 'path';
 
 import { VaultService } from './vault/vault.service';
 import { EnvironmentService } from './environment/environment.service';
+import { enableIdempotentAgents } from './lib/idempotent-agents';
 import { IntentAgent } from './agents/intent.agent';
 import { ConversationAgent } from './agents/conversation.agent';
 import { AuditAgent } from './agents/audit.agent';
@@ -83,6 +84,10 @@ export class PipelineService {
     const client = new Anthropic({
       apiKey: this.config.getOrThrow('ANTHROPIC_API_KEY'),
     });
+
+    // Make agent provisioning idempotent: re-running updates existing agents
+    // (matched by name) instead of creating duplicates on the account.
+    enableIdempotentAgents(client);
 
     // ── Step 1: Vault ──────────────────────────────────────
     this.logger.log('\n📦 Step 1/4: Vault');

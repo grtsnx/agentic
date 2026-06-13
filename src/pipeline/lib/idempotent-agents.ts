@@ -30,13 +30,11 @@ export function enableIdempotentAgents(client: Anthropic): void {
       logger.log(
         `Reusing "${params.name}" → ${existing.id} (updating to v${existing.version + 1})`,
       );
-      return originalCreate === undefined
-        ? existing
-        : agents.update(
-            existing.id,
-            { version: existing.version, ...params },
-            options,
-          );
+      return agents.update(
+        existing.id,
+        { version: existing.version, ...params },
+        options,
+      );
     }
     return originalCreate(params, options);
   };
