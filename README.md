@@ -1,234 +1,307 @@
-# AI Builder — Agent Setup
+<div align="center">
 
-This project sets up the "brain" behind an AI website-and-app builder. When you run
-it once, it creates **26 specialized AI agents** on your Anthropic account. Each agent
-is good at one job (researching, designing, writing code, deploying, etc.), and a final
-"orchestrator" agent knows how to make them work together.
+# 🤖 AI Builder — Agent Setup
 
-You do **not** need to be a programmer to run this. Just follow the steps below in order.
+**The "brain" behind an AI website-and-app builder.**
 
----
+Run one command and it provisions **26 specialized AI agents** on your Anthropic
+account — each an expert at one job (research, design, code, deploy…) — coordinated
+by a single orchestrator agent.
 
-## What this actually does
+<sub>Built with</sub>
+[![NestJS](https://img.shields.io/badge/NestJS-E0234E?logo=nestjs&logoColor=white)](https://nestjs.com/)
+[![Bun](https://img.shields.io/badge/Bun-000000?logo=bun&logoColor=white)](https://bun.sh/)
+[![Anthropic](https://img.shields.io/badge/Anthropic-Managed%20Agents-D4A27F)](https://console.anthropic.com/)
 
-When you run the setup command one time, it will:
+</div>
 
-1. **Create a secure vault** — a locked box on Anthropic's servers that safely stores
-   your service passwords (API keys).
-2. **Create an environment** — the workspace the agents run inside.
-3. **Create 26 agents** — the AI workers listed at the bottom of this page.
-4. **Save the results** — it writes a file with all the agent IDs so other apps can use them.
-
-That's it. It's a one-time provisioning step, not something that runs all day.
+> [!NOTE]
+> You do **not** need to be a programmer to run this. Just follow the
+> [Step-by-step guide](#-step-by-step-guide) in order.
 
 ---
 
-## Before you start (one-time install)
+## 📑 Contents
 
-You need two free things installed on your computer.
+- [What it does](#-what-it-does)
+- [Quick start](#-quick-start)
+- [Step-by-step guide](#-step-by-step-guide)
+- [Environment variables](#-environment-variables)
+- [Re-running & cleanup](#-re-running--cleanup)
+- [FAQ](#-faq)
+- [Troubleshooting](#-troubleshooting)
+- [The 26 agents](#-the-26-agents)
+- [For developers](#-for-developers)
 
-### 1. Bun (runs the project)
+---
 
-Bun is the tool that runs this project. Open your terminal and paste this:
+## ✨ What it does
 
-**Mac or Linux:**
+Running the setup command **once** will:
+
+| Step | What happens |
+| :--: | :-- |
+| 1️⃣ | **Loads your vault** — a secure box on Anthropic's servers that holds your API keys |
+| 2️⃣ | **Uses your environment** — the workspace the agents run inside |
+| 3️⃣ | **Creates 26 agents** — the AI workers (see [the full list](#-the-26-agents)) |
+| 4️⃣ | **Saves the results** — writes every agent ID to a file other apps can read |
+
+It's a **one-time provisioning step**, not something that runs all day.
+
+```mermaid
+flowchart LR
+    A([💡 Your idea]) --> B[Intent · Conversation · Audit]
+    B --> C[Research · Design · Asset · Video]
+    C --> D[Schema · CMS · Email · Payments · i18n]
+    D --> E[CodeWriter]
+    E --> F[QA · Accessibility · Performance]
+    F --> G[RunDev → Test → Preview → Deploy]
+    G --> H([🚀 Live app])
+```
+
+---
+
+## ⚡ Quick start
+
+> Already have Bun and your three Anthropic values? Do this:
+
+```bash
+bun install
+cp .env.example .env        # then fill in the 3 required values
+bun run setup:pipeline
+```
+
+New here? Follow the full guide below. 👇
+
+---
+
+## 🧭 Step-by-step guide
+
+### 1. Install Bun (one time)
+
+Bun is the tool that runs this project.
+
+**macOS / Linux**
 ```bash
 curl -fsSL https://bun.sh/install | bash
 ```
 
-**Windows (PowerShell):**
+**Windows (PowerShell)**
 ```powershell
 powershell -c "irm bun.sh/install.ps1 | iex"
 ```
 
-After it finishes, close and reopen your terminal, then check it works:
+Close and reopen your terminal, then confirm it works:
 ```bash
-bun --version
+bun --version   # a version number like 1.3.14 means you're good
 ```
-If you see a version number (like `1.3.14`), you're good.
 
-### 2. An Anthropic API key (the only required key)
+### 2. Get your 3 Anthropic values
 
-This is the password that lets the project talk to Anthropic's AI.
+Everything you need comes from the **[Anthropic Console](https://console.anthropic.com)**.
 
-1. Go to **https://console.anthropic.com**
-2. Sign in (or create an account).
-3. Open **API Keys** and click **Create Key**.
-4. Copy the key — it starts with `sk-ant-...`. Keep it somewhere safe for the next step.
+| Value | Where to get it |
+| :-- | :-- |
+| `ANTHROPIC_API_KEY` | **API Keys** → *Create Key* (starts with `sk-ant-…`) |
+| `ANTHROPIC_ENVIRONMENT_ID` | **Managed Agents → Environments** → create one → copy its ID (`env_…`) |
+| `ANTHROPIC_VAULT_ID` | **Managed Agents → Vaults** → create one → copy its ID (`vlt_…`) |
 
-> ⚠️ Treat this key like a password. Never share it or post it publicly.
+> [!WARNING]
+> Treat your API key like a password. Never share it or commit it publicly.
 
----
-
-## Setup (do this once)
-
-### Step 1 — Open the project in your terminal
+### 3. Set up the project
 
 ```bash
-cd path/to/agents
-```
-(Replace `path/to/agents` with the folder where this project lives.)
-
-### Step 2 — Install the project
-
-```bash
-bun install
+cd path/to/agents     # the folder where this project lives
+bun install           # install dependencies
+cp .env.example .env  # create your settings file
 ```
 
-### Step 3 — Create your settings file
+### 4. Add your values to `.env`
 
-The project reads your keys from a file called `.env`. There's a template called
-`.env.example`. Copy it to make your own:
+Open `.env` in any text editor and fill in the three **required** values:
 
-```bash
-cp .env.example .env
-```
-
-### Step 4 — Add your Anthropic key
-
-Open the new `.env` file in any text editor and paste your key after `ANTHROPIC_API_KEY=`:
-
-```
+```ini
 ANTHROPIC_API_KEY=sk-ant-your-key-here
+ANTHROPIC_ENVIRONMENT_ID=env_your-environment-id
+ANTHROPIC_VAULT_ID=vlt_your-vault-id
 ```
 
-**That's the only required value.** Everything else is optional (see the table below).
+Everything else is **optional** — see [Environment variables](#-environment-variables).
 Save the file.
 
----
-
-## Run it
+### 5. Run it 🚀
 
 ```bash
 bun run setup:pipeline
 ```
 
-Sit back and watch. You'll see progress messages like:
+You'll see live progress:
 
-```
+```text
 📦 Step 1/4: Vault
 🌍 Step 2/4: Environment
 🤖 Step 3/4: Agents
-   ✅ Intent Agent → agent_01EU...
-   ✅ Design Agent → agent_01Wv...
+   ✅ Intent Agent  → agent_01EU...
+   ✅ Design Agent  → agent_01Wv...
    ...
 💾 Step 4/4: Saving agents.config.json
    ✅ Pipeline setup complete!
 ```
 
 When it finishes, all 26 agent IDs are saved to:
-```
+
+```text
 src/pipeline/output/agents.config.json
 ```
 
-🎉 You're done.
+🎉 **You're done.**
 
 ---
 
-## Which keys do I need?
+## 🔑 Environment variables
 
-Only **`ANTHROPIC_API_KEY`** is required. Everything else is optional — if you leave a key
-blank, the project simply skips that feature and prints a friendly "Skipping…" note instead
-of failing.
+There are **3 required** values (all from the Anthropic Console). Everything else is
+optional: leave an optional key blank and the project simply skips that feature with a
+friendly `Skipping…` note instead of failing.
 
-| Key | Required? | What it's for | Where to get it |
-| --- | --- | --- | --- |
-| `ANTHROPIC_API_KEY` | ✅ **Required** | Talking to Anthropic's AI | [Anthropic Console → API Keys](https://console.anthropic.com/settings/keys) |
-| `ANTHROPIC_ENVIRONMENT_ID` | Auto-generated | The workspace the agents run in | Generated by the first run; paste it back in to reuse it afterwards |
-| `ANTHROPIC_VAULT_ID` | Auto-generated | The secure vault for your keys | Generated by the first run; paste it back in to reuse it afterwards |
-| `INSFORGE_API_KEY` | Optional | Database features | Your [InsForge](https://insforge.dev) dashboard → API Keys |
-| `COOLIFY_API_TOKEN` | Optional | Deploying/previewing websites | Your [Coolify](https://coolify.io) instance → Keys & Tokens → API tokens |
-| `UNSPLASH_ACCESS_KEY` | Optional | Stock photos | [Unsplash Developers](https://unsplash.com/developers) → Your apps |
-| `R2_*` keys | Optional | File/image storage | [Cloudflare Dashboard → R2 → API Tokens](https://dash.cloudflare.com/?to=/:account/r2/api-tokens) |
-| `RESEND_API_KEY` | Optional | Sending emails | [Resend → API Keys](https://resend.com/api-keys) |
-| `EMAIL_DOMAIN` | Optional | Your verified email domain (e.g. `example.com`). Emails are sent from `{name}@EMAIL_DOMAIN` | [Resend → Domains](https://resend.com/domains) (must be verified) |
-| `STRIPE_SECRET_KEY` | Optional | Payments via Stripe | [Stripe Dashboard → API keys](https://dashboard.stripe.com/apikeys) |
-| `LEMONSQUEEZY_API_KEY` | Optional | Payments via Lemon Squeezy | [Lemon Squeezy → Settings → API](https://app.lemonsqueezy.com/settings/api) |
-| `PADDLE_API_KEY` | Optional | Payments via Paddle | [Paddle → Developer Tools → Authentication](https://vendors.paddle.com/authentication-v2) |
-| `PAYSTACK_SECRET_KEY` | Optional | Payments via Paystack | [Paystack → Settings → API Keys & Webhooks](https://dashboard.paystack.com/#/settings/developers) |
-| `PAYPAL_CLIENT_SECRET` | Optional | Payments via PayPal | [PayPal Developer → Apps & Credentials](https://developer.paypal.com/dashboard/applications) |
-| `HIGGSFIELD_API_KEY` | Optional | AI video (video agent is skipped without it) | [Higgsfield](https://higgsfield.ai) → API access |
-| `DAYTONA_*` keys | Optional | Sandboxed dev environments | [Daytona Dashboard → Keys](https://app.daytona.io/dashboard/keys) |
+### Required
 
-Add an optional key later only if you want that specific feature switched on.
+| Key | What it's for | Where to get it |
+| :-- | :-- | :-- |
+| `ANTHROPIC_API_KEY` | Talking to Anthropic's AI | [Console → API Keys](https://console.anthropic.com/settings/keys) |
+| `ANTHROPIC_ENVIRONMENT_ID` | The workspace agents run in | [Console](https://console.anthropic.com) → Managed Agents → Environments |
+| `ANTHROPIC_VAULT_ID` | The secure vault for your keys | [Console](https://console.anthropic.com) → Managed Agents → Vaults |
+
+### Optional (turn features on)
+
+<details>
+<summary><strong>Show all optional keys</strong></summary>
+
+| Key | Feature | Where to get it |
+| :-- | :-- | :-- |
+| `INSFORGE_API_KEY` | Database | Your [InsForge](https://insforge.dev) dashboard → API Keys |
+| `COOLIFY_API_TOKEN` | Deploy / preview sites | Your [Coolify](https://coolify.io) instance → Keys & Tokens |
+| `UNSPLASH_ACCESS_KEY` | Stock photos | [Unsplash Developers](https://unsplash.com/developers) |
+| `R2_*` keys | File / image storage | [Cloudflare → R2 → API Tokens](https://dash.cloudflare.com/?to=/:account/r2/api-tokens) |
+| `RESEND_API_KEY` | Sending emails | [Resend → API Keys](https://resend.com/api-keys) |
+| `EMAIL_DOMAIN` | Your verified send domain — emails go out as `{name}@EMAIL_DOMAIN` | [Resend → Domains](https://resend.com/domains) |
+| `STRIPE_SECRET_KEY` | Payments (Stripe) | [Stripe → API keys](https://dashboard.stripe.com/apikeys) |
+| `LEMONSQUEEZY_API_KEY` | Payments (Lemon Squeezy) | [Lemon Squeezy → API](https://app.lemonsqueezy.com/settings/api) |
+| `PADDLE_API_KEY` | Payments (Paddle) | [Paddle → Authentication](https://vendors.paddle.com/authentication-v2) |
+| `PAYSTACK_SECRET_KEY` | Payments (Paystack) | [Paystack → API Keys](https://dashboard.paystack.com/#/settings/developers) |
+| `PAYPAL_CLIENT_SECRET` | Payments (PayPal) | [PayPal → Apps & Credentials](https://developer.paypal.com/dashboard/applications) |
+| `HIGGSFIELD_API_KEY` | AI video (video agent skipped without it) | [Higgsfield](https://higgsfield.ai) → API access |
+| `DAYTONA_*` keys | Sandboxed dev environments | [Daytona → Keys](https://app.daytona.io/dashboard/keys) |
+
+</details>
 
 ---
 
-## Frequently asked questions
+## 🔁 Re-running & cleanup
 
-**Do I need to keep this running?**
-No. It's a one-time setup. Run it, it creates the agents, it stops.
+**Safe to run again any time.** The setup is **idempotent** — re-running finds each agent
+by name and **updates it in place** instead of creating a duplicate. Tweak an agent, then:
 
-**Can I run it again?**
-Yes — it's safe. The setup is **idempotent**: re-running finds each agent by name and
-**updates it in place** instead of creating a duplicate. So you can tweak an agent and
-re-run `bun run setup:pipeline` to push the change.
+```bash
+bun run setup:pipeline
+```
 
-**I have leftover duplicate agents from an early run — how do I clean them up?**
-Run:
+Got leftover duplicates from an early/failed run? Clean them up with:
+
 ```bash
 bun run archive:duplicates
 ```
-This keeps one agent per name (preferring the ones in `agents.config.json`) and archives
-the rest. Agents with a unique name are never touched.
 
-**It said "Skipping … not in env" — did something break?**
-No. That's normal. It just means you didn't fill in an optional key, so that feature was
-skipped on purpose.
+This keeps one agent per name (preferring the IDs in `agents.config.json`) and archives the
+rest. Agents with a unique name are never touched.
 
-**Where do the agent IDs go?**
+---
+
+## ❓ FAQ
+
+<details>
+<summary><strong>Do I need to keep this running?</strong></summary>
+
+No. It's a one-time setup. Run it, it creates the agents, it stops.
+</details>
+
+<details>
+<summary><strong>It said "Skipping … not in env" — did something break?</strong></summary>
+
+No, that's normal. It just means an optional key was blank, so that feature was skipped on
+purpose.
+</details>
+
+<details>
+<summary><strong>Where do the agent IDs go?</strong></summary>
+
 Into `src/pipeline/output/agents.config.json` after a successful run.
+</details>
 
-**Emails are sent from where?**
-From whatever domain you set in `EMAIL_DOMAIN` in your `.env`, using addresses like
-`noreply@your-domain.com` or `hello@your-domain.com`. It must be a domain you've verified
-with Resend.
+<details>
+<summary><strong>Which address do emails come from?</strong></summary>
 
----
-
-## Troubleshooting
-
-| Message you see | What it means | What to do |
-| --- | --- | --- |
-| `Configuration key ANTHROPIC_API_KEY does not exist` | Your key is missing | Make sure `.env` exists and has your `ANTHROPIC_API_KEY` filled in |
-| `401` / `authentication` error | The key is wrong or expired | Create a fresh key in the Anthropic Console and paste it again |
-| `command not found: bun` | Bun isn't installed | Reinstall Bun (see "Before you start") and reopen your terminal |
-| `Skipping … not in env` | An optional key is blank | Safe to ignore, unless you wanted that feature |
-
-If you get stuck, copy the full error message and share it with whoever set this project up.
+From whatever domain you set in `EMAIL_DOMAIN` (e.g. `noreply@your-domain.com`). It must be
+a domain you've verified with Resend.
+</details>
 
 ---
 
-## The 26 agents (for the curious)
+## 🛠 Troubleshooting
 
-Grouped roughly by the order they run in:
+| Message | Meaning | Fix |
+| :-- | :-- | :-- |
+| `Configuration key ANTHROPIC_API_KEY does not exist` | Key is missing | Ensure `.env` exists and has `ANTHROPIC_API_KEY` filled in |
+| `401` / `authentication` error | Key is wrong or expired | Create a fresh key in the Console and paste it again |
+| `command not found: bun` | Bun isn't installed | Reinstall Bun (step 1) and reopen your terminal |
+| `Skipping … not in env` | An optional key is blank | Safe to ignore — unless you wanted that feature |
 
-- **Understanding your request:** Intent, Conversation, Audit
-- **Look & content:** Research, Design, Asset, Video, Animation
-- **Data & features:** Schema, CMS, Email, Payments, i18n (translations)
-- **Building the app:** CodeWriter
-- **Quality checks:** QAS, Accessibility, Performance
-- **Run, fix & ship:** RunDev, AutoFix, Testing, Preview, Deploy, Version
-- **Extras:** CustomMCP, KnowledgeBase
-- **The conductor:** Orchestrator (coordinates all of the above)
+> Still stuck? Copy the full error message and share it with whoever set this project up.
 
 ---
 
-## For developers
+## 🧩 The 26 agents
 
-This is a [NestJS](https://nestjs.com/) project. Common commands:
+<details>
+<summary><strong>See all agents, grouped by pipeline stage</strong></summary>
+
+| Stage | Agents |
+| :-- | :-- |
+| 🧠 Understand the request | Intent · Conversation · Audit |
+| 🎨 Look & content | Research · Design · Asset · Video · Animation |
+| 🗄️ Data & features | Schema · CMS · Email · Payments · i18n |
+| 🏗️ Build the app | CodeWriter |
+| ✅ Quality checks | QAS · Accessibility · Performance |
+| 🚀 Run, fix & ship | RunDev · AutoFix · Testing · Preview · Deploy · Version |
+| 🔌 Extras | CustomMCP · KnowledgeBase |
+| 🎯 The conductor | Orchestrator (coordinates everything above) |
+
+</details>
+
+---
+
+## 👩‍💻 For developers
+
+This is a [NestJS](https://nestjs.com/) project.
 
 ```bash
-bun install              # install dependencies
-bun run build            # type-check / compile
-bun run setup:pipeline   # provision (or update) the 26 agents (main command)
+bun install                # install dependencies
+bun run build              # type-check / compile
+bun run setup:pipeline     # provision (or update) the 26 agents  ← main command
 bun run archive:duplicates # archive duplicate agents from old runs
-bun run start:dev        # run the Nest app in watch mode
-bun run test             # run unit tests
+bun run start:dev          # run the Nest app in watch mode
+bun run test               # run unit tests
 ```
 
-Key locations:
-- `src/pipeline/` — the provisioning pipeline (vault, environment, agents)
-- `src/pipeline/agents/` — one file per agent
-- `src/pipeline/config/` — models, tools, and MCP server config
-- `doc/instruct.md` — the original specification (read-only)
+**Project layout**
+
+```text
+src/pipeline/
+├── pipeline.service.ts     # orchestrates the whole setup
+├── agents/                 # one file per agent (26 total)
+├── config/                 # models, tools, and MCP server config
+├── vault/ · environment/   # vault + environment provisioning
+└── output/                 # generated agents.config.json
+doc/instruct.md             # original specification (read-only)
+```
