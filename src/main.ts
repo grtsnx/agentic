@@ -14,8 +14,11 @@ async function bootstrap() {
   });
 
   // ── OpenAPI document ───────────────────────────────────────────────────
+  // AI/brand name is configurable via AI_NAME; never hardcode a brand here.
+  const aiName = process.env.AI_NAME?.trim();
+  const title = aiName ? `${aiName} — AI Builder` : 'AI Builder';
   const config = new DocumentBuilder()
-    .setTitle('JAX AI Builder API')
+    .setTitle(title)
     .setDescription(
       'Runtime API for the 27-agent website/app builder pipeline. ' +
         'Start builds, stream orchestrator events (SSE), and approve deploys.',
