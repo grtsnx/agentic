@@ -13,7 +13,7 @@ export class OrchestratorAgent {
    * and still listed in the system-prompt roster for context — they're just triggered
    * outside the coordinator's agent toolset:
    *   - conversation  → intake clarification loop, routed by the app
-   *   - video         → optional; triggered only when HIGGSFIELD_API_KEY is present
+   *   - video         → optional; triggered when HIGGSFIELD_API_KEY or PEXELS_API_KEY is present
    *   - i18n          → optional; triggered only when requiresi18n
    *   - version       → post-deploy git/Memory snapshot, app-triggered
    *   - custommcp     → background, user-registers custom MCPs
@@ -102,7 +102,7 @@ PHASE 2 — PARALLEL RESEARCH & DESIGN (all fire simultaneously after audit):
 4a. research    → industry patterns, competitors, content ideas
 4b. design      → DesignSpec (palette, fonts, spacing, animations)
 4c. asset       → Unsplash → R2 images per section slot
-4d. video       → Higgsfield videos — SKIP if HIGGSFIELD_API_KEY not in env
+4d. video       → background videos (Higgsfield AI, else Pexels stock) — SKIP only if BOTH HIGGSFIELD_API_KEY and PEXELS_API_KEY are missing
 
 PHASE 3 — ANIMATION (sequential, waits for design):
 5. animation    → GSAP/Framer/Three.js files — needs DesignSpec to proceed
@@ -156,7 +156,7 @@ BACKGROUND (run independently, never block pipeline):
 
 SKIPPING LOGIC:
 Always check IntentSpec before delegating to optional agents:
-- video:    if (!env.HIGGSFIELD_API_KEY) → skip, proceed without video
+- video:    if (!env.HIGGSFIELD_API_KEY && !env.PEXELS_API_KEY) → skip, proceed without video
 - schema:   if (!requiresDatabase && !requiresAuth) → skip
 - cms:      if (!requiresCMS) → skip
 - email:    if (!requiresEmail && !hasContactForm) → skip
@@ -216,7 +216,7 @@ Emit a job event at every phase transition:
 Emit agent-level events:
 { type: 'agent_start', agent: 'design', parallel: true }
 { type: 'agent_complete', agent: 'design', durationMs: 12400, tokensUsed: 5823 }
-{ type: 'agent_skip', agent: 'video', reason: 'HIGGSFIELD_API_KEY not set' }
+{ type: 'agent_skip', agent: 'video', reason: 'no video source key set (HIGGSFIELD_API_KEY / PEXELS_API_KEY)' }
 { type: 'agent_error', agent: 'rundev', error: '...' }
 
 ERROR HANDLING:

@@ -221,7 +221,8 @@ then reused on every later run. Only fill them in manually if you already have I
 | :-- | :-- | :-- |
 | `INSFORGE_API_KEY` | Database | Your [InsForge](https://insforge.dev) dashboard → API Keys |
 | `COOLIFY_API_TOKEN` | Deploy / preview sites | Your [Coolify](https://coolify.io) instance → Keys & Tokens |
-| `UNSPLASH_ACCESS_KEY` | Stock photos (if blank, Asset sources royalty-free images online via keyless APIs/web search, or generates on-brand SVG art — never grey placeholders) | [Unsplash Developers](https://unsplash.com/developers) |
+| `UNSPLASH_ACCESS_KEY` | Stock photos (if blank, Asset falls back to Pexels, then keyless online sources/web search, then on-brand generated SVG art — never grey placeholders) | [Unsplash Developers](https://unsplash.com/developers) |
+| `PEXELS_API_KEY` | *Optional* — free stock **photos + videos**. Used by the Asset agent when no Unsplash key is set, and by the Video agent for real stock footage when no Higgsfield key is set | [Pexels API](https://www.pexels.com/api/) |
 | `R2_*` keys | File / image storage | [Cloudflare → R2 → API Tokens](https://dash.cloudflare.com/?to=/:account/r2/api-tokens) |
 | `RESEND_API_KEY` | Sending emails | [Resend → API Keys](https://resend.com/api-keys) |
 | `EMAIL_DOMAIN` | Your verified send domain — emails go out as `{name}@EMAIL_DOMAIN` | [Resend → Domains](https://resend.com/domains) |
@@ -230,7 +231,7 @@ then reused on every later run. Only fill them in manually if you already have I
 | `PADDLE_API_KEY` | Payments (Paddle) | [Paddle → Authentication](https://vendors.paddle.com/authentication-v2) |
 | `PAYSTACK_SECRET_KEY` | Payments (Paystack) | [Paystack → API Keys](https://dashboard.paystack.com/#/settings/developers) |
 | `PAYPAL_CLIENT_SECRET` | Payments (PayPal) | [PayPal → Apps & Credentials](https://developer.paypal.com/dashboard/applications) |
-| `HIGGSFIELD_API_KEY` | AI video (video agent skipped without it) | [Higgsfield](https://higgsfield.ai) → API access |
+| `HIGGSFIELD_API_KEY` | AI-generated video. Without it the Video agent falls back to Pexels stock footage (if `PEXELS_API_KEY` is set), and is skipped only if **both** are missing | [Higgsfield](https://higgsfield.ai) → API access |
 | `REFERO_API_KEY` | Design research — grounds the Design & Research agents in real product screens via [Refero MCP](https://api.refero.design/mcp) (needs Refero Pro) | [Refero → MCP](https://refero.design/mcp) |
 | `DAYTONA_*` keys | Sandboxed dev environments | [Daytona → Keys](https://app.daytona.io/dashboard/keys) |
 
@@ -415,8 +416,8 @@ whether it runs in a parallel group, and the condition that decides if it runs a
 | 3 | **Audit** | Security-scans the prompt, then later the generated code | 🟢 Haiku | shell + read | — | always (runs **twice**) |
 | 4 | **Research** | Studies the industry, competitors, content ideas | 🟡 Sonnet | read + web (+Refero) | ✅ A | always |
 | 5 | **Design** | Picks colors, fonts, spacing, component library → `DesignSpec` | 🟡 Sonnet | read + web (+Refero) | ✅ A | always |
-| 6 | **Asset** | Hosts your images + finds stock photos (or sources/generates them when no Unsplash key), uploads to storage | 🟡 Sonnet | code + web | ✅ A | always |
-| 7 | **Video** | Generates AI background videos | 🟡 Sonnet | code | ✅ A | `HIGGSFIELD_API_KEY` is set |
+| 6 | **Asset** | Hosts your images + finds stock photos (Unsplash → Pexels → keyless online → generated SVG), uploads to storage | 🟡 Sonnet | code + web | ✅ A | always |
+| 7 | **Video** | Background videos — AI-generated (Higgsfield) or real stock footage (Pexels) | 🟡 Sonnet | code + Higgsfield | ✅ A | `HIGGSFIELD_API_KEY` **or** `PEXELS_API_KEY` is set |
 | 8 | **Animation** | Builds the motion layer (GSAP / Motion / Three.js) | 🟡 Sonnet | code + web | — | always (waits for Design) |
 | 9 | **Schema** | Designs the database + security rules | 🟡 Sonnet | code + InsForge | ✅ B | site needs a database or login |
 | 10 | **CMS** | Sets up editable content collections | 🟡 Sonnet | code + InsForge | ✅ B | site needs a CMS |
@@ -490,9 +491,12 @@ only connect to **remote URL** MCP servers, and they authenticate using a token 
 | **InsForge** | Create databases, tables, auth, storage, vector search | Schema, CMS, KnowledgeBase | `INSFORGE_API_KEY` |
 | **Coolify** | Deploy preview + production sites | Preview, Deploy | `COOLIFY_API_TOKEN` |
 | **Refero** | Search real product/UI screenshots for design inspiration | Design, Research | `REFERO_API_KEY` (Refero Pro) — *optional* |
+| **Higgsfield** | Generate AI background videos | Video | `HIGGSFIELD_API_KEY` — *optional* |
 
 If an MCP's key is missing, that power is simply not attached and the agent works without it
-(Refero is fully optional; InsForge/Coolify power the data + deploy features).
+(Refero and Higgsfield are fully optional; InsForge/Coolify power the data + deploy features).
+The **Higgsfield** MCP is attached to the Video agent only when `HIGGSFIELD_API_KEY` is set — it
+prefers the MCP tools and falls back to Higgsfield's REST API if a tool call fails.
 
 > **Why not a shadcn/HeroUI MCP?** Those are **local** plug-ins meant for code editors (they run on
 > your own machine via `npx shadcn@latest mcp`). The deployed cloud agents can only use **remote**

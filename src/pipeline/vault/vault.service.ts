@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Anthropic from '@anthropic-ai/sdk';
-import { REFERO_MCP_URL } from '../config/mcps.config';
+import { REFERO_MCP_URL, HIGGSFIELD_MCP_URL } from '../config/mcps.config';
 
 @Injectable()
 export class VaultService {
@@ -38,6 +38,18 @@ export class VaultService {
         name: 'Unsplash Access Key',
         envKey: 'UNSPLASH_ACCESS_KEY',
         hosts: ['api.unsplash.com'],
+      },
+      {
+        name: 'Pexels API Key',
+        envKey: 'PEXELS_API_KEY',
+        hosts: [
+          'api.pexels.com',
+          'images.pexels.com',
+          'videos.pexels.com',
+          'static-videos.pexels.com',
+          'player.vimeo.com',
+          '*.vimeo.com',
+        ],
       },
       {
         name: 'Cloudflare R2 Access Key',
@@ -110,12 +122,13 @@ export class VaultService {
         this.logger.log(`✅ Credential: ${cred.name}`);
       } catch (err: any) {
         if (err?.status === 409) {
-          this.logger.warn(`Already exists: ${cred.name}`);
+          this.logger.log(`Already up to date: ${cred.name}`);
         } else throw err;
       }
     }
 
     await this.addReferoCredential(client, vaultId);
+    await this.addHiggsfieldCredential(client, vaultId);
   }
 
   /**
@@ -143,7 +156,42 @@ export class VaultService {
       this.logger.log('✅ Credential: Refero MCP Token');
     } catch (err: any) {
       if (err?.status === 409) {
-        this.logger.warn('Already exists: Refero MCP Token');
+        this.logger.log('Already up to date: Refero MCP Token');
+      } else throw err;
+    }
+  }
+
+  /**
+   * Higgsfield MCP authenticates with a static bearer token bound to its MCP server
+   * URL (https://mcp.higgsfield.ai/mcp). Optional — skipped when no key is set. This
+   * is separate from the host-bound `Higgsfield API Key` credential above, which lets
+   * the Video agent also fall back to the REST API via bash.
+   */
+  private async addHiggsfieldCredential(
+    client: Anthropic,
+    vaultId: string,
+  ): Promise<void> {
+    const token = this.config.get<string>('HIGGSFIELD_API_KEY');
+    if (!token) {
+      this.logger.warn('Skipping Higgsfield MCP — HIGGSFIELD_API_KEY not in env');
+      return;
+    }
+    try {
+      await (client.beta.vaults as any).credentials.create(vaultId, {
+        display_name: 'Higgsfield MCP Token',
+        auth: {
+          type: 'static_bearer',
+          token,
+          mcp_server_url: this.config.get(
+            'HIGGSFIELD_MCP_URL',
+            HIGGSFIELD_MCP_URL,
+          ),
+        },
+      });
+      this.logger.log('✅ Credential: Higgsfield MCP Token');
+    } catch (err: any) {
+      if (err?.status === 409) {
+        this.logger.log('Already up to date: Higgsfield MCP Token');
       } else throw err;
     }
   }

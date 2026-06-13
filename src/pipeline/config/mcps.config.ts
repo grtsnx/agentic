@@ -4,9 +4,11 @@ export const MCP_NAMES = {
   INSFORGE: 'insforge',
   COOLIFY: 'coolify',
   REFERO: 'refero',
+  HIGGSFIELD: 'higgsfield',
 } as const;
 
 export const REFERO_MCP_URL = 'https://api.refero.design/mcp';
+export const HIGGSFIELD_MCP_URL = 'https://mcp.higgsfield.ai/mcp';
 
 /**
  * Animate UI (https://animate-ui.com) is a shadcn-compatible component REGISTRY of
@@ -66,6 +68,11 @@ export function buildMcpServers(config: ConfigService) {
       name: MCP_NAMES.REFERO,
       url: config.get('REFERO_MCP_URL', REFERO_MCP_URL),
     },
+    HIGGSFIELD: {
+      type: 'url',
+      name: MCP_NAMES.HIGGSFIELD,
+      url: config.get('HIGGSFIELD_MCP_URL', HIGGSFIELD_MCP_URL),
+    },
   };
 }
 
@@ -75,4 +82,14 @@ export function buildMcpServers(config: ConfigService) {
  */
 export function referoEnabled(config: ConfigService): boolean {
   return Boolean(config.get<string>('REFERO_API_KEY'));
+}
+
+/**
+ * Higgsfield exposes a remote MCP (https://mcp.higgsfield.ai/mcp) for AI video/image
+ * generation, authenticated via a static bearer token (HIGGSFIELD_API_KEY) stored in
+ * the vault. Only attach it to the Video agent when the key is present; otherwise the
+ * agent skips video generation entirely.
+ */
+export function higgsfieldEnabled(config: ConfigService): boolean {
+  return Boolean(config.get<string>('HIGGSFIELD_API_KEY'));
 }

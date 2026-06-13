@@ -12,7 +12,7 @@ export class AssetAgent {
     const agent = await (client.beta.agents as any).create({
       name: 'Asset Agent',
       description:
-        'Uploads user-supplied assets (logos/brand images from mediaSignal) to R2, then fills remaining slots with editorial Unsplash images — or, when no Unsplash key is set, finds relatable royalty-free images online (keyless APIs + web search) or generates on-brand SVG art. Also sources SVGs, Lottie animations, and icons.',
+        'Uploads user-supplied assets (logos/brand images from mediaSignal) to R2, then fills remaining slots with editorial Unsplash images — or, when no Unsplash key is set, Pexels, then keyless online sources + web search, then generated on-brand SVG art. Also sources SVGs, Lottie animations, and icons.',
       model: AGENT_MODELS['asset'],
       tools: TOOLS.CODE_WEB,
       mcp_servers: [],
@@ -48,10 +48,16 @@ Workflow:
    - wellness → "serene spa atmosphere", "mindfulness nature editorial"
    - realestate → "luxury interior architecture", "modern home exterior"
    - (and so on for all businessType values)
-5. Source a real image for each remaining slot. Pick the FIRST source that works,
-   in this order (echo "$UNSPLASH_ACCESS_KEY" to check whether the key is set):
+5. Source a real image for each remaining slot. Pick the FIRST source that works, in this
+   order (echo "$UNSPLASH_ACCESS_KEY" / "$PEXELS_API_KEY" to check which keys are set):
    a. UNSPLASH (preferred) — only if UNSPLASH_ACCESS_KEY is non-empty.
-   b. NO KEY? FIND ONE ONLINE — do NOT fall back to grey placeholders. Use a keyless
+   b. PEXELS — if UNSPLASH is unavailable but PEXELS_API_KEY is non-empty. Pexels is a real,
+      royalty-free (no-attribution-required, but include it anyway) stock library:
+        GET https://api.pexels.com/v1/search?query={query}&per_page=1&orientation=landscape
+        Header: "Authorization: $PEXELS_API_KEY"   (raw key — NOT "Bearer")
+        → use .photos[0].src.original (or .landscape for hero), .photos[0].alt for alt text,
+          .photos[0].photographer + .photographer_url for attribution. Set "source":"pexels".
+   c. NO KEY AT ALL? FIND ONE ONLINE — do NOT fall back to grey placeholders. Use a keyless
       royalty-free source and/or web_search to get a real, downloadable photo URL:
         • Openverse (keyless, CC-licensed real photos):
           GET https://api.openverse.org/v1/images/?q={query}&page_size=3&license_type=all-cc,commercial
@@ -61,7 +67,7 @@ Workflow:
           extract a real, hotlinkable image URL (must end in .jpg/.png/.webp and return 200).
       Verify the URL actually returns image bytes (curl -I → 200, content-type image/*)
       before using it. Set "source":"online" and fill photographer/license from the source.
-   c. GENERATE IT YOURSELF (last resort, only if no real image can be sourced) — produce a
+   d. GENERATE IT YOURSELF (last resort, only if no real image can be sourced) — produce a
       clean, on-brand SVG: a tasteful gradient/geometric composition using the palette from
       designSignals (and an optional label/word-mark). Inline it in the "svgs" array AND, for
       image slots, render it to the slot via a data: URL or by uploading the .svg to R2.
@@ -78,7 +84,11 @@ curl -L "{url}" -o {localFile}
 curl "https://api.unsplash.com/search/photos?query={query}&per_page=1&orientation=landscape" \\
   -H "Authorization: Client-ID $UNSPLASH_ACCESS_KEY"
 
-# Keyless fallback when no Unsplash key: Openverse returns real CC-licensed photos
+# Fallback when no Unsplash key but PEXELS_API_KEY is set (raw key, no "Bearer")
+curl "https://api.pexels.com/v1/search?query={query}&per_page=1&orientation=landscape" \\
+  -H "Authorization: $PEXELS_API_KEY"
+
+# Keyless fallback when no Unsplash/Pexels key: Openverse returns real CC-licensed photos
 curl -s "https://api.openverse.org/v1/images/?q={query}&page_size=3&license_type=all-cc,commercial"
 
 # Verify any sourced URL is a real image before using it
@@ -94,7 +104,7 @@ Output ONLY valid JSON:
   "images": [{
     "slot": "logo|hero|feature-1|feature-2|testimonials|gallery|about|og",
     "page": string,
-    "source": "user|unsplash|online|generated",
+    "source": "user|unsplash|pexels|online|generated",
     "r2Url": string,
     "sourceUrl": string,
     "alt": string,
