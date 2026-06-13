@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Anthropic from '@anthropic-ai/sdk';
+import { REFERO_MCP_URL } from '../config/mcps.config';
 
 @Injectable()
 export class VaultService {
@@ -114,6 +115,38 @@ export class VaultService {
           this.logger.warn(`Already exists: ${cred.name}`);
         } else throw err;
       }
+    }
+
+    await this.addReferoCredential(client, vaultId);
+  }
+
+  /**
+   * Refero MCP authenticates with a static bearer token bound to its MCP server
+   * URL (not host-substituted env var). Optional — skipped when no key is set.
+   */
+  private async addReferoCredential(
+    client: Anthropic,
+    vaultId: string,
+  ): Promise<void> {
+    const token = this.config.get<string>('REFERO_API_KEY');
+    if (!token) {
+      this.logger.warn('Skipping Refero — REFERO_API_KEY not in env');
+      return;
+    }
+    try {
+      await (client.beta.vaults as any).credentials.create(vaultId, {
+        display_name: 'Refero MCP Token',
+        auth: {
+          type: 'static_bearer',
+          token,
+          mcp_server_url: this.config.get('REFERO_MCP_URL', REFERO_MCP_URL),
+        },
+      });
+      this.logger.log('✅ Credential: Refero MCP Token');
+    } catch (err: any) {
+      if (err?.status === 409) {
+        this.logger.warn('Already exists: Refero MCP Token');
+      } else throw err;
     }
   }
 }
