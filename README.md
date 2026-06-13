@@ -47,6 +47,10 @@ coordinated by a single orchestrator agent.
 - [How your images & links are respected](#-how-your-images--links-are-respected)
 - [Token budget](#-token-budget)
 
+**Run builds (runtime API)**
+- [Running builds: the runtime API](#-running-builds-the-runtime-api)
+- [Watching it work in realtime](#-watching-it-work-in-realtime)
+
 **Reference**
 - [For developers](#-for-developers)
 
@@ -217,7 +221,7 @@ then reused on every later run. Only fill them in manually if you already have I
 | :-- | :-- | :-- |
 | `INSFORGE_API_KEY` | Database | Your [InsForge](https://insforge.dev) dashboard → API Keys |
 | `COOLIFY_API_TOKEN` | Deploy / preview sites | Your [Coolify](https://coolify.io) instance → Keys & Tokens |
-| `UNSPLASH_ACCESS_KEY` | Stock photos | [Unsplash Developers](https://unsplash.com/developers) |
+| `UNSPLASH_ACCESS_KEY` | Stock photos (if blank, Asset sources royalty-free images online via keyless APIs/web search, or generates on-brand SVG art — never grey placeholders) | [Unsplash Developers](https://unsplash.com/developers) |
 | `R2_*` keys | File / image storage | [Cloudflare → R2 → API Tokens](https://dash.cloudflare.com/?to=/:account/r2/api-tokens) |
 | `RESEND_API_KEY` | Sending emails | [Resend → API Keys](https://resend.com/api-keys) |
 | `EMAIL_DOMAIN` | Your verified send domain — emails go out as `{name}@EMAIL_DOMAIN` | [Resend → Domains](https://resend.com/domains) |
@@ -265,8 +269,16 @@ bun run purge:all --yes --with-environments  # also delete the environment(s)
 bun run purge:all --yes --with-memory        # also delete the memory store(s) — wipes saved persona
 ```
 
-> ⚠️ **Destructive and irreversible.** It's a dry run by default; nothing is deleted until
-> you add `--yes`. After purging, run `bun run setup:pipeline` to provision everything fresh.
+It also **blanks the auto-generated IDs in your `.env`** for whatever it deleted, so the next
+setup re-provisions them cleanly (never reusing a dead ID):
+
+- `ANTHROPIC_VAULT_ID` → always cleared (vaults are always purged)
+- `ANTHROPIC_ENVIRONMENT_ID` → cleared only with `--with-environments`
+- `ANTHROPIC_MEMORY_STORE_ID` → cleared only with `--with-memory`
+
+> ⚠️ **Destructive and irreversible.** It's a dry run by default; nothing is deleted (and your
+> `.env` is untouched) until you add `--yes`. After purging, run `bun run setup:pipeline` to
+> provision everything fresh.
 
 ---
 
@@ -403,7 +415,7 @@ whether it runs in a parallel group, and the condition that decides if it runs a
 | 3 | **Audit** | Security-scans the prompt, then later the generated code | 🟢 Haiku | shell + read | — | always (runs **twice**) |
 | 4 | **Research** | Studies the industry, competitors, content ideas | 🟡 Sonnet | read + web (+Refero) | ✅ A | always |
 | 5 | **Design** | Picks colors, fonts, spacing, component library → `DesignSpec` | 🟡 Sonnet | read + web (+Refero) | ✅ A | always |
-| 6 | **Asset** | Hosts your images + finds stock photos, uploads to storage | 🟡 Sonnet | shell + read | ✅ A | always |
+| 6 | **Asset** | Hosts your images + finds stock photos (or sources/generates them when no Unsplash key), uploads to storage | 🟡 Sonnet | code + web | ✅ A | always |
 | 7 | **Video** | Generates AI background videos | 🟡 Sonnet | code | ✅ A | `HIGGSFIELD_API_KEY` is set |
 | 8 | **Animation** | Builds the motion layer (GSAP / Motion / Three.js) | 🟡 Sonnet | code + web | — | always (waits for Design) |
 | 9 | **Schema** | Designs the database + security rules | 🟡 Sonnet | code + InsForge | ✅ B | site needs a database or login |
@@ -623,6 +635,77 @@ slightly reduced output — it only aborts if the **total** 200k is exceeded.
 
 ---
 
+## 🚀 Running builds: the runtime API
+
+Provisioning (`setup:pipeline`) is a **one-time** step that creates the agents. To actually
+**run builds**, this project also ships a thin **runtime API** that turns the provisioned
+Orchestrator into an HTTP + streaming service your own frontend (in a separate repo) can call.
+
+Start it:
+
+```bash
+bun run start        # or: bun run start:dev  (watch mode)
+```
+
+It reads `src/pipeline/output/agents.config.json`, opens an Anthropic **session** on the
+Orchestrator, mounts your vault / environment / memory store, and exposes four endpoints:
+
+| Method & path | What it does | Returns |
+| :-- | :-- | :-- |
+| `POST /builds` | Start a build from a prompt (+ optional image/link attachments) | `{ buildId, sessionId }` |
+| `GET /builds/:id` | Poll the build's status (`running` · `awaiting_input` · `completed` · `error`) | status JSON |
+| `GET /builds/:id/stream` | **Live SSE stream** of orchestrator events (see next section) | `text/event-stream` |
+| `POST /builds/:id/approve` | Continue past the preview gate to deploy | `{ buildId, status }` |
+
+A build is simply: **create a session → send your prompt (with any images/links as content
+blocks) → stream the events back → approve at the preview gate.** The pause at preview is what
+the `awaiting_input` status and the `approve` endpoint are for.
+
+### Interactive API docs (built in)
+
+When the server is running, open:
+
+- **Swagger UI** → [`/docs`](http://localhost:3000/docs) (raw OpenAPI JSON at `/docs-json`)
+- **Scalar reference** → [`/reference`](http://localhost:3000/reference)
+
+CORS is enabled so your separate frontend can call these directly; lock it down in production by
+setting `CORS_ORIGIN` to your app's origin(s).
+
+> This repo is **backend-only** and framework-agnostic. Your frontend (Next.js, Remix, plain
+> React, mobile — anything) lives in its own repo and just consumes these four endpoints.
+
+---
+
+## 👀 Watching it work in realtime
+
+Yes — the `GET /builds/:id/stream` SSE feed shows the build happening **live, step by step**.
+Each frame is one Anthropic session event, forwarded verbatim, so your UI can render:
+
+| Event | What you see |
+| :-- | :-- |
+| `agent.thread_message_sent` / `received` | The Orchestrator **delegating to a sub-agent** (`from_agent_name` → `to_agent_name`) — the multi-agent hand-off |
+| `agent.tool_use` | **Code being written** — each file write shows the path + contents; each `bash` shows the command |
+| `agent.tool_result` | **Build output, test runs, errors** — the raw terminal feedback (`is_error` flags failures) |
+| `agent.message` | The agent's narration ("Building the hero section…") |
+| `agent.mcp_tool_use` / `mcp_tool_result` | External actions (database, deploy, design search) |
+| `agent.thinking` | A "thinking…" **progress pulse** |
+
+Two honest caveats so you build the UI correctly:
+
+1. **It streams as *steps*, not token-by-token typing.** You get a complete file-write, a
+   complete command result, a complete message per event — not characters appearing one by one
+   (this SDK surface has no text-delta events).
+2. **`agent.thinking` is a progress signal, not the reasoning text.** The platform exposes that
+   the agent *is* thinking, but not *what* it's thinking — so you can show a spinner, not a
+   chain-of-thought transcript.
+
+The runtime forwards every event as `{ kind: <event.type>, payload: <raw event> }`, plus two
+synthetic kinds — `status` (build lifecycle) and `error`. Rendering each `kind` nicely (a code
+pane, a terminal pane, agent badges, a thinking indicator) is your frontend's job; the data is
+all there, live.
+
+---
+
 ## 👩‍💻 For developers
 
 This is a [NestJS](https://nestjs.com/) project.
@@ -630,10 +713,11 @@ This is a [NestJS](https://nestjs.com/) project.
 ```bash
 bun install                # install dependencies
 bun run build              # type-check / compile
-bun run setup:pipeline     # provision (or update) the 27 agents  ← main command
+bun run setup:pipeline     # provision (or update) the 27 agents  ← run this first
+bun run start              # serve the runtime API (POST /builds, SSE stream, /docs, /reference)
+bun run start:dev          # ↑ same, in watch mode
 bun run archive:duplicates # archive duplicate agents from old runs
 bun run purge:all          # wipe agents+vaults+sessions for a fresh start (dry run; --yes to apply)
-bun run start:dev          # run the Nest app in watch mode
 bun run test               # run unit tests
 bun run smoke              # boot the full DI graph (no network / no API key)
 bun audit --audit-level=high  # scan dependencies for known CVEs
@@ -657,13 +741,21 @@ ever calling the Anthropic API, so it stays fast and needs no credentials.
 **Project layout**
 
 ```text
-src/pipeline/
-├── pipeline.service.ts     # orchestrates the whole setup
-├── agents/                 # one file per agent (27 total)
-├── config/                 # models, tools, and MCP server config
-├── vault/ · environment/   # vault + environment provisioning
-├── memory/                 # memory-store provisioning (persona + cross-session memory)
-├── lib/                    # helpers (idempotent agents, .env write-back)
-└── output/                 # generated agents.config.json
+src/
+├── main.ts                 # serves the runtime API + Swagger (/docs) + Scalar (/reference)
+├── app.module.ts           # wires PipelineModule + RuntimeModule
+├── pipeline/               # PROVISIONING (the one-time setup)
+│   ├── pipeline.service.ts     # orchestrates the whole setup
+│   ├── agents/                 # one file per agent (27 total)
+│   ├── config/                 # models, tools, and MCP server config
+│   ├── vault/ · environment/   # vault + environment provisioning
+│   ├── memory/                 # memory-store provisioning (persona + cross-session memory)
+│   ├── lib/                    # helpers (idempotent agents, .env write-back/clear)
+│   ├── *.command.ts            # CLI entrypoints: setup / archive / purge
+│   └── output/                 # generated agents.config.json
+└── runtime/                # RUNTIME (running builds)
+    ├── build.controller.ts     # POST /builds, GET /builds/:id, SSE stream, approve
+    ├── runtime.service.ts      # session create → send → stream → approve
+    └── dto/                    # request/response DTOs (Swagger-annotated)
 doc/instruct.md             # original specification (read-only)
 ```
