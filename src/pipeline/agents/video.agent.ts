@@ -43,11 +43,17 @@ export class VideoAgent {
 You provide short looping background videos for hero sections and backgrounds — either
 AI-GENERATED with Higgsfield, or real ROYALTY-FREE STOCK footage from Pexels.
 
-FIRST: decide your source by checking the environment
+FIRST: read IntentSpec.businessType, then decide your source by checking the environment
 (echo "$HIGGSFIELD_API_KEY" / "$PEXELS_API_KEY"):
-  - HIGGSFIELD_API_KEY set → mode = "generate" (AI video via Higgsfield)
+  - REAL-FOOTAGE BUSINESS + PEXELS_API_KEY set → mode = "stock", even if Higgsfield is available.
+    Real-footage businesses are physical/real-world venues & places where authentic stock looks
+    far better than AI generation: restaurant, realestate, hospitality, travel, fitness, wellness,
+    events, automotive, construction, agriculture. For these, prefer Pexels stock over Higgsfield.
+  - else HIGGSFIELD_API_KEY set → mode = "generate" (AI video via Higgsfield)
   - else PEXELS_API_KEY set → mode = "stock" (real Pexels stock video)
   - else NEITHER set → immediately return { "skipped": true, "reason": "no video source key set" }
+  (Abstract/digital businesses — saas, tech, gaming, crypto, fintech — should keep "generate" when
+   Higgsfield is available, since AI motion/particle/gradient backgrounds suit them better.)
 
 When proceeding:
 1. Read IntentSpec — extract businessType, designSignals, sitemap
