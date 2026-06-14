@@ -19,9 +19,9 @@ export class BuildStatusResponseDto {
   sessionId: string;
 
   @ApiProperty({
-    enum: ['running', 'awaiting_input', 'completed', 'error'],
+    enum: ['running', 'awaiting_input', 'completed', 'error', 'stopped'],
     description:
-      'running = streaming; awaiting_input = turn ended (preview pause or done); error = failed.',
+      'running = streaming; awaiting_input = turn ended (preview pause or done); error = failed; stopped = cancelled by the user.',
   })
   status: BuildStatus;
 
@@ -33,6 +33,21 @@ export class ApproveBuildResponseDto {
   @ApiProperty()
   buildId: string;
 
-  @ApiProperty({ enum: ['running', 'awaiting_input', 'completed', 'error'] })
+  @ApiProperty({
+    enum: ['running', 'awaiting_input', 'completed', 'error', 'stopped'],
+  })
+  status: BuildStatus;
+}
+
+export class ResumeBuildResponseDto {
+  @ApiProperty({ description: 'The build id to stream from (rebound or reused).' })
+  buildId: string;
+
+  @ApiProperty({ description: 'The Anthropic session id this build is bound to.' })
+  sessionId: string;
+
+  @ApiProperty({
+    enum: ['running', 'awaiting_input', 'completed', 'error', 'stopped'],
+  })
   status: BuildStatus;
 }

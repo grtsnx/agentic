@@ -31,7 +31,12 @@ export interface StartBuildInput {
   attachments?: BuildAttachment[];
 }
 
-export type BuildStatus = 'running' | 'awaiting_input' | 'completed' | 'error';
+export type BuildStatus =
+  | 'running'
+  | 'awaiting_input'
+  | 'completed'
+  | 'error'
+  | 'stopped';
 
 /** Envelope every SSE frame is wrapped in so the frontend can switch on `kind`. */
 interface SseFrame {
@@ -46,6 +51,10 @@ interface BuildRecord {
   events$: ReplaySubject<SseFrame>;
   /** Guards against two turns streaming the same session concurrently. */
   streaming: boolean;
+  /** Set by `cancel()` so the active turn loop breaks and reports `stopped`. */
+  cancelRequested: boolean;
+  /** The live SDK event stream, kept so `cancel()` can abort it mid-flight. */
+  activeStream?: unknown;
   createdAt: number;
 }
 
@@ -98,6 +107,7 @@ export class RuntimeService implements OnModuleInit {
       status: 'running',
       events$: new ReplaySubject<SseFrame>(),
       streaming: false,
+      cancelRequested: false,
       createdAt: Date.now(),
     };
     this.builds.set(record.id, record);
@@ -107,6 +117,52 @@ export class RuntimeService implements OnModuleInit {
     void this.runTurn(record, this.buildContent(input));
 
     return { buildId: record.id, sessionId: session.id };
+  }
+
+  /**
+   * Re-binds a build to an existing (durable) Anthropic session after the runtime
+   * has forgotten it — e.g. the server restarted while the user's browser still
+   * holds the persisted `sessionId`. The session itself lives on Anthropic's side,
+   * so we just recreate a local record pointing at it and the user can resume the
+   * conversation. If we still have a live record for the session, we reuse it.
+   */
+  resume(
+    sessionId: string,
+    knownBuildId?: string,
+  ): { buildId: string; sessionId: string; status: BuildStatus } {
+    if (!sessionId?.trim()) {
+      throw new BadRequestException('`sessionId` is required');
+    }
+
+    // Already tracking this session (or this exact build) → reuse it as-is.
+    for (const r of this.builds.values()) {
+      if (r.sessionId === sessionId || r.id === knownBuildId) {
+        return { buildId: r.id, sessionId: r.sessionId, status: r.status };
+      }
+    }
+
+    // Keep the client's build id when it's free, so its persisted references and
+    // any in-flight stream URLs keep lining up after the rebind.
+    const id =
+      knownBuildId && !this.builds.has(knownBuildId)
+        ? knownBuildId
+        : randomUUID();
+
+    const record: BuildRecord = {
+      id,
+      sessionId,
+      status: 'awaiting_input',
+      events$: new ReplaySubject<SseFrame>(),
+      streaming: false,
+      cancelRequested: false,
+      createdAt: Date.now(),
+    };
+    this.builds.set(record.id, record);
+    // Emit a status frame so a reconnecting client syncs immediately.
+    this.setStatus(record, 'awaiting_input');
+    this.logger.log(`Rebound build ${record.id} → existing session ${sessionId}`);
+
+    return { buildId: record.id, sessionId, status: record.status };
   }
 
   /** Returns the live SSE stream of orchestrator events for a build. */
@@ -138,6 +194,7 @@ export class RuntimeService implements OnModuleInit {
   async approve(
     buildId: string,
     message?: string,
+    attachments?: BuildAttachment[],
   ): Promise<{ buildId: string; status: BuildStatus }> {
     const record = this.getRecord(buildId);
     if (record.streaming) {
@@ -146,8 +203,33 @@ export class RuntimeService implements OnModuleInit {
       );
     }
     const text = message?.trim() || 'Approved — deploy to production.';
-    void this.runTurn(record, [{ type: 'text', text }]);
+    void this.runTurn(record, this.buildContent({ prompt: text, attachments }));
     return { buildId: record.id, status: 'running' };
+  }
+
+  /**
+   * Stops the in-flight turn for a build. Best-effort: aborts the active event
+   * stream and flags the run loop to break, then the turn finalizes as
+   * `stopped`. The underlying session stays alive, so the user can resume by
+   * sending another message (or wipe the chat and start fresh).
+   */
+  cancel(buildId: string): { buildId: string; status: BuildStatus } {
+    const record = this.getRecord(buildId);
+    if (!record.streaming) {
+      return { buildId: record.id, status: record.status };
+    }
+    record.cancelRequested = true;
+    const stream = record.activeStream as
+      | { controller?: { abort?: () => void }; abort?: () => void }
+      | undefined;
+    try {
+      stream?.controller?.abort?.();
+      stream?.abort?.();
+    } catch {
+      // best-effort — the loop's cancelRequested check will still break it.
+    }
+    this.logger.log(`Build ${record.id} stop requested`);
+    return { buildId: record.id, status: 'stopped' };
   }
 
   // ── internals ─────────────────────────────────────────────────────────
@@ -161,6 +243,15 @@ export class RuntimeService implements OnModuleInit {
   private buildContent(input: StartBuildInput): unknown[] {
     const blocks: unknown[] = [{ type: 'text', text: input.prompt }];
     for (const a of input.attachments ?? []) {
+      // The model only consumes images and PDF/text documents. Other kinds the
+      // composer accepts (audio, video, archives, …) are dropped here so an
+      // unsupported attachment can never fail the whole build.
+      if (!this.isModelSupportedAttachment(a)) {
+        this.logger.debug(
+          `Skipping unsupported attachment (${a.type}/${a.mediaType ?? '?'})`,
+        );
+        continue;
+      }
       const blockType = a.type === 'document' ? 'document' : 'image';
       if (a.url) {
         blocks.push({ type: blockType, source: { type: 'url', url: a.url } });
@@ -178,6 +269,17 @@ export class RuntimeService implements OnModuleInit {
     return blocks;
   }
 
+  /** True when Anthropic can ingest the attachment as a content block. */
+  private isModelSupportedAttachment(a: BuildAttachment): boolean {
+    // URL attachments are trusted — we can't sniff their bytes here.
+    if (a.url && !a.base64) return true;
+    const mediaType = (a.mediaType ?? '').toLowerCase();
+    if (a.type === 'image') {
+      return mediaType === '' || mediaType.startsWith('image/');
+    }
+    return mediaType === 'application/pdf' || mediaType.startsWith('text/');
+  }
+
   /**
    * Sends one user message and streams the resulting orchestrator events until the
    * turn ends, forwarding every event verbatim to subscribers. When the turn ends the
@@ -190,6 +292,7 @@ export class RuntimeService implements OnModuleInit {
   ): Promise<void> {
     if (record.streaming) return;
     record.streaming = true;
+    record.cancelRequested = false;
     this.setStatus(record, 'running');
 
     try {
@@ -200,16 +303,34 @@ export class RuntimeService implements OnModuleInit {
       const stream = await (this.client.beta as any).sessions.events.stream(
         record.sessionId,
       );
+      record.activeStream = stream;
 
       for await (const event of stream) {
+        if (record.cancelRequested) break;
         const kind = (event?.type as string) ?? 'event';
         this.push(record, kind, event);
       }
 
+      record.activeStream = undefined;
       record.streaming = false;
-      this.setStatus(record, 'awaiting_input');
+      if (record.cancelRequested) {
+        record.cancelRequested = false;
+        this.logger.log(`Build ${record.id} stopped by user`);
+        this.setStatus(record, 'stopped');
+      } else {
+        this.setStatus(record, 'awaiting_input');
+      }
     } catch (err: any) {
+      record.activeStream = undefined;
       record.streaming = false;
+      // An abort triggered by cancel() surfaces here as a thrown error — treat
+      // it as a clean stop, not a build failure.
+      if (record.cancelRequested) {
+        record.cancelRequested = false;
+        this.logger.log(`Build ${record.id} stopped by user`);
+        this.setStatus(record, 'stopped');
+        return;
+      }
       this.logger.error(`Build ${record.id} failed: ${err?.message ?? err}`);
       this.push(record, 'error', { message: String(err?.message ?? err) });
       this.setStatus(record, 'error');
