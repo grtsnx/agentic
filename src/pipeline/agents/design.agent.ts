@@ -3,7 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import Anthropic from '@anthropic-ai/sdk';
 import { AGENT_MODELS } from '../config/models.config';
 import { TOOLS } from '../config/tools.config';
-import { MCP_NAMES, buildMcpServers, referoEnabled } from '../config/mcps.config';
+import {
+  MCP_NAMES,
+  buildMcpServers,
+  referoEnabled,
+} from '../config/mcps.config';
 
 @Injectable()
 export class DesignAgent {

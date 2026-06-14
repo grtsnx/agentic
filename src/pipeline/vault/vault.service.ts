@@ -1,7 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Anthropic from '@anthropic-ai/sdk';
-import { REFERO_MCP_URL, HIGGSFIELD_MCP_URL } from '../config/mcps.config';
+import {
+  REFERO_MCP_URL,
+  HIGGSFIELD_MCP_URL,
+  COOLIFY_MCP_URL,
+} from '../config/mcps.config';
 
 @Injectable()
 export class VaultService {
@@ -127,8 +131,43 @@ export class VaultService {
       }
     }
 
+    await this.addCoolifyCredential(client, vaultId);
     await this.addReferoCredential(client, vaultId);
     await this.addHiggsfieldCredential(client, vaultId);
+  }
+
+  /**
+   * Coolify is attached to the Preview/Deploy agents as a remote URL MCP server, which
+   * authenticates with a static bearer token bound to its MCP server URL
+   * (https://cloud2.blydr.ai/mcp) — NOT the host-substituted env-var credential above
+   * (that one only lets agents hit the Coolify REST API over bash). Without this
+   * static_bearer credential the MCP `initialize` fails with "no credential is stored
+   * for this server URL". The URL here must match `buildMcpServers().COOLIFY.url` exactly.
+   */
+  private async addCoolifyCredential(
+    client: Anthropic,
+    vaultId: string,
+  ): Promise<void> {
+    const token = this.config.get<string>('COOLIFY_API_TOKEN');
+    if (!token) {
+      this.logger.warn('Skipping Coolify MCP — COOLIFY_API_TOKEN not in env');
+      return;
+    }
+    try {
+      await (client.beta.vaults as any).credentials.create(vaultId, {
+        display_name: 'Coolify MCP Token',
+        auth: {
+          type: 'static_bearer',
+          token,
+          mcp_server_url: this.config.get('COOLIFY_MCP_URL', COOLIFY_MCP_URL),
+        },
+      });
+      this.logger.log('✅ Credential: Coolify MCP Token');
+    } catch (err: any) {
+      if (err?.status === 409) {
+        this.logger.log('Already up to date: Coolify MCP Token');
+      } else throw err;
+    }
   }
 
   /**
@@ -173,7 +212,9 @@ export class VaultService {
   ): Promise<void> {
     const token = this.config.get<string>('HIGGSFIELD_API_KEY');
     if (!token) {
-      this.logger.warn('Skipping Higgsfield MCP — HIGGSFIELD_API_KEY not in env');
+      this.logger.warn(
+        'Skipping Higgsfield MCP — HIGGSFIELD_API_KEY not in env',
+      );
       return;
     }
     try {

@@ -122,7 +122,9 @@ export class PipelineService {
     if (written.length) {
       this.logger.log(`   📝 Saved ${written.join(' + ')} to ${envPath}`);
     } else {
-      this.logger.log('   📝 .env already has vault + environment + memory IDs');
+      this.logger.log(
+        '   📝 .env already has vault + environment + memory IDs',
+      );
     }
 
     // ── Step 3: Agents (in dependency order) ──────────────

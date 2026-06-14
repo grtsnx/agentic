@@ -184,7 +184,10 @@ export class RuntimeService implements OnModuleInit {
    * build moves to `awaiting_input` (it may be the preview pause, or simply done —
    * the client decides whether to call /approve).
    */
-  private async runTurn(record: BuildRecord, content: unknown[]): Promise<void> {
+  private async runTurn(
+    record: BuildRecord,
+    content: unknown[],
+  ): Promise<void> {
     if (record.streaming) return;
     record.streaming = true;
     this.setStatus(record, 'running');

@@ -79,7 +79,9 @@ export const TOOLS = {
     },
   ],
 
-  NONE: [{ type: 'agent_toolset_20260401', default_config: { enabled: false } }],
+  NONE: [
+    { type: 'agent_toolset_20260401', default_config: { enabled: false } },
+  ],
 
   withMcp: (serverName: string) => ({
     type: 'mcp_toolset',

@@ -1,13 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import type {
-  BuildAttachment,
-  StartBuildInput,
-} from '../runtime.service';
+import type { BuildAttachment, StartBuildInput } from '../runtime.service';
 
 export class BuildAttachmentDto implements BuildAttachment {
   @ApiProperty({
     enum: ['image', 'document'],
-    description: "'image' for logos/screenshots/photos, 'document' for PDFs/brand kits.",
+    description:
+      "'image' for logos/screenshots/photos, 'document' for PDFs/brand kits.",
   })
   type: 'image' | 'document';
 
@@ -18,7 +16,8 @@ export class BuildAttachmentDto implements BuildAttachment {
   url?: string;
 
   @ApiPropertyOptional({
-    description: 'Inline base64-encoded bytes (use when you have no public URL).',
+    description:
+      'Inline base64-encoded bytes (use when you have no public URL).',
   })
   base64?: string;
 
@@ -38,7 +37,8 @@ export class StartBuildDto implements StartBuildInput {
 
   @ApiPropertyOptional({
     type: [BuildAttachmentDto],
-    description: 'Images/logos/brand kits the user attached — honored end-to-end by the agents.',
+    description:
+      'Images/logos/brand kits the user attached — honored end-to-end by the agents.',
   })
   attachments?: BuildAttachmentDto[];
 }

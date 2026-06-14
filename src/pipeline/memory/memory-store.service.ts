@@ -86,7 +86,10 @@ export class MemoryStoreService {
     }
   }
 
-  private async seedDefaults(memoryStores: any, storeId: string): Promise<void> {
+  private async seedDefaults(
+    memoryStores: any,
+    storeId: string,
+  ): Promise<void> {
     const seeds: Array<{ path: string; content: string }> = [
       { path: '/persona.md', content: DEFAULT_PERSONA },
       { path: '/user-instructions.md', content: DEFAULT_USER_INSTRUCTIONS },
@@ -99,7 +102,9 @@ export class MemoryStoreService {
         if (err?.status === 409) {
           this.logger.warn(`Already exists: ${seed.path}`);
         } else {
-          this.logger.warn(`Could not seed ${seed.path}: ${err?.message ?? err}`);
+          this.logger.warn(
+            `Could not seed ${seed.path}: ${err?.message ?? err}`,
+          );
         }
       }
     }

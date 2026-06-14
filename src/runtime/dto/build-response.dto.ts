@@ -2,7 +2,9 @@ import { ApiProperty } from '@nestjs/swagger';
 import type { BuildStatus } from '../runtime.service';
 
 export class StartBuildResponseDto {
-  @ApiProperty({ description: 'Opaque build id used for streaming + approval.' })
+  @ApiProperty({
+    description: 'Opaque build id used for streaming + approval.',
+  })
   buildId: string;
 
   @ApiProperty({ description: 'Underlying Anthropic session id.' })

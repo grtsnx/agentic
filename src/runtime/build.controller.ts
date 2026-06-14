@@ -53,7 +53,7 @@ export class BuildController {
   @ApiOperation({
     summary: 'Stream build events (SSE)',
     description:
-      'Server-Sent Events stream of orchestrator events. Each frame\'s `data` is JSON: `{ kind, payload }`.',
+      "Server-Sent Events stream of orchestrator events. Each frame's `data` is JSON: `{ kind, payload }`.",
   })
   @ApiParam({ name: 'id', description: 'Build id returned by POST /builds' })
   @ApiProduces('text/event-stream')

@@ -9,6 +9,7 @@ export const MCP_NAMES = {
 
 export const REFERO_MCP_URL = 'https://api.refero.design/mcp';
 export const HIGGSFIELD_MCP_URL = 'https://mcp.higgsfield.ai/mcp';
+export const COOLIFY_MCP_URL = 'https://cloud2.blydr.ai/mcp';
 
 /**
  * Animate UI (https://animate-ui.com) is a shadcn-compatible component REGISTRY of
@@ -61,7 +62,7 @@ export function buildMcpServers(config: ConfigService) {
     COOLIFY: {
       type: 'url',
       name: MCP_NAMES.COOLIFY,
-      url: config.get('COOLIFY_MCP_URL', 'https://cloud2.blydr.ai/mcp'),
+      url: config.get('COOLIFY_MCP_URL', COOLIFY_MCP_URL),
     },
     REFERO: {
       type: 'url',
