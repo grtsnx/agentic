@@ -19,6 +19,14 @@ import { AppService } from './app.service.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
+/** Unset stays on. `false`, `0`, `off`, and `no` stop recording and sending. */
+function isObserveEnabled(value = process.env.OBSERVE_ENABLED): boolean {
+  if (value === undefined || value.trim() === '') {
+    return true;
+  }
+  return !['false', '0', 'off', 'no'].includes(value.trim().toLowerCase());
+}
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -27,6 +35,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     // Distributed tracing, auto-correlated logs, request/job metrics, error
     // telemetry, alarms, and more — out of the box. Sign up at https://observe.nestjs.com
     ObserveModule.forRoot({
+      enabled: isObserveEnabled(),
       appKey: process.env.OBSERVE_APP_KEY,
       appSecret: process.env.OBSERVE_APP_SECRET,
       serviceId: process.env.OBSERVE_SERVICE_ID ?? '',
