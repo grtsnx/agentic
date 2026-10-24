@@ -1,5 +1,5 @@
 {
-  "$schema": "https://json.schemastore.org/nest-cli",
+  "$schema": "./schemas/nest-cli.schema.json",
   "collection": "@nestjs/schematics",
   "sourceRoot": "src",
   "exec": "scripts/start-with-paths.mjs",
