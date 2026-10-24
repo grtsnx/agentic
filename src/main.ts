@@ -4,6 +4,7 @@ import {
   StandardSchemaValidationPipe,
   ConsoleLogger,
 } from '@nestjs/common';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule, ObserveInstrument } from '@/app';
 
@@ -41,10 +42,27 @@ async function bootstrap() {
       ? true
       : {
           directives: {
-            scriptSrc: ["'self'", "'unsafe-inline'", 'https://unpkg.com'],
+            defaultSrc: [`'self'`],
+            styleSrc: [`'self'`, `'unsafe-inline'`],
+            imgSrc: [`'self'`, 'data:', 'validator.swagger.io'],
+            scriptSrc: [
+              "'self'",
+              'https:',
+              "'unsafe-inline'",
+              'https://unpkg.com',
+            ],
           },
         },
   });
+
+  const config = new DocumentBuilder()
+    .setTitle('Cats example')
+    .setDescription('The cats API description')
+    .setVersion('1.0')
+    .addTag('cats')
+    .build();
+  const documentFactory = () => SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, documentFactory);
 
   await app.listen(process.env.PORT ?? 3000);
 }
