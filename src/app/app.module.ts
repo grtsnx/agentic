@@ -6,12 +6,13 @@ import {
   FileTemplateEngine,
   MailModule,
 } from '@nestjs/mail';
-import { AppController } from './app.controller.js';
-import { AppService } from './app.service.js';
-import { join } from 'path';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ResilienceModule } from '@nestjs/resilience';
 import { IdempotencyModule } from '@nestjs/idempotency';
+import { WorkflowsModule } from '@nestjs/workflows';
+import { join } from 'path';
+import { AppController } from './app.controller.js';
+import { AppService } from './app.service.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -68,6 +69,13 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       // Runs after guards, so req.user is set. Keys never collide across users.
       // scope: (req: { user?: User }) => req.user?.id,
       scope: (req: any) => req?.headers['x-request-id'],
+    }),
+    WorkflowsModule.forRoot({
+      worker: {
+        concurrency: 10, // instances this process executes at once
+        leaseDuration: '30s', // how long a crashed process keeps its instances
+        shutdownTimeout: '10s', // how long a deploy waits for running steps
+      },
     }),
   ],
 
