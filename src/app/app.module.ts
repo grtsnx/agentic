@@ -10,6 +10,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { ResilienceModule } from '@nestjs/resilience';
 import { IdempotencyModule } from '@nestjs/idempotency';
 import { WorkflowsModule } from '@nestjs/workflows';
+import { TerminusModule } from '@nestjs/terminus';
 import { join } from 'path';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
@@ -70,6 +71,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       // scope: (req: { user?: User }) => req.user?.id,
       scope: (req: any) => req?.headers['x-request-id'],
     }),
+    TerminusModule,
     WorkflowsModule.forRoot({
       worker: {
         concurrency: 10, // instances this process executes at once

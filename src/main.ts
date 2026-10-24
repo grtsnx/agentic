@@ -13,7 +13,7 @@ async function bootstrap() {
     instrument: ObserveInstrument,
     logger: new ConsoleLogger({
       json: true,
-      logLevels: ['log', 'warn', 'error', 'fatal'],
+      logLevels: ['warn', 'error', 'fatal'],
     }),
   });
 
