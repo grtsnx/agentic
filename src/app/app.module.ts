@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { createObserveModule } from '@nestjs/observe';
 import { ConfigModule } from '@nestjs/config';
 import {
@@ -12,6 +13,7 @@ import { IdempotencyModule } from '@nestjs/idempotency';
 import { WorkflowsModule } from '@nestjs/workflows';
 import { TerminusModule } from '@nestjs/terminus';
 import { join } from 'path';
+import { HttpExceptionFilter, ResponseInterceptor } from '@/middleware';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 
@@ -82,6 +84,10 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
   ],
 
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_INTERCEPTOR, useClass: ResponseInterceptor },
+    { provide: APP_FILTER, useClass: HttpExceptionFilter },
+  ],
 })
 export class AppModule {}
