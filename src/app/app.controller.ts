@@ -9,7 +9,7 @@ import {
 import { AppService } from './app.service.js';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 
-@Controller()
+@Controller({ version: ['1', '2'] })
 @ApiTags('Server')
 export class AppController {
   constructor(
