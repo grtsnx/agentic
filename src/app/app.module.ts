@@ -10,6 +10,8 @@ import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { join } from 'path';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { ResilienceModule } from '@nestjs/resilience';
+import { IdempotencyModule } from '@nestjs/idempotency';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -44,6 +46,28 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
           limit: 10,
         },
       ],
+    }),
+    ResilienceModule.forRoot({
+      defaults: {
+        timeout: '5s',
+        retry: { attempts: 3, backoff: { delay: '200ms', maxDelay: '2s' } },
+      },
+      presets: {
+        carrier: {
+          timeout: '2s',
+          retry: { attempts: 2 },
+          circuitBreaker: {
+            failureRateThreshold: 50,
+            minimumCalls: 10,
+            openDuration: '30s',
+          },
+        },
+      },
+    }),
+    IdempotencyModule.forRoot({
+      // Runs after guards, so req.user is set. Keys never collide across users.
+      // scope: (req: { user?: User }) => req.user?.id,
+      scope: (req: any) => req?.headers['x-request-id'],
     }),
   ],
 
