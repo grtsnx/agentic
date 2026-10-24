@@ -7,8 +7,10 @@ import {
   MemoryHealthIndicator,
 } from '@nestjs/terminus';
 import { AppService } from './app.service.js';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 
 @Controller()
+@ApiTags('Server')
 export class AppController {
   constructor(
     private readonly appService: AppService,
@@ -18,11 +20,13 @@ export class AppController {
     private readonly memory: MemoryHealthIndicator,
   ) {}
 
+  @ApiOperation({ summary: 'ping server' })
   @Get()
   getHello(): string {
     return this.appService.getHello();
   }
 
+  @ApiOperation({ summary: 'Health check' })
   @Get('health')
   @HealthCheck()
   check() {
