@@ -1,8 +1,6 @@
 {
-  "$schema": "./schemas/nest-cli.schema.json",
   "collection": "@nestjs/schematics",
   "sourceRoot": "src",
-  "exec": "scripts/start-with-paths.mjs",
   "compilerOptions": {
     "deleteOutDir": true,
     "assets": ["mail/templates/**/*"],

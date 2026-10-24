@@ -55,14 +55,26 @@ async function bootstrap() {
         },
   });
 
+  const apiVersion = '1.0';
   const config = new DocumentBuilder()
     .setTitle(process.env.PLATFORM_NAME ?? 'Agentic')
-    .setDescription('The cats API description')
-    .setVersion('1.0')
-    .addTag('Server')
+    .setDescription(process.env.PLATFORM_NAME + ' API description')
+    .setVersion(apiVersion)
+    .addTag('Server', `Version ${apiVersion}`)
     .build();
-  const documentFactory = () => SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, documentFactory);
+  const buildApiDocument = () => SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, buildApiDocument, {
+    // Nest keeps the first document for the life of the process, and the
+    // browser will cache swagger-ui-init.js. Rebuild on each load so a
+    // refresh shows routes added since the server started.
+    patchDocumentOnRequest: (_request, response) => {
+      const httpResponse = response as {
+        setHeader: (name: string, value: string) => void;
+      };
+      httpResponse.setHeader('Cache-Control', 'no-store');
+      return buildApiDocument();
+    },
+  });
 
   await app.listen(process.env.PORT ?? 3000);
 }
