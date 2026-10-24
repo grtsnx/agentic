@@ -21,4 +21,10 @@ describe('AppController', () => {
       expect(appController.getHello()).toBe('Hello World!');
     });
   });
+
+  describe('health', () => {
+    it('returns an in-process liveness result', () => {
+      expect(appController.live()).toEqual({ status: 'ok' });
+    });
+  });
 });

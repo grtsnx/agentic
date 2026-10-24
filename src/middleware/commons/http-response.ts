@@ -9,11 +9,13 @@ export function httpResponse(
   statusCode: number,
   message: string,
   data?: unknown,
+  metadata?: Record<string, unknown>,
 ): Record<string, unknown> {
   const body: Record<string, unknown> = {
     statusCode,
     statusType: statusType(statusCode),
     message,
+    ...metadata,
   };
 
   if (data !== undefined) {
@@ -36,6 +38,14 @@ export function describeException(exception: unknown): {
   }
 
   const statusCode = exception.getStatus();
+
+  if (statusCode >= HttpStatus.INTERNAL_SERVER_ERROR) {
+    return {
+      statusCode,
+      message: 'Internal server error',
+    };
+  }
+
   const body = exception.getResponse();
 
   if (typeof body === 'string') {

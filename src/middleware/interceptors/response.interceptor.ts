@@ -6,7 +6,7 @@ import {
   StreamableFile,
 } from '@nestjs/common';
 import { Observable, map } from 'rxjs';
-import { httpResponse } from './http-response.js';
+import { httpResponse } from '../commons/http-response.js';
 
 @Injectable()
 export class ResponseInterceptor implements NestInterceptor {
@@ -15,7 +15,9 @@ export class ResponseInterceptor implements NestInterceptor {
       return next.handle();
     }
 
-    const response = context.switchToHttp().getResponse<{ statusCode: number }>();
+    const response = context
+      .switchToHttp()
+      .getResponse<{ statusCode: number }>();
 
     return next.handle().pipe(
       map((data: unknown) => {
