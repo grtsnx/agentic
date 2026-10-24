@@ -54,6 +54,10 @@ export function describeException(exception: unknown): {
       ? rawMessage
       : exception.message;
 
+  if ('data' in record) {
+    return { statusCode, message, data: record.data };
+  }
+
   const rest = { ...record };
   delete rest.message;
   delete rest.error;
