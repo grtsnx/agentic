@@ -28,7 +28,7 @@ export function isDirectTextRequest(message: string): boolean {
   const text = message.trim();
   return (
     ACKNOWLEDGEMENT.test(text) ||
-    /^(?:what is |calculate )?-?\d{1,8}\s*(?:[+*\/-]|times|plus|minus)\s*-?\d{1,8}[?.!]*(?: reply with just (?:the number|the answer)\.)?$/i.test(
+    /^(?:what is |calculate )?-?\d{1,8}\s*(?:[+*/-]|times|plus|minus)\s*-?\d{1,8}[?.!]*(?: reply with just (?:the number|the answer)\.)?$/i.test(
       text,
     ) ||
     /^(?:convert|make) ["“][^"”\n]{1,240}["”] (?:to|into) (?:uppercase|lowercase)[.!]?(?: return only (?:the text|those (?:two )?words)\.)?$/i.test(

@@ -339,9 +339,12 @@ describe('OpenaiService', () => {
       const service = new OpenaiService(undefined, undefined, clef);
       if (streaming) {
         let completed = false;
-        for await (const event of service.streamReply('Hello', {
-          hasAttachments: true,
-        }))
+        for await (const event of service.streamReply(
+          'Review the attached document',
+          {
+            hasAttachments: true,
+          },
+        ))
           if (event.type === 'completed') {
             expect(event.response.runtime.routing).toEqual(decision);
             completed = true;
@@ -349,16 +352,71 @@ describe('OpenaiService', () => {
         expect(completed).toBe(true);
       } else
         expect(
-          (await service.generateReply('Hello', { hasAttachments: true }))
-            .runtime.routing,
+          (
+            await service.generateReply('Review the attached document', {
+              hasAttachments: true,
+            })
+          ).runtime.routing,
         ).toEqual(decision);
       expect(agents.captureConfig).toHaveBeenCalledWith(
         expect.objectContaining({ model: 'gpt-6-luna' }),
       );
       expect(route).toHaveBeenCalledWith(
-        'Hello',
+        'Review the attached document',
         expect.objectContaining({ hasAttachments: true }),
         expect.any(AbortSignal),
+      );
+    },
+  );
+
+  it.each([false, true])(
+    'bypasses classification and tools for direct text (stream=%s)',
+    async (streaming) => {
+      const clef = new ClefService(new ConfigService());
+      const route = vi.spyOn(clef, 'route');
+      agents.run.mockResolvedValue({
+        finalOutput: streaming ? '391' : { ...output, message: '391' },
+        state: {
+          usage: {
+            requests: 1,
+            inputTokens: 10,
+            outputTokens: 1,
+            totalTokens: 11,
+            inputTokensDetails: [],
+            outputTokensDetails: [],
+          },
+        },
+        rawResponses: [],
+        newItems: [],
+        completed: Promise.resolve(),
+        async *[Symbol.asyncIterator]() {
+          yield {
+            type: 'raw_model_stream_event',
+            data: { type: 'output_text_delta', delta: '391' },
+          };
+        },
+      });
+      const service = new OpenaiService(undefined, undefined, clef);
+      if (streaming) {
+        let completed = false;
+        for await (const event of service.streamReply('17 * 23')) {
+          if (event.type === 'completed') {
+            expect(event.response.runtime.routing?.reason).toBe('fast_path');
+            completed = true;
+          }
+        }
+        expect(completed).toBe(true);
+      } else {
+        const response = await service.generateReply('17 * 23');
+        expect(response.runtime.routing?.reason).toBe('fast_path');
+      }
+      expect(route).not.toHaveBeenCalled();
+      expect(agents.captureConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'gpt-5-nano',
+          tools: [],
+          modelSettings: { reasoning: { effort: 'minimal' } },
+        }),
       );
     },
   );

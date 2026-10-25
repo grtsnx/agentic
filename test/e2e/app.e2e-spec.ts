@@ -194,7 +194,9 @@ describe('AppController (e2e)', () => {
             reason: 'classified',
             probability: 0.94,
             durationMs: 120,
-            estimatedCostUsd: null,
+            estimatedCostUsd: 0.000009994,
+            usage: { input_tokens: 263, output_tokens: 0 },
+            requestId: 'example-cf-ray',
           },
           durationMs: 1840,
           tokens: {

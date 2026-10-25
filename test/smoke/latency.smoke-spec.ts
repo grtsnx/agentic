@@ -36,7 +36,15 @@ describe('live economical model latency', () => {
         tracingDisabled: true,
         modelSettings: { maxTokens: 2048 },
       });
-      const samples = [];
+      const samples: Array<{
+        id: string;
+        round: number;
+        effort: 'low' | 'minimal';
+        firstTokenMs: number | undefined;
+        totalMs: number;
+        correct: boolean;
+        tokens: number;
+      }> = [];
       // Alternate effort order to avoid attributing a warmed provider connection to one setting.
       for (let round = 0; round < 2; round++)
         for (const item of cases)

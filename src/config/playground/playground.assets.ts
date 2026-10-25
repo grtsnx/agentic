@@ -1,3 +1,4 @@
+import { MESSAGE_EDIT_APP, MESSAGE_EDIT_STYLES } from './message-edit.asset.js';
 import {
   CHATKIT_APP,
   CHATKIT_HISTORY_VIEW,
@@ -137,6 +138,8 @@ export const PLAYGROUND_APP = `(() => {
   let elapsedTimer;
   let reconnectTimer;
   let startedAt;
+
+  ${MESSAGE_EDIT_APP}
 
   const themeRoot = document.documentElement;
   function applyTheme(theme) {
@@ -341,7 +344,9 @@ export const PLAYGROUND_APP = `(() => {
   async function send() {
     const message = elements.message.value.trim();
     if (!message || active || chatTransport.busy || !chatTransport.connected || workspacePanel.isUploading()) return;
+    closeMessageEditor?.();
     const userMessage=createMessage('user', message);
+    pendingUserMessage=userMessage;
     const attachments = workspacePanel.moveToMessage(userMessage.body,userMessage.content);
     assistantMessage = undefined;
     createAssistant();
@@ -360,6 +365,7 @@ export const PLAYGROUND_APP = `(() => {
 
   async function resetConversation() {
     if(active || chatTransport.busy)return;
+    closeMessageEditor?.();messageElements.clear();pendingUserMessage=undefined;
     chatkitWidgets.clear();
     try {await workspacePanel.reset(true);} catch(error) {setConnection('offline',error.message);return;}
     chatTransport.newThread();
@@ -456,6 +462,7 @@ export const PLAYGROUND_APP = `(() => {
     message.orb.setVisible(false);
     message.finished = true;
     message.orb.dispose();
+    if(data.itemId)messageElements.set(data.itemId,message.article);
     const sources = renderAnswer(message.content, data.response?.message ?? message.rawText, data.response?.sources);
     addRuntime(data.response?.runtime);
     addAnswerActions(message, data.response?.message ?? message.rawText, sources);
@@ -483,12 +490,14 @@ export const PLAYGROUND_APP = `(() => {
   });
 
   chatTransport.on('chat.error', (data) => {
+    pendingUserMessage=undefined;
     void workspacePanel.refresh();
     interruptResponse(data.message ?? 'The response could not be completed. Please try again.');
   });
 
   chatTransport.on('chat.widget', (item) => renderChatkitWidget(item));
   chatTransport.on('chat.history', (items) => {
+    closeMessageEditor?.();messageElements.clear();pendingUserMessage=undefined;
     assistantMessage?.orb.dispose();
     stopElapsed();
     closeSources();
@@ -501,10 +510,11 @@ export const PLAYGROUND_APP = `(() => {
       if (item.type === 'user_message') {
         const message = createMessage('user', item.content.map(part => part.text).join('\\n'));
         workspacePanel.renderSent(message.body, message.content, item.attachments.map(file => file.id));
+        bindUserMessage(message,item);
       } else if (item.type === 'assistant_message') {
         const message = createAssistant();
         message.rawText = item.content.map(part => part.text).join('\\n');
-        chatTransport.deliver('chat.completed', {response: item.agentic ?? {message:message.rawText, sources:[]}});
+        chatTransport.deliver('chat.completed', {itemId:item.id,response: item.agentic ?? {message:message.rawText, sources:[]}});
       } else renderChatkitWidget(item);
     }
   });
@@ -534,6 +544,7 @@ export const PLAYGROUND_APP = `(() => {
 
 export const PLAYGROUND_STYLES = `
 ${CHATKIT_STYLES}
+${MESSAGE_EDIT_STYLES}
 ${WORKSPACE_STYLES}
 ${ANSWER_ACTIONS_STYLES}:root {
   color-scheme: light;

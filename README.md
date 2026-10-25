@@ -60,11 +60,17 @@ CLEF_ROUTING_TIMEOUT_MS=3000
 CLEF_ROUTING_CONFIDENCE=0.75
 ```
 
-Run `bun run benchmark:routing` before enabling Clef. It makes paid classifier requests for 14 labeled prompts, without generating answers or executing tools. The report at `.tmp/clef-routing-benchmark.json` compares local and effective accuracy, classifier-only accuracy, fallback rate, and p50/p95 latency. The command fails if no real Clef decisions succeed or effective accuracy is below 85%; this small fixture is a smoke benchmark, not proof of production quality. Live validation is still pending credentials.
+Run `bun run benchmark:routing` before enabling Clef. It makes 66 real classifier requests (22 labeled cases, three rounds), without generating answers or executing tools. Normal provider charges apply. `.tmp/clef-routing-benchmark.json` records accuracy against the local router, fallback reasons, p50/p95 latency, reported token usage, request IDs, and list-price estimates. Rollout gates require at least 95% accuracy without local regression or complex-task downgrades, at most 10% fallback, p95 routing latency at most 1 second, complete usage, and separately verified billing. The command writes the report and exits non-zero if any gate fails. Billing remains unverified in the report until actual account charges can be reconciled; a token estimate cannot pass that gate.
 
-After reviewing the report, set `CLEF_ROUTING_ENABLED=true` and restart the API/CLI. The classifier sees the latest text (up to 8,000 characters), six recent user messages (up to 1,000 characters each), and whether attachments exist. File content, images, tool output, and credentials are not included in classifier state. Timeouts, uncertain probabilities, malformed replies, and provider failures fall back locally; cancellation stops the turn. No automatic classifier retries. At most eight classifier requests run concurrently per process.
+Live check on October 25, 2026: effective accuracy **66/66**, local accuracy **63/66**, fallback **6/66** (uncertain classifications), routing p50 **759ms**, p95 **1,523ms**. Cloudflare reported **20,193 input tokens**, with a **$0.000767334** list-price estimate. These small synthetic fixtures are not proof of production accuracy. **Keep Clef disabled by default:** latency exceeded the gate and account usage access returned HTTP 403, so actual billed cost could not be verified. Free allocation and invoice adjustments can change the amount charged.
 
-`runtime.routing` reports the selected model, classifier/fallback source, reason, probability when available, and routing duration. Clef billing is **not included** in generation token/cost totals; classifier cost remains `null` until usage is verified. Voice keeps its configured realtime model. Approval decisions remain explicit human actions.
+For opt-in trials only, set `CLEF_ROUTING_ENABLED=true` and restart the API/CLI. The classifier sees the latest text (up to 8,000 characters), six recent user messages (up to 1,000 characters each), and whether attachments exist. File content, images, tool output, and credentials are not included in classifier state. Timeouts, uncertain probabilities, malformed replies, and provider failures fall back locally; cancellation stops the turn. No automatic classifier retries. At most eight classifier requests run concurrently per process.
+
+`runtime.routing` reports the selected model, source, reason, probability when available, duration, provider token usage, request ID, and estimated classifier cost. Estimates use Cloudflare's published input price, including uncertain responses with usage; missing usage remains `null`. Classifier usage/cost stays separate from generation totals. Voice keeps its configured realtime model. Approval decisions remain explicit human actions.
+
+Clear greetings, basic arithmetic, and short text transformations bypass remote classification and tools. Nano uses minimal reasoning for tool-free requests; tool-enabled requests retain low reasoning because hosted web search does not support minimal reasoning. Other tasks keep their existing tools and model settings.
+
+Run `bun run benchmark:latency` to compare first-text and completion latency for low versus minimal reasoning on four simple tasks over two rounds (16 paid OpenAI requests). Results go to `.tmp/response-latency-benchmark.json`. The October 25 check passed all eight answers per setting: median first text improved from **1,120ms to 892ms** (about 20%); p95 improved from **1,824ms to 1,435ms**. Network and provider load vary, and this does not predict latency or quality for complex tasks.
 
 ## Optional web tools
 
@@ -173,6 +179,10 @@ Specialists use the OpenAI Agents SDK: a manager delegates to a researcher or co
 
 Each workspace retains up to 300 redacted, size-limited audit events with tool inputs, outputs, latency, outcome, and cost metadata. Model costs are estimates; external tool costs remain unknown when the provider does not supply them. Workspace state and approvals disappear on restart. These are local capability-scoped features, not durable storage or multi-user account authentication. Voice retains its existing read-only web tools.
 
+### Edit a message
+
+Use the pencil below a sent text message, edit it inline, then choose **Update**. **Cancel** (or Escape) keeps the original message. Updates retain that message's attachments and replace subsequent replies and model context. Pending approvals are cancelled; completed actions and their audit records are not undone. The composer draft stays untouched. Editing is unavailable while a response or action is running.
+
 ### Local code sandbox
 
 Code execution requires human approval, a trusted local Docker installation, and `SANDBOX_ENABLED=true`. Install the pinned image before starting the API:
@@ -182,6 +192,17 @@ docker pull node:26.12.1-bookworm-slim@sha256:28147155d47dc31abe0a46e0d12b59b2fb
 ```
 
 JavaScript runs as a non-root user with no network, host mounts, credentials, or Linux capabilities. Limits include 0.5 CPU, 128 MiB memory, 32 processes, a read-only root, 16 MiB temporary storage, 32 KiB output, and an independent eight-second lifetime. Cleanup failures reserve capacity until removal succeeds. Containers share the Docker host kernel; this is not a hardened multi-tenant execution service. Compose disables execution because its application container has no Docker runner; do not mount the Docker socket into it.
+
+To check the actual isolation boundaries without an OpenAI request:
+
+```bash
+bun run build
+RUN_SANDBOX_SMOKE=true node test/smoke/sandbox.smoke.mjs
+```
+
+Expect `PASS` lines for the configured CPU/memory/PID quotas, blocked outbound network, read-only root, absent application credentials, memory exhaustion, eight-second timeout, output cap, and cancellation cleanup. This uses real short-lived Docker containers and leaves `SANDBOX_ENABLED` in `.env` unchanged.
+
+For the full approval flow, enable `SANDBOX_ENABLED=true` in `.env`, restart the API, and ask in the playground: **“Propose running exactly this JavaScript: console.log(2 + 2). Wait for my approval.”** Review the inline card and select **Approve once**. Ask for the result afterward. To check denial, repeat with different code and choose **Deny**; no container should run. For timeout behavior, propose `setInterval(() => {}, 1000)` and approve it. It must stop with a non-zero exit code, not a successful result.
 
 ## Testing
 
@@ -251,7 +272,7 @@ src/
 │   ├── livekit/          # Voice agent, worker, and console setup.
 │   ├── openai/           # Model routing, delegation budgets, and provider errors.
 │   ├── schema/           # Zod schemas and categorized types/.
-│   └── playground/       # Custom chat UI, ChatKit transport, previews, and LiveKit voice.
+│   └── playground/       # Chat UI, inline editing, ChatKit transport, previews, and voice.
 ├── dto/                  # API input and output contracts.
 ├── lib/                  # Provider integrations, Clef routing, and ChatKit protocol adapter.
 ├── middleware/           # Filters, interceptors, errors, and shared utilities.
@@ -289,7 +310,8 @@ Ordered from foundations to advanced capabilities. ✅ Verified complete · ⬜ 
 - ✅ Return token usage, model/tool calls, and clearly labelled cost estimates.
 - ✅ Route lightweight work to GPT-5 Nano and promote complex work only as high as GPT-6 Luna.
 - ✅ Add optional Clef-flash routing with bounded context, timeout, validated decisions, and local fallback.
-- ⬜ Validate Clef routing accuracy, latency, fallback rate, and billed cost against real Cloudflare responses before enabling it by default.
+- ✅ Measure Clef accuracy, latency, fallback rate, and reported usage against real Cloudflare responses.
+- ⬜ Reconcile actual Clef billed cost and meet the latency rollout gate before enabling it by default.
 - ✅ Document each API version in Swagger, Scalar, and OpenAPI JSON.
 - ✅ Verify a real provider response with a documented local smoke-test command.
 - ✅ Map provider authentication, timeout, rate-limit, and availability failures to stable application errors.
@@ -376,7 +398,22 @@ Ordered from foundations to advanced capabilities. ✅ Verified complete · ⬜ 
 - ⬜ Detect dirty worktrees, conflicts, generated files, and secret exposure.
 - ⬜ Produce reproducible artifacts and a verification summary.
 
-### 10. Composio app integrations
+### 10. Browser and computer use
+
+- ⬜ Add browser navigation, page reading, screenshots, and accessible element inspection in an isolated browser session.
+- ⬜ Support clicking, typing, forms, uploads, and downloads through the existing permission tiers and human approvals.
+- ⬜ Add local computer use through an explicitly enabled companion with scoped access to applications, folders, keyboard, and mouse.
+- ⬜ Show the active browser or desktop session, real action progress, and an immediate stop/takeover control.
+- ⬜ Support cloud computers over SSH with verified host keys, short-lived credentials, least-privilege accounts, and restricted commands or file access.
+- ⬜ Provide remote desktop control through an authenticated encrypted tunnel or private network; SSH shell access alone does not provide graphical computer use.
+- ⬜ Evaluate boats.dev and lower-cost VM or hosted-computer alternatives for browser/desktop support, isolation, startup latency, regions, and total billed cost before choosing a provider.
+- ⬜ Share task and approval contracts across local, SSH-connected, and managed cloud computers; keep external provider adapters under `lib/`.
+- ⬜ Isolate browser profiles and desktop sessions per user/task; protect credentials and treat page, screenshot, and terminal content as untrusted input.
+- ⬜ Enforce resource, network, filesystem, runtime, and spending limits; suspend idle machines and clean up expired sessions and orphaned VMs.
+- ⬜ Record redacted action results, artifacts, latency, cost, and failures; verify outcomes before retrying actions that could create duplicate effects.
+- ⬜ Test disconnects, cancellation, approval expiry, prompt injection, and session isolation; validate local computer use separately on macOS, Windows, and Linux.
+
+### 11. Composio app integrations
 
 - ⬜ Integrate [Composio Platform](https://docs.composio.dev/docs/configuring-sessions) with a stable local user ID.
 - ⬜ List connected apps and available tools without exposing credentials.
@@ -385,7 +422,7 @@ Ordered from foundations to advanced capabilities. ✅ Verified complete · ⬜ 
 - ⬜ Add one read-only integration before any write-capable integration.
 - ⬜ Test revoked connections, expired credentials, retries, and duplicate actions.
 
-### 11. Database and Redis persistence
+### 12. Database and Redis persistence
 
 - ⬜ Choose a relational database and define migrations for users, sessions, tasks, approvals, and audit records.
 - ⬜ Add transactional writes, idempotency keys, optimistic concurrency, and rollback tests.
@@ -393,7 +430,7 @@ Ordered from foundations to advanced capabilities. ✅ Verified complete · ⬜ 
 - ⬜ Define ownership, retention, deletion, backup, restore, and encryption policies.
 - ⬜ Test migration rollback, duplicate delivery, concurrent writes, and restore procedures.
 
-### 12. Mem0 long-term memory
+### 13. Mem0 long-term memory
 
 - ⬜ Define which facts may enter long-term memory and which data must never be stored.
 - ⬜ Integrate Mem0 behind a provider-neutral memory interface.
@@ -401,7 +438,7 @@ Ordered from foundations to advanced capabilities. ✅ Verified complete · ⬜ 
 - ⬜ Add relevance thresholds, provenance, expiration, deduplication, and tenant isolation.
 - ⬜ Measure whether retrieved memories improve task results without leaking between sessions.
 
-### 13. Temporal durable workflows
+### 14. Temporal durable workflows
 
 - ⬜ Identify workflows that exceed the OpenAI Agents SDK's built-in execution and recovery guarantees.
 - ⬜ Add [Temporal](https://docs.temporal.io/ai) only for workflows that need durable waits, retries, signals, or recovery.
@@ -409,7 +446,7 @@ Ordered from foundations to advanced capabilities. ✅ Verified complete · ⬜ 
 - ⬜ Support human approval waits, cancellation, retry policies, and compensation.
 - ⬜ Test worker restarts, replay, duplicate delivery, timeout, and partial failure.
 
-### 14. Local Docker and self-hosted sandboxes
+### 15. Local Docker and self-hosted sandboxes
 
 - ⬜ Define a sandbox provider interface shared by managed, Docker, and future self-hosted runtimes.
 - ✅ Run local Docker sandboxes as non-root with read-only filesystems, dropped capabilities, quotas, and isolated networks.
@@ -417,7 +454,7 @@ Ordered from foundations to advanced capabilities. ✅ Verified complete · ⬜ 
 - ⬜ Add image allowlists, vulnerability scanning, cleanup, and orphan recovery.
 - ⬜ Document a self-hosted deployment and its threat model.
 
-### 15. Multi-user identity, tenancy, quotas, and billing
+### 16. Multi-user identity, tenancy, quotas, and billing
 
 - ⬜ Add authentication, secure sessions, account recovery, and optional multi-factor authentication.
 - ⬜ Enforce tenant ownership and authorization in every service and data query.
@@ -426,7 +463,7 @@ Ordered from foundations to advanced capabilities. ✅ Verified complete · ⬜ 
 - ⬜ Add organization roles, invitations, audit access, and account deletion.
 - ⬜ Add billing only after metering and quota tests are reliable.
 
-### 16. Evaluations, observability, security, and production operations
+### 17. Evaluations, observability, security, and production operations
 
 - ✅ Exclude sensitive prompt, response, and tool data from main-agent and specialist SDK traces.
 - ✅ Bound main-agent output per model call and distinguish exhausted quota from temporary rate limits.

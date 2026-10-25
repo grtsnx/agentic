@@ -63,7 +63,7 @@ class RuntimeRoutingDto {
   @ApiProperty({
     type: Number,
     nullable: true,
-    example: null,
+    example: 0.000009994,
     description:
       'Classifier list-price estimate from provider usage; excludes free allowances and is separate from generation cost.',
   })
@@ -72,6 +72,7 @@ class RuntimeRoutingDto {
   usage?: RoutingUsageDto;
   @ApiPropertyOptional({
     description: 'Provider request reference for usage reconciliation.',
+    example: 'example-cf-ray',
   })
   requestId?: string;
 }

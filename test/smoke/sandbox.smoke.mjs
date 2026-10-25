@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { ConfigService } from '@nestjs/config';
-import { SandboxService } from '../../dist/lib/sandbox/sandbox.service.js';
+import { SandboxService } from '../../dist/lib/index.js';
 
 if (process.env.RUN_SANDBOX_SMOKE !== 'true')
   throw new Error('Set RUN_SANDBOX_SMOKE=true.');
@@ -35,6 +35,17 @@ try {
   console.log(
     'PASS: actual CPU, memory, PID, filesystem, network, and credential isolation',
   );
+  const exhausted = await sandbox.execute(
+    'const buffers=[]; for(let n=0;n<48;n++) buffers.push(Buffer.alloc(8*1024*1024,1)); console.log("unexpected allocation success");',
+    new AbortController().signal,
+  );
+  assert.equal(
+    exhausted.exitCode,
+    137,
+    'Memory pressure must terminate this container.',
+  );
+  assert.ok(!exhausted.stdout.includes('unexpected allocation success'));
+  console.log('PASS: actual memory exhaustion is contained');
   const started = Date.now();
   const expired = await sandbox.execute(
     'setInterval(()=>{},1000)',

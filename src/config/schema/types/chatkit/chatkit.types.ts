@@ -48,8 +48,11 @@ export type ChatkitThread = {
   items: ChatkitItem[];
   approvals: Map<string, string>;
   busy: boolean;
+  // Model-history offsets avoid duplicating the complete session for every turn.
+  checkpoints: Map<string, number>;
 };
 export type ChatkitEvent =
+  | { type: 'thread.item.removed'; item_id: string }
   | { type: 'thread.created' | 'thread.updated'; thread: ChatkitThreadView }
   | {
       type: 'thread.item.added' | 'thread.item.done' | 'thread.item.replaced';

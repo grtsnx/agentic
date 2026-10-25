@@ -142,22 +142,20 @@ describe('optional Clef routing', () => {
     async (probability) => {
       vi.stubGlobal(
         'fetch',
-        vi
-          .fn()
-          .mockResolvedValue(
-            new Response(
-              JSON.stringify({
-                success: true,
-                result: {
-                  usage: { input_tokens: 1000, output_tokens: 0 },
-                  answers: {
-                    needs_complex: { type: 'noul', noul: probability },
-                  },
+        vi.fn().mockResolvedValue(
+          new Response(
+            JSON.stringify({
+              success: true,
+              result: {
+                usage: { input_tokens: 1000, output_tokens: 0 },
+                answers: {
+                  needs_complex: { type: 'noul', noul: probability },
                 },
-              }),
-              { headers: { 'cf-ray': 'synthetic-request' } },
-            ),
+              },
+            }),
+            { headers: { 'cf-ray': 'synthetic-request' } },
           ),
+        ),
       );
       const result = await new ClefService(new ConfigService(settings)).route(
         'Question',
@@ -173,19 +171,17 @@ describe('optional Clef routing', () => {
   it('rejects malformed usage instead of reporting invented cost', async () => {
     vi.stubGlobal(
       'fetch',
-      vi
-        .fn()
-        .mockResolvedValue(
-          new Response(
-            JSON.stringify({
-              success: true,
-              result: {
-                usage: { input_tokens: -2, output_tokens: 0 },
-                answers: { needs_complex: { type: 'noul', noul: 0.9 } },
-              },
-            }),
-          ),
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            success: true,
+            result: {
+              usage: { input_tokens: -2, output_tokens: 0 },
+              answers: { needs_complex: { type: 'noul', noul: 0.9 } },
+            },
+          }),
         ),
+      ),
     );
     expect(
       await new ClefService(new ConfigService(settings)).route('Question'),

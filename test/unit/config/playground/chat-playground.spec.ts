@@ -38,6 +38,7 @@ class Element extends EventEmitter {
   showModal() {
     this.open = true;
   }
+  remove() {}
   close() {
     this.open = false;
     this.emit('close');
@@ -68,6 +69,7 @@ function setup(deferFrames = false) {
   const socket = Object.assign(new EventEmitter(), {
     connected: true,
     files: [],
+    edit: vi.fn().mockResolvedValue(undefined),
   });
   const writeText = vi.fn().mockResolvedValue(undefined);
   const fetchMock = vi.fn().mockResolvedValue({
@@ -511,5 +513,41 @@ describe('uploaded file citations', () => {
     expect(
       descendants(ui.content).filter((node) => node.tagName === 'code'),
     ).toHaveLength(1);
+  });
+});
+
+describe('inline user message editing', () => {
+  it('offers an accessible editor, cancel, and update without changing the composer draft', async () => {
+    const ui = setup();
+    ui.socket.emit('chat.user', {
+      id: 'user-id',
+      content: [{ text: 'Hello' }],
+      attachments: [],
+    });
+    ui.socket.emit('chat.completed', {
+      response: { message: 'Reply', sources: [] },
+    });
+    const user = ui.query('#messages').children[0]!;
+    const edit = descendants(user).find(
+      (node) => node.attributes.get('aria-label') === 'Edit message',
+    );
+    expect(edit).toBeDefined();
+    edit!.emit('click');
+    let editor = descendants(user).find((node) => node.tagName === 'textarea')!;
+    expect(editor.value).toBe('Hello');
+    let update = descendants(user).find(
+      (node) => node.textContent === 'Update',
+    )!;
+    expect(update.disabled).toBe(true);
+    editor.value = 'Corrected';
+    editor.emit('input');
+    ui.query('#message').value = 'Unsent draft';
+    descendants(user)
+      .find((node) => node.tagName === 'form')!
+      .emit('submit', { preventDefault() {} });
+    await vi.waitFor(() =>
+      expect(ui.socket.edit).toHaveBeenCalledWith('user-id', 'Corrected'),
+    );
+    expect(ui.query('#message').value).toBe('Unsent draft');
   });
 });

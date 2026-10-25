@@ -27,6 +27,7 @@ function setup(responses: Response[]) {
     emit(name: string, data: unknown): void;
     on(name: string, handler: (data: unknown) => void): void;
     busy: boolean;
+    edit(itemId: string, text: string): Promise<void>;
     action(item: { id: string }, action: unknown): Promise<void>;
   };
   for (const name of [
@@ -36,6 +37,8 @@ function setup(responses: Response[]) {
     'chat.error',
     'chat.cancelled',
     'chat.widget',
+    'chat.user',
+    'chat.removed',
   ])
     transport.on(name, (data) => events.push([name, data]));
   return { transport, fetch, events, browserEvents };
@@ -111,6 +114,39 @@ describe('custom playground ChatKit transport', () => {
       type: 'threads.add_user_message',
       params: { thread_id: 'thread' },
     });
+  });
+  it('sends edits with server item IDs and surfaces authoritative removals', async () => {
+    const ui = setup([
+      sse([{ type: 'thread.created', thread: { id: 'thread' } }, completed]),
+      Response.json({ files: [] }),
+      sse([
+        { type: 'thread.item.removed', item_id: 'old' },
+        {
+          type: 'thread.item.done',
+          item: {
+            id: 'new',
+            type: 'user_message',
+            content: [{ text: 'Corrected' }],
+            attachments: [],
+          },
+        },
+        completed,
+      ]),
+      Response.json({ files: [] }),
+    ]);
+    ui.transport.emit('chat.send', { message: 'Original' });
+    await vi.waitFor(() => expect(ui.transport.busy).toBe(false));
+    await ui.transport.edit('old', 'Corrected');
+    const edit = ui.fetch.mock.calls[2] as unknown as [string, RequestInit];
+    expect(JSON.parse(edit[1].body as string)).toEqual({
+      type: 'threads.edit_user_message',
+      params: { thread_id: 'thread', item_id: 'old', text: 'Corrected' },
+    });
+    expect(ui.events).toContainEqual(['chat.removed', { itemId: 'old' }]);
+    expect(ui.events).toContainEqual([
+      'chat.user',
+      expect.objectContaining({ id: 'new' }),
+    ]);
   });
   it('reports truncated streams without declaring completion or replaying the request', async () => {
     const ui = setup([sse([completed], true)]);

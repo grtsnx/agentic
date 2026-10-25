@@ -210,6 +210,62 @@ describe('ChatKit protocol and capability isolation', () => {
       params: { thread_id: id },
     }).expect(404);
   });
+  it('edits an owned user message and removes later turns, rejecting foreign or invalid edits', async () => {
+    const auth = await owner(),
+      foreign = await owner();
+    const original = await post(auth, {
+      type: 'threads.create',
+      params: { input },
+    }).expect(200);
+    const output = events(original.text);
+    const id = output[0].thread.id;
+    const user = output.find(
+      (event) =>
+        event.type === 'thread.item.done' && event.item.type === 'user_message',
+    ).item;
+    const assistant = output.find(
+      (event) =>
+        event.type === 'thread.item.done' &&
+        event.item.type === 'assistant_message',
+    ).item;
+    const edit = {
+      type: 'threads.edit_user_message',
+      params: { thread_id: id, item_id: user.id, text: 'Updated question' },
+    };
+    await post(foreign, edit).expect(404);
+    await post(auth, { ...edit, params: { ...edit.params, text: ' ' } }).expect(
+      400,
+    );
+    await post(auth, {
+      ...edit,
+      params: { ...edit.params, item_id: assistant.id },
+    }).expect(404);
+    await post(auth, {
+      type: 'threads.add_user_message',
+      params: { thread_id: id, input },
+    }).expect(200);
+    const updated = await post(auth, edit).expect(200);
+    expect(events(updated.text)).toContainEqual({
+      type: 'thread.item.removed',
+      item_id: user.id,
+    });
+    const history = await post(auth, {
+      type: 'items.list',
+      params: { thread_id: id, order: 'asc' },
+    }).expect(200);
+    const messages = history.body.data.filter(
+      (item: { type: string }) => item.type === 'user_message',
+    );
+    expect(messages).toHaveLength(1);
+    expect(messages[0].content[0].text).toBe('Updated question');
+    expect(
+      history.body.data.some(
+        (item: { id: string }) => item.id === assistant.id,
+      ),
+    ).toBe(false);
+    await post(auth, edit).expect(404);
+  });
+
   it('rejects missing tokens, cross-owner reads and actions, model overrides, and unsupported uploads', async () => {
     const a = await owner(),
       b = await owner();

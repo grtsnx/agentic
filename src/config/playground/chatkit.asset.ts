@@ -55,22 +55,25 @@ function createChatkitTransport() {
   async function send(data) {
     if(controller)return;
     controller=new AbortController();const current=controller;
-    let completed;
+    let completed;let completedId;
     deliver('chat.started');
     try {
       const input={content:[{type:'input_text',text:data.message}],attachments:data.attachments??[],inference_options:{}};
-      await stream(threadId?'threads.add_user_message':'threads.create',threadId?{thread_id:threadId,input}:{input},event=>{
+      await stream(data.itemId?'threads.edit_user_message':threadId?'threads.add_user_message':'threads.create',data.itemId?{thread_id:threadId,item_id:data.itemId,text:data.message}:threadId?{thread_id:threadId,input}:{input},event=>{
         if(event.type==='thread.created'){threadId=event.thread.id;files=event.thread.files??[];}
+        if(event.type==='thread.item.removed')deliver('chat.removed',{itemId:event.item_id});
+        if(event.type==='thread.item.replaced')deliver('chat.widget',event.item);
         if(event.type==='progress_update')deliver('chat.status',{message:event.text});
         if(event.type==='thread.item.updated'&&event.update.type==='assistant_message.content_part.text_delta')deliver('chat.delta',{delta:event.update.delta});
         if(event.type==='thread.item.done'){
-          if(event.item.type==='assistant_message')completed=event.item.agentic??{message:event.item.content.map(part=>part.text).join('\n'),sources:[]};
+          if(event.item.type==='user_message')deliver('chat.user',event.item);
+          if(event.item.type==='assistant_message'){completedId=event.item.id;completed=event.item.agentic??{message:event.item.content.map(part=>part.text).join('\n'),sources:[]};}
           else if(event.item.type==='widget')deliver('chat.widget',event.item);
         }
       },current.signal);
       if(!completed)throw new Error('The response was interrupted. Please send a new message.');
       await syncFiles().catch(()=>{});
-      deliver('chat.completed',{response:completed});
+      deliver('chat.completed',{response:completed,...(completedId?{itemId:completedId}:{})});
     } catch(error){
       deliver(current.signal.aborted&&connected?'chat.cancelled':'chat.error',{message:connected?error.message:'Network connection lost. Reconnect and send a new message.'});
     } finally {if(controller===current)controller=undefined;}
@@ -100,6 +103,7 @@ function createChatkitTransport() {
     emit(name,data){if(name==='chat.send')void send(data);else if(name==='chat.cancel'){deliver('chat.cancelling');controller?.abort();}},
     disconnect(){controller?.abort();},connect(){deliver(connected?'connect':'disconnect');},
     newThread(){threadId=undefined;files=[];},json,load,action,
+    async edit(itemId,message){if(!threadId)throw new Error('Conversation not found.');await send({itemId,message});},
     async deleteThread(id){await json('threads.delete',{thread_id:id});if(threadId===id)resetConversation();},
   };
 }

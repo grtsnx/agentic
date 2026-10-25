@@ -6,6 +6,35 @@ const runSmoke = process.env.RUN_PROVIDER_SMOKE === 'true' ? it : it.skip;
 
 describe('OpenAI provider smoke test', () => {
   runSmoke(
+    'streams a direct answer through the tool-free fast path',
+    async () => {
+      const environment = validateEnvironment({ ...process.env });
+      if (!environment.OPENAI_API_KEY)
+        throw new Error(
+          'OPENAI_API_KEY is required for the provider smoke test',
+        );
+      const service = new OpenaiService(new ConfigService(environment));
+      const started = performance.now();
+      let firstTextMs: number | undefined;
+      let completed = false;
+      for await (const event of service.streamReply('17 * 23')) {
+        if (event.type === 'delta' && event.delta && firstTextMs === undefined)
+          firstTextMs = Math.round(performance.now() - started);
+        if (event.type === 'completed') {
+          expect(event.response.message).toMatch(/391/);
+          expect(event.response.runtime.routing?.reason).toBe('fast_path');
+          expect(event.response.runtime.tokens.total).toBeGreaterThan(0);
+          console.info(JSON.stringify({ fastPath: true, firstTextMs }));
+          completed = true;
+        }
+      }
+      expect(completed).toBe(true);
+      expect(firstTextMs).toBeDefined();
+    },
+    120_000,
+  );
+
+  runSmoke(
     'streams a complete reply using the Agentic identity',
     async () => {
       const environment = validateEnvironment({

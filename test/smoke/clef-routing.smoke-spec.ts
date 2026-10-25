@@ -5,6 +5,8 @@ import {
   validateEnvironment,
   routeOpenaiModel,
   CLEF_INPUT_USD_PER_MILLION,
+  type ModelRoutingDecision,
+  type OpenaiModel,
 } from '@/config';
 import { clefCases } from '../fixtures/routing/clef-cases.js';
 
@@ -25,7 +27,15 @@ describe('live Clef routing benchmark', () => {
         CLEF_ROUTING_ENABLED: true,
       });
       const service = new ClefService(new ConfigService(config));
-      const cases = [];
+      const cases: Array<
+        ModelRoutingDecision & {
+          id: string;
+          round: number;
+          expected: OpenaiModel;
+          localModel: OpenaiModel;
+          localDurationMs: number;
+        }
+      > = [];
       // Repeated rounds expose provider variability; rotating order reduces cold-start bias.
       for (let round = 0; round < 3; round++)
         for (let index = 0; index < clefCases.length; index++) {

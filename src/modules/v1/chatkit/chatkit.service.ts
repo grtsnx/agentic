@@ -7,6 +7,7 @@ import {
   type OnModuleDestroy,
 } from '@nestjs/common';
 import { ChatkitAdapterService } from '@/lib';
+import { MemorySession } from '@openai/agents';
 import { describeException } from '@/middleware';
 import {
   chatkitRequestSchema,
@@ -137,6 +138,7 @@ export class ChatkitService implements OnModuleDestroy {
         items: [],
         approvals: new Map(),
         busy: false,
+        checkpoints: new Map(),
       };
       try {
         this.attach(thread, request.params.input, owner);
@@ -174,6 +176,40 @@ export class ChatkitService implements OnModuleDestroy {
         return {
           stream: this.respond(thread, request.params.input, owner, signal),
         };
+      case 'threads.edit_user_message': {
+        this.requireIdle(thread);
+        const item = thread.items.find(
+          (item) => item.id === request.params.item_id,
+        );
+        if (
+          !item ||
+          item.type !== 'user_message' ||
+          !thread.checkpoints.has(item.id)
+        )
+          throw new NotFoundException(
+            'Message not found or no longer editable.',
+          );
+        if (item.attachments.some((file) => !thread.scope.files.has(file.id)))
+          throw new ConflictException(
+            'An attachment was deleted. Send a new message instead.',
+          );
+        const edited: ChatkitInput = {
+          content: [{ type: 'input_text', text: request.params.text }],
+          attachments: item.attachments.map((file) => file.id),
+          inference_options: {},
+          quoted_text: item.quoted_text,
+        };
+        if (
+          !chatkitRequestSchema.safeParse({
+            type: 'threads.create',
+            params: { input: edited },
+          }).success
+        )
+          throw new BadRequestException('The edited message is too long.');
+        return {
+          stream: this.respond(thread, edited, owner, signal, false, item.id),
+        };
+      }
       case 'threads.custom_action':
         this.requireIdle(thread);
         if (!thread.approvals.has(request.params.item_id))
@@ -188,6 +224,7 @@ export class ChatkitService implements OnModuleDestroy {
     owner: WorkspaceScope,
     external: AbortSignal,
     created = false,
+    editId?: string,
   ): AsyncGenerator<ChatkitEvent> {
     this.requireIdle(thread);
     thread.busy = true;
@@ -208,6 +245,57 @@ export class ChatkitService implements OnModuleDestroy {
     try {
       snapshot = await thread.scope.session.getItems();
       signal.throwIfAborted();
+      if (editId) {
+        const index = thread.items.findIndex((item) => item.id === editId);
+        const offset = thread.checkpoints.get(editId);
+        if (index < 0 || offset === undefined)
+          throw new NotFoundException(
+            'Message not found or no longer editable.',
+          );
+        const kept = thread.items.slice(0, index);
+        const removed = thread.items.slice(index);
+        const retainedFiles = new Set(input.attachments);
+        for (const item of kept)
+          if (item.type === 'user_message')
+            for (const file of item.attachments) retainedFiles.add(file.id);
+        snapshot = snapshot.slice(0, offset);
+        // Prepare replacement memory before committing. No async gap during the
+        // history/file/approval transition; completed side effects and audits remain.
+        const session = new MemorySession({ initialItems: snapshot });
+        const pending = this.workspaces.store
+          .approvals(thread.scope)
+          .filter((approval) => approval.status === 'pending');
+        for (const approval of pending)
+          this.workspaces.store.consume(thread.scope, approval.id, 'cancel');
+        thread.scope.session = session;
+        thread.items = kept;
+        for (const id of thread.scope.files.keys())
+          if (!retainedFiles.has(id)) thread.scope.files.delete(id);
+        for (const item of removed) {
+          thread.checkpoints.delete(item.id);
+          thread.approvals.delete(item.id);
+        }
+        // Clear stale cards in the retained prefix too. Never replay an approval
+        // or refund the workspace turn budget just because text was edited.
+        const updated: ChatkitItem[] = [];
+        for (const [itemId, approvalId] of thread.approvals) {
+          const approval = this.workspaces.store
+            .approvals(thread.scope)
+            .find((item) => item.id === approvalId);
+          if (!approval || !pending.some((item) => item.id === approvalId))
+            continue;
+          const card = this.adapter.approval(thread.scope.id, approval, itemId);
+          const position = thread.items.findIndex((item) => item.id === itemId);
+          if (position >= 0) {
+            thread.items[position] = card;
+            updated.push(card);
+          }
+        }
+        for (const item of removed)
+          yield { type: 'thread.item.removed', item_id: item.id };
+        for (const item of updated)
+          yield { type: 'thread.item.replaced', item };
+      }
       if (created)
         yield { type: 'thread.created', thread: this.adapter.thread(thread) };
       const user: ChatkitItem = {
@@ -220,6 +308,7 @@ export class ChatkitService implements OnModuleDestroy {
         inference_options: {},
         quoted_text: input.quoted_text,
       };
+      thread.checkpoints.set(user.id, snapshot.length);
       thread.items.push(user);
       yield { type: 'thread.item.done', item: user };
       if (input.attachments.length) {

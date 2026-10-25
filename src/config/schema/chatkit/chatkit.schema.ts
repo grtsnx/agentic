@@ -41,6 +41,16 @@ export const chatkitRequestSchema = z.discriminatedUnion('type', [
     params: z.object({ thread_id: threadId, input }),
   }),
   z.object({
+    type: z.literal('threads.edit_user_message'),
+    params: z
+      .object({
+        thread_id: threadId,
+        item_id: threadId,
+        text: z.string().trim().min(1).max(8000),
+      })
+      .strict(),
+  }),
+  z.object({
     type: z.literal('threads.get_by_id'),
     params: z.object({ thread_id: threadId }),
   }),
