@@ -24,7 +24,7 @@ bun run start:dev
 | Scalar     | http://localhost:3001/docs       |
 | Text CLI   | `bun run chat`                   |
 
-Chat routes simple requests to `gpt-5-nano` and complex requests to `gpt-6-luna`. Responses include input/output tokens, model usage, and estimated model cost.
+Chat uses a local heuristic router: simple requests go to `gpt-5-nano`; engineering tasks, attachment questions, and complex follow-ups go to `gpt-6-luna`. Follow-ups use bounded recent user context, and ordinary new topics can return to Nano. This is rule-based routing, not a semantic classifier. Responses include input/output tokens, model usage, and estimated model cost.
 
 ## Configuration
 

@@ -21,3 +21,8 @@ export type OpenaiStreamEvent = z.infer<typeof openaiStreamEventSchema>;
 export type OpenaiStreamResponse = z.infer<typeof openaiStreamResponseSchema>;
 
 export type OpenaiModel = (typeof OPENAI_MODELS)[keyof typeof OPENAI_MODELS];
+
+export interface OpenaiRoutingContext {
+  recentUserMessages?: string[];
+  hasAttachments?: boolean;
+}

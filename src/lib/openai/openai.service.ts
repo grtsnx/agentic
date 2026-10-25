@@ -55,7 +55,7 @@ export class OpenaiService {
     options: OpenaiReplyOptions = {},
   ): Promise<OpenaiResponse> {
     const startedAt = performance.now();
-    const model = routeOpenaiModel(message);
+    const model = await this.selectModel(message, options);
     const searchEnabled = this.setting('WEB_SEARCH_ENABLED', true);
     const signal = this.runSignal(options.signal);
     const sources: WebSource[] = options.sources ?? [];
@@ -116,7 +116,7 @@ export class OpenaiService {
     yield thinking;
     lastStatus = this.statusKey(thinking);
 
-    const model = routeOpenaiModel(message);
+    const model = await this.selectModel(message, options);
     const searchEnabled = this.setting('WEB_SEARCH_ENABLED', true);
     const signal = this.runSignal(options.signal);
     const sources: WebSource[] = options.sources ?? [];
@@ -189,6 +189,39 @@ export class OpenaiService {
           ),
         }),
       };
+    } catch (error) {
+      throw mapProviderError(error);
+    }
+  }
+
+  private async selectModel(
+    message: string,
+    options: OpenaiStreamOptions,
+  ): Promise<OpenaiModel> {
+    try {
+      const history = (await options.session?.getItems(24)) ?? [];
+      const recentUserMessages = history.flatMap((item) => {
+        if (!('role' in item) || item.role !== 'user' || !('content' in item))
+          return [];
+        const content =
+          typeof item.content === 'string'
+            ? item.content
+            : item.content
+                .flatMap((part) =>
+                  part.type === 'input_text' ? [part.text] : [],
+                )
+                .join('\n');
+        if (
+          content.startsWith('[Server-confirmed action result.') ||
+          content.startsWith('[Conversation summary of earlier turns]')
+        )
+          return [];
+        return [content.slice(0, 4000)];
+      });
+      return routeOpenaiModel(message, {
+        recentUserMessages,
+        hasAttachments: options.hasAttachments,
+      });
     } catch (error) {
       throw mapProviderError(error);
     }

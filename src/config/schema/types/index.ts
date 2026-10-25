@@ -6,6 +6,7 @@ export type {
   OpenaiStreamEvent,
   OpenaiStreamResponse,
   OpenaiModel,
+  OpenaiRoutingContext,
 } from './openai/openai.types.js';
 export type {
   TokenDetails,

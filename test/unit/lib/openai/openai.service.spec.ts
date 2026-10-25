@@ -17,6 +17,7 @@ vi.mock('@openai/agents', () => ({
 }));
 
 import { OpenaiService } from '@/lib';
+import type { MemorySession } from '@openai/agents';
 import {
   WebToolsService,
   webToolInputSchema,
@@ -217,6 +218,69 @@ describe('OpenaiService', () => {
       expect.objectContaining({ model: 'gpt-6-luna' }),
     );
   });
+
+  it.each([false, true])(
+    'uses isolated user history for routing in both transports (stream=%s)',
+    async (streaming) => {
+      agents.run.mockResolvedValue({
+        finalOutput: streaming ? 'The answer.' : output,
+        state: {
+          usage: {
+            requests: 1,
+            inputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0,
+            inputTokensDetails: [],
+            outputTokensDetails: [],
+          },
+        },
+        rawResponses: [],
+        newItems: [],
+        completed: Promise.resolve(),
+        async *[Symbol.asyncIterator]() {
+          yield {
+            type: 'raw_model_stream_event',
+            data: { type: 'output_text_delta', delta: 'The answer.' },
+          };
+        },
+      });
+      const engineering = {
+        getItems: vi
+          .fn()
+          .mockResolvedValue([
+            {
+              role: 'user',
+              content: [
+                { type: 'input_text', text: 'Debug this TypeScript API.' },
+              ],
+            },
+          ]),
+      } as unknown as MemorySession;
+      const ordinary = {
+        getItems: vi.fn().mockResolvedValue([
+          { role: 'user', content: 'Tell me about Rome.' },
+          {
+            role: 'assistant',
+            content: 'Design a secure distributed API with tests.',
+          },
+        ]),
+      } as unknown as MemorySession;
+      const service = new OpenaiService();
+      for (const session of [engineering, ordinary]) {
+        if (streaming) {
+          for await (const _event of service.streamReply('continue', {
+            session,
+          })) {
+            /* Consume the stream to verify its configured model. */
+          }
+        } else await service.generateReply('continue', { session });
+        expect(session.getItems).toHaveBeenCalledWith(24);
+      }
+      expect(
+        agents.captureConfig.mock.calls.map((call) => call[0].model),
+      ).toEqual(['gpt-6-luna', 'gpt-5-nano']);
+    },
+  );
 
   it('rejects a run without structured output', async () => {
     agents.run.mockResolvedValue({ finalOutput: undefined });

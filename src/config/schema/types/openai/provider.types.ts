@@ -23,6 +23,7 @@ export interface RuntimeSource {
 export interface OpenaiStreamOptions {
   tools?: Tool[];
   scopedToolsOnly?: boolean;
+  hasAttachments?: boolean;
   sources?: import('../web-tools/web-tool.types.js').WebSource[];
   toolInstructions?: string;
   onToolAudit?: (
