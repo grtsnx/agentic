@@ -1,3 +1,4 @@
+import type { ConnectionState, ChatSocketResponse } from '@/config';
 import { randomUUID } from 'node:crypto';
 import { UseFilters } from '@nestjs/common';
 import {
@@ -7,7 +8,6 @@ import {
   WebSocketGateway,
   type OnGatewayConnection,
   type OnGatewayDisconnect,
-  type WsResponse,
 } from '@nestjs/websockets';
 import {
   catchError,
@@ -22,13 +22,6 @@ import type { Socket } from 'socket.io';
 import { ChatV1RequestDto } from '@/dto';
 import { OpenaiService } from '@/lib';
 import { ApplicationException, WebsocketExceptionFilter } from '@/middleware';
-
-interface ConnectionState {
-  abortController?: AbortController;
-  session: ReturnType<OpenaiService['createSession']>;
-}
-
-type ChatSocketResponse = WsResponse<Record<string, unknown>>;
 
 @UseFilters(WebsocketExceptionFilter)
 @WebSocketGateway({

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { LiveKitService, type LiveKitVoiceCredentials } from '@/lib';
+import { LiveKitService } from '@/lib';
+import type { LiveKitVoiceCredentials } from '@/config';
 
 @Injectable()
 export class VoiceService {

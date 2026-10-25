@@ -3,7 +3,7 @@ import {
   GoneException,
   NotFoundException,
 } from '@nestjs/common';
-import { ChatSessionService } from '@/modules/v1/chat/chat-session.service.js';
+import { ChatSessionService } from '@/modules';
 
 describe('ChatSessionService', () => {
   function setup(overrides: Record<string, number> = {}) {

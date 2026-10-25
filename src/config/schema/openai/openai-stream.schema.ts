@@ -32,6 +32,3 @@ export const openaiStreamEventSchema = z.discriminatedUnion('type', [
     })
     .strict(),
 ]);
-
-export type OpenaiStreamEvent = z.infer<typeof openaiStreamEventSchema>;
-export type OpenaiStreamResponse = z.infer<typeof openaiStreamResponseSchema>;

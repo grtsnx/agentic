@@ -1,4 +1,4 @@
-import { routeOpenaiModel } from '@/lib/openai/openai-model-router.js';
+import { routeOpenaiModel } from '@/config';
 
 describe('routeOpenaiModel', () => {
   it.each([

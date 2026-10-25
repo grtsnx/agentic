@@ -1,9 +1,8 @@
+import type { OpenaiModel } from '@/config';
 export const OPENAI_MODELS = {
   economical: 'gpt-5-nano',
   complex: 'gpt-6-luna',
 } as const;
-
-export type OpenaiModel = (typeof OPENAI_MODELS)[keyof typeof OPENAI_MODELS];
 
 const COMPLEXITY_SIGNALS = [
   /```|\b(?:typescript|javascript|python|sql|api|code)\b/i,

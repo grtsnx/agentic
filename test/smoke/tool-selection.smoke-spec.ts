@@ -2,11 +2,11 @@ import { Agent, Runner, tool } from '@openai/agents';
 import {
   AGENT_INSTRUCTIONS,
   AGENT_NAME,
-} from '@/config/agent/agent-instructions.js';
-import { validateEnvironment } from '@/config/environment.js';
-import { WebToolsService } from '@/config/web-tools';
-import { OPENAI_MODELS } from '@/lib/openai/openai-model-router.js';
-import { mapProviderError } from '@/lib/openai/provider-error.js';
+  OPENAI_MODELS,
+  mapProviderError,
+  validateEnvironment,
+  WebToolsService,
+} from '@/config';
 
 const runSmoke = process.env.RUN_TOOL_SELECTION_SMOKE === 'true' ? it : it.skip;
 interface SelectionCase {

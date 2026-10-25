@@ -1,14 +1,7 @@
+import type { ErrorRecord } from '@/config';
 import { HttpStatus } from '@nestjs/common';
 import { ZodError } from 'zod';
-import { ApplicationException } from '@/middleware/errors/application.exception.js';
-
-type ErrorRecord = {
-  cause?: unknown;
-  code?: unknown;
-  message?: unknown;
-  name?: unknown;
-  status?: unknown;
-};
+import { ApplicationException } from '@/middleware';
 
 export function mapProviderError(cause: unknown): ApplicationException {
   if (cause instanceof ApplicationException) return cause;

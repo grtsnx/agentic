@@ -1,11 +1,12 @@
 import { defineAgent, type JobContext, voice, llm } from '@livekit/agents';
-import { validateEnvironment, type Environment } from '../environment.js';
+import { validateEnvironment } from '../environment.js';
+import type { Environment } from '@/config';
 import { createLiveKitVoiceModel } from '@/lib';
-import { WebToolsService } from '@/config/web-tools';
+import { WebToolsService } from '../web-tools/web-tools.service.js';
 import {
   VOICE_AGENT_INSTRUCTIONS,
   VOICE_GREETING_INSTRUCTIONS,
-} from '@/config/agent/agent-instructions.js';
+} from '../agent/instruction.js';
 
 // Export traces and redacted logs without retaining user audio or transcripts.
 export const VOICE_RECORDING_OPTIONS = {

@@ -1,5 +1,5 @@
 import { Readable, Writable } from 'node:stream';
-import { CliService } from '@/cli/cli.service.js';
+import { CliService } from '@/cli';
 
 describe('CliService', () => {
   it('streams a reply and prints runtime usage', async () => {

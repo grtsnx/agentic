@@ -1,3 +1,9 @@
+import type {
+  TokenDetails,
+  RuntimeSource,
+  OpenaiStreamOptions,
+  OpenaiReplyOptions,
+} from '@/config';
 import { Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -16,51 +22,21 @@ import {
   type OpenaiStreamEvent,
   type OpenaiRuntime,
   type WebSource,
-} from '@/config/schema';
-import {
-  OPENAI_MODELS,
-  routeOpenaiModel,
-  type OpenaiModel,
-} from './openai-model-router.js';
-import {
   AGENT_INSTRUCTIONS,
   AGENT_NAME,
-} from '@/config/agent/agent-instructions.js';
-import { ApplicationException } from '@/middleware/errors/application.exception.js';
-import { mapProviderError } from './provider-error.js';
-import { WebToolsService } from '@/config/web-tools';
+  OPENAI_MODELS,
+  routeOpenaiModel,
+  mapProviderError,
+  type OpenaiModel,
+  WebToolsService,
+} from '@/config';
+
+import { ApplicationException } from '@/middleware';
 
 const TOKENS_PER_MILLION = 1_000_000;
 
 // GPT-6 Luna uses higher standard-tier rates when one request exceeds this input size.
 const LONG_CONTEXT_THRESHOLD = 272_000;
-
-// The SDK preserves provider-specific token breakdowns under dynamic keys.
-interface TokenDetails {
-  [key: string]: number | TokenDetails;
-}
-
-interface RuntimeSource {
-  state: {
-    usage: {
-      requests: number;
-      inputTokens: number;
-      outputTokens: number;
-      totalTokens: number;
-      inputTokensDetails: TokenDetails[];
-      outputTokensDetails: TokenDetails[];
-    };
-  };
-  newItems: Array<{ type: string; toolName?: string }>;
-  rawResponses: Array<{ providerData?: Record<string, unknown> }>;
-}
-
-export interface OpenaiStreamOptions {
-  session?: MemorySession;
-  signal?: AbortSignal;
-}
-
-export interface OpenaiReplyOptions extends OpenaiStreamOptions {}
 
 @Injectable()
 export class OpenaiService {

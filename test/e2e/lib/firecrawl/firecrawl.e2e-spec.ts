@@ -1,7 +1,7 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { ConfigService } from '@nestjs/config';
-import { FirecrawlService } from '@/lib/firecrawl/firecrawl.service.js';
+import { FirecrawlService } from '@/lib';
 
 describe('Firecrawl SDK transport', () => {
   let server: Server;

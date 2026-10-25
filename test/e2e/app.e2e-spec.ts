@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '@/app';
-import { configureApplication } from '@/bootstrap/application.js';
+import { configureApplication } from '@/bootstrap';
 import { validateEnvironment } from '@/config';
 
 describe('AppController (e2e)', () => {

@@ -1,5 +1,5 @@
 import { validateEnvironment } from '@/config';
-import { createLiveKitVoiceModel } from '@/lib/livekit/livekit.service.js';
+import { createLiveKitVoiceModel } from '@/lib';
 
 describe('createLiveKitVoiceModel', () => {
   const base = {

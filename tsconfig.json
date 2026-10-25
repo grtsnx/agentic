@@ -19,14 +19,10 @@
     "strictPropertyInitialization": false,
     "types": ["vitest/globals", "node"],
     "paths": {
-      "@/app": ["./src/app/app.module.ts"],
+      "@/app": ["./src/app/index.ts"],
       "@/app/*": ["./src/app/*"],
       "@/config": ["./src/config/index.ts"],
       "@/config/*": ["./src/config/*"],
-      "@/config/schema": ["./src/config/schema/index.ts"],
-      "@/config/schema/*": ["./src/config/schema/*"],
-      "@/config/web-tools": ["./src/config/web-tools/index.ts"],
-      "@/config/web-tools/*": ["./src/config/web-tools/*"],
       "@/dto": ["./src/dto/index.ts"],
       "@/dto/*": ["./src/dto/*"],
       "@/lib": ["./src/lib/index.ts"],
@@ -35,7 +31,11 @@
       "@/middleware/*": ["./src/middleware/*"],
       "@/modules": ["./src/modules/index.ts"],
       "@/modules/*": ["./src/modules/*"],
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@/bootstrap": ["./src/bootstrap/index.ts"],
+      "@/bootstrap/*": ["./src/bootstrap/*"],
+      "@/cli": ["./src/cli/index.ts"],
+      "@/cli/*": ["./src/cli/*"]
     }
   }
 }

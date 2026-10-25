@@ -17,14 +17,6 @@ const pageSchema = z.object({
   content: z.string(),
 });
 export const webPagesSchema = z.array(pageSchema);
-export type WebPage = z.infer<typeof pageSchema>;
-export type WebSource = Omit<WebPage, 'content'> & { domain: string };
-export interface WebToolOptions {
-  timeoutMs: number;
-  maxResults: number;
-  domains: string[];
-  signal: AbortSignal;
-}
 
 export const contextSearchSchema = z.object({
   results: z.array(

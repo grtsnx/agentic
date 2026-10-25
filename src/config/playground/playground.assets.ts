@@ -25,12 +25,12 @@ export const PLAYGROUND_PAGE = `<!doctype html>
       <header class="topbar">
         <a class="brand" href="/playground" aria-label="Agentic home">
           <span class="brand-mark" aria-hidden="true">${AGENTIC_SYMBOL}</span>
-          <span>Agentic</span><span class="brand-divider" aria-hidden="true">/</span><span class="workspace-label">Your workspace</span>
+          <span>Agentic</span>
         </a>
         <div class="topbar-actions">
           <span id="connection" class="sr-only" role="status">Connecting</span>
           <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Use dark theme">
-            <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.5A8.5 8.5 0 1 1 9.5 3 7 7 0 0 0 21 14.5Z"/></svg>
+            <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.53 1.72a.75.75 0 0 1 .16.82A8.97 8.97 0 0 0 9 6a9 9 0 0 0 9 9 8.97 8.97 0 0 0 3.46-.69.75.75 0 0 1 .98.98 10.5 10.5 0 0 1-9.69 6.46c-5.8 0-10.5-4.7-10.5-10.5 0-4.37 2.67-8.11 6.46-9.7a.75.75 0 0 1 .82.17Z"/></svg>
             <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
           </button>
           <button id="new-chat" class="quiet-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New chat</button>
@@ -471,8 +471,6 @@ html[data-connection='online'] .brand-mark { background: var(--success); }
 ${VOICE_PLAYGROUND_STYLES}
 
 button:focus-visible, a:focus-visible { outline: 3px solid #9aaee9; outline-offset: 4px; }
-.brand-divider { margin: 0 1px; color: #d3d6de; font-weight: 300; }
-.workspace-label { color: #858c9b; font-size: .8rem; font-weight: 450; letter-spacing: -.01em; }
 .quiet-button svg, .send-button svg, .starter-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .send-button svg { width: 21px; height: 21px; }
 .welcome-aura { position: relative; display: grid; place-items: center; width: 76px; height: 76px; margin-bottom: 24px; isolation: isolate; }
@@ -494,6 +492,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid #9aaee9; outline-offs
 .theme-toggle { display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 1px solid var(--border); border-radius: 10px; color: var(--muted); background: var(--surface); cursor: pointer; }
 .theme-toggle:hover { color: var(--text); background: var(--surface-subtle); }
 .theme-toggle svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.theme-icon-moon { width: 16px; height: 16px; fill: currentColor; stroke: none; }
 html:not([data-theme='dark']) .theme-icon-sun,
 html[data-theme='dark'] .theme-icon-moon { display: none; }
 .quiet-button { display: inline-flex; align-items: center; gap: 7px; padding: 9px 13px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); cursor: pointer; font-size: .73rem; font-weight: 500; }
@@ -579,7 +578,7 @@ textarea::placeholder { color: #8a93a5; }
 @keyframes voice-think { 50% { height: 10px; transform: translateY(-2px); } }
 @keyframes voice-wave { 50% { height: 13px; } }
 @keyframes voice-session-enter { from { opacity: 0; transform: scale(.985); } }
-@media (max-width: 640px) { .app-shell { grid-template-rows: 62px minmax(0, 1fr) auto; } .workspace-label, .brand-divider { display: none; } .empty-state { padding: 30px 20px; } .welcome-aura { width: 62px; height: 62px; margin-bottom: 18px; } .prompt-starters { gap: 8px; margin-top: 26px; } .prompt-starter { padding: 12px; border-radius: 13px; } .prompt-starter strong { font-size: .66rem; } .prompt-starter > span:not(.starter-icon):not(.starter-arrow), .starter-arrow { display: none; } .empty-state p { font-size: .8rem; max-width: 270px; } .composer-wrap, .messages { width: calc(100% - 28px); } .composer-wrap { padding-bottom: 12px; } .composer { padding: 14px 13px 10px; border-radius: 20px; } .topbar { padding: 0 18px; } .voice-status { font-size: 0; } .messages { padding-top: 28px; } .composer-hint { display: none; } }
+@media (max-width: 640px) { .app-shell { grid-template-rows: 62px minmax(0, 1fr) auto; } .empty-state { padding: 30px 20px; } .welcome-aura { width: 62px; height: 62px; margin-bottom: 18px; } .prompt-starters { gap: 8px; margin-top: 26px; } .prompt-starter { padding: 12px; border-radius: 13px; } .prompt-starter strong { font-size: .66rem; } .prompt-starter > span:not(.starter-icon):not(.starter-arrow), .starter-arrow { display: none; } .empty-state p { font-size: .8rem; max-width: 270px; } .composer-wrap, .messages { width: calc(100% - 28px); } .composer-wrap { padding-bottom: 12px; } .composer { padding: 14px 13px 10px; border-radius: 20px; } .topbar { padding: 0 18px; } .voice-status { font-size: 0; } .messages { padding-top: 28px; } .composer-hint { display: none; } }
 
 @media (max-width: 640px) { textarea { font-size: 16px; } .send-button, .stop-button, .voice-button { width: 44px; height: 44px; } .quiet-button { min-height: 44px; } .composer-wrap { padding-bottom: max(12px, env(safe-area-inset-bottom)); } }
 @media (max-height: 500px) { .empty-state { justify-content: flex-start; padding-top: 24px; padding-bottom: 24px; } .welcome-aura { width: 48px; height: 48px; margin-bottom: 14px; } .prompt-starters { margin-top: 20px; } textarea { max-height: 100px; } }
@@ -587,43 +586,61 @@ textarea::placeholder { color: #8a93a5; }
 html[data-theme='dark'] {
   color-scheme: dark;
   --background: #000000;
-  --surface: #171b24;
-  --surface-subtle: #222733;
-  --text: #e8ebf2;
-  --muted: #a7b0c0;
-  --border: #2d3340;
-  --accent: #3c4658;
+  --surface: #0d0d0d;
+  --surface-subtle: #171717;
+  --text: #f5f5f5;
+  --muted: #a3a3a3;
+  --border: #262626;
+  --accent: #262626;
 }
 html[data-theme='dark'] body,
 html[data-theme='dark'] .app-shell { background: #000000; }
 html[data-theme='dark'] .topbar { background: #000000; }
-html[data-theme='dark'] .workspace-label,
+html[data-theme='dark'] textarea::placeholder,
 html[data-theme='dark'] .empty-state p,
 html[data-theme='dark'] .disclaimer,
 html[data-theme='dark'] .composer-hint,
-html[data-theme='dark'] .message-label { color: #9aa3b5; }
+html[data-theme='dark'] .message-label,
+html[data-theme='dark'] .prompt-starter > span:not(.starter-icon):not(.starter-arrow),
+html[data-theme='dark'] .starter-arrow,
+html[data-theme='dark'] .status-elapsed { color: #a3a3a3; }
+html[data-theme='dark'] .status-label { background-image: linear-gradient(100deg, #737373 20%, #f5f5f5 45%, #a3a3a3 70%); }
 html[data-theme='dark'] .quiet-button,
 html[data-theme='dark'] .theme-toggle,
-html[data-theme='dark'] .avatar { background: #1c212c; }
-html[data-theme='dark'] .prompt-starter { border-color: #2c3342; color: #d5dbe6; background: #1a1e28; }
-html[data-theme='dark'] .prompt-starter strong { color: #eef1f6; }
-html[data-theme='dark'] .starter-icon { border-color: #323848; background: #222838; }
+html[data-theme='dark'] .avatar { background: #0d0d0d; }
+html[data-theme='dark'] .prompt-starter { border-color: #262626; color: #d4d4d4; background: #0d0d0d; }
+html[data-theme='dark'] .prompt-starter strong { color: #f5f5f5; }
+html[data-theme='dark'] .starter-icon,
+html[data-theme='dark'] .prompt-starter:nth-child(2) .starter-icon,
+html[data-theme='dark'] .prompt-starter:nth-child(3) .starter-icon { border-color: #262626; color: #a3a3a3; background: #141414; }
+html[data-theme='dark'] .composer:focus-within { border-color: #3a3a3a; box-shadow: 0 0 0 3px #ffffff0d; }
 html[data-theme='dark'] .composer-wrap { background: linear-gradient(to top, #000000 78%, #00000000); }
-html[data-theme='dark'] .composer { border-color: #31384a; background: #171b24; }
-html[data-theme='dark'] .user .message-content { border-color: #343b4d; color: #e4e8f1; background: #242a38; }
-html[data-theme='dark'] .assistant .avatar { border-color: #343b4d; color: #c5d0f5; background: #1c2433; }
-html[data-theme='dark'] .runtime-chips span { border-color: #31384a; color: #b7c0d0; background: #1c212c; }
-html[data-theme='dark'] .voice-session { color: #e8ebf2; background: #000000; }
+html[data-theme='dark'] .composer { border-color: #262626; background: #0d0d0d; }
+html[data-theme='dark'] .user .message-content { border-color: #262626; color: #f5f5f5; background: #141414; }
+html[data-theme='dark'] .assistant .avatar { border-color: #262626; color: #d4d4d4; background: #141414; }
+html[data-theme='dark'] .runtime-chips span { border-color: #262626; color: #a3a3a3; background: #141414; }
+html[data-theme='dark'] .voice-session { color: #f5f5f5; background: #000000; }
 html[data-theme='dark'] .voice-session-header,
 html[data-theme='dark'] .voice-transcript-panel > header,
-html[data-theme='dark'] .voice-transcript-panel > footer { border-color: #2a3040; }
+html[data-theme='dark'] .voice-transcript-panel > footer { border-color: #262626; }
 html[data-theme='dark'] .voice-stage,
-html[data-theme='dark'] .voice-transcript-panel { border-color: #2a3040; background: #141820; }
+html[data-theme='dark'] .voice-transcript-panel { border-color: #262626; background: #0d0d0d; }
 html[data-theme='dark'] .voice-back,
 html[data-theme='dark'] .voice-control,
-html[data-theme='dark'] .voice-start { color: #e8ebf2; }
+html[data-theme='dark'] .voice-start { color: #f5f5f5; }
+html[data-theme='dark'] .voice-session-brand strong > span:last-child,
+html[data-theme='dark'] .voice-eyebrow,
+html[data-theme='dark'] .voice-elapsed,
+html[data-theme='dark'] #voice-session-hint,
+html[data-theme='dark'] .voice-participant div > span,
+html[data-theme='dark'] .voice-quality,
+html[data-theme='dark'] .voice-transcript-empty h3,
+html[data-theme='dark'] .voice-transcript-empty p,
+html[data-theme='dark'] .voice-transcript-panel > footer,
+html[data-theme='dark'] .voice-transcript-turn .speaker,
+html[data-theme='dark'] .voice-transcript-turn.interim .words { color: #a3a3a3; }
 html[data-theme='dark'] .voice-participant,
-html[data-theme='dark'] .voice-transcript-turn.user .words { border-color: #31384a; background: #1c212c; }
+html[data-theme='dark'] .voice-transcript-turn.user .words { border-color: #262626; background: #141414; }
 html[data-connection='online'] .brand-mark,
 html[data-connection='online'] .voice-session-brand .brand-mark { background: var(--success); }
 `;

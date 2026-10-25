@@ -1,5 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
-import { mapProviderError } from '@/lib/openai/provider-error.js';
+import { mapProviderError } from '@/config';
 
 describe('mapProviderError', () => {
   it.each([

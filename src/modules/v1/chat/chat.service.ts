@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { ChatV1ResponseDto } from '@/dto';
+import { type ChatV1ResponseDto } from '@/dto';
 import { OpenaiService } from '@/lib';
 
 @Injectable()

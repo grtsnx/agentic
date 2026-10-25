@@ -1,3 +1,4 @@
+import type { ApiVersion } from '@/config';
 import { HttpStatus, type INestApplication } from '@nestjs/common';
 import {
   DocumentBuilder,
@@ -9,10 +10,9 @@ import {
   type SchemaObject,
 } from '@nestjs/swagger';
 import { apiReference } from '@scalar/nestjs-api-reference';
-import type { Environment } from '@/config';
+import { type Environment } from '@/config';
 
-const apiVersions = ['1', '2'] as const;
-type ApiVersion = (typeof apiVersions)[number];
+export const apiVersions = ['1', '2'] as const;
 
 const operationMethods = [
   'get',

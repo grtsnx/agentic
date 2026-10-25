@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Firecrawl } from 'firecrawl';
-import { firecrawlPageSchema, type WebToolOptions } from '@/config/schema';
+import { firecrawlPageSchema, type WebToolOptions } from '@/config';
 
 @Injectable()
 export class FirecrawlService {

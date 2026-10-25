@@ -1,3 +1,4 @@
+import type { SessionRecord } from '@/config';
 import { randomUUID } from 'node:crypto';
 import {
   ConflictException,
@@ -8,13 +9,8 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { MemorySession } from '@openai/agents';
-import type { ChatSessionDto, ChatV1ResponseDto } from '@/dto';
+import { type ChatSessionDto, type ChatV1ResponseDto } from '@/dto';
 import { OpenaiService } from '@/lib';
-
-interface SessionRecord extends ChatSessionDto {
-  providerSession: MemorySession;
-  busy: boolean;
-}
 
 @Injectable()
 export class ChatSessionService {

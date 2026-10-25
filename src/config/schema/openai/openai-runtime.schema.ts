@@ -31,5 +31,3 @@ export const openaiRuntimeSchema = z
     tools: z.array(callSchema),
   })
   .strict();
-
-export type OpenaiRuntime = z.infer<typeof openaiRuntimeSchema>;

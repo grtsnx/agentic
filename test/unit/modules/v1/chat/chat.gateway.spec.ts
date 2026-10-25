@@ -1,7 +1,7 @@
 import { lastValueFrom } from 'rxjs';
 import { toArray } from 'rxjs/operators';
 import type { Socket } from 'socket.io';
-import { ChatV1Gateway } from '@/modules/v1/chat/chat.gateway.js';
+import { ChatV1Gateway } from '@/modules';
 
 describe('ChatV1Gateway', () => {
   it('maps the shared chat stream to versioned WebSocket events', async () => {

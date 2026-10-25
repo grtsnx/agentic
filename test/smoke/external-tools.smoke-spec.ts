@@ -1,6 +1,9 @@
-import { validateEnvironment } from '@/config';
-import { WebToolsService } from '@/config/web-tools';
-import type { Environment, WebSource } from '@/config/schema';
+import {
+  validateEnvironment,
+  WebToolsService,
+  type Environment,
+  type WebSource,
+} from '@/config';
 
 const runSmoke = process.env.RUN_EXTERNAL_TOOLS_SMOKE === 'true' ? it : it.skip;
 

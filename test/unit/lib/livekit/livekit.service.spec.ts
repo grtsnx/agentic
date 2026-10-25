@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TokenVerifier } from 'livekit-server-sdk';
 import { validateEnvironment, type Environment } from '@/config';
-import { LiveKitService } from '@/lib/livekit/livekit.service.js';
+import { LiveKitService } from '@/lib';
 
 describe('LiveKitService', () => {
   const environment = validateEnvironment({

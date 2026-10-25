@@ -22,12 +22,8 @@ export const openaiOutputSchema = z
   })
   .strict();
 
-export type OpenaiOutput = z.infer<typeof openaiOutputSchema>;
-
 // Runtime metadata comes from the SDK, not from the model's structured output.
 export const openaiResponseSchema = openaiOutputSchema.extend({
   runtime: openaiRuntimeSchema,
   sources: z.array(openaiSourceSchema).default([]),
 });
-
-export type OpenaiResponse = z.infer<typeof openaiResponseSchema>;

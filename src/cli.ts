@@ -1,7 +1,6 @@
 import { ConsoleLogger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { CliModule } from '@/cli/cli.module.js';
-import { CliService } from '@/cli/cli.service.js';
+import { CliModule, CliService } from '@/cli';
 
 const app = await NestFactory.createApplicationContext(CliModule, {
   logger: new ConsoleLogger({ logLevels: ['warn', 'error', 'fatal'] }),

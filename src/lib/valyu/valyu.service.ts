@@ -1,8 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Valyu } from 'valyu-js';
-import { valyuSearchSchema, type WebToolOptions } from '@/config/schema';
-import { WebToolError } from '@/config/web-tools/web-tool.policy.js';
+import { valyuSearchSchema, type WebToolOptions, WebToolError } from '@/config';
 
 @Injectable()
 export class ValyuService {

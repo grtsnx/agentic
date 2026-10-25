@@ -2,7 +2,7 @@ import { type INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { AppModule } from '@/app';
-import { configureApplication } from '@/bootstrap/application.js';
+import { configureApplication } from '@/bootstrap';
 import { validateEnvironment } from '@/config';
 import { VoiceService } from '@/modules';
 

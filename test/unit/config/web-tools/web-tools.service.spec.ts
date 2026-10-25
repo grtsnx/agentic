@@ -31,9 +31,7 @@ vi.mock('valyu-js', () => ({
   },
 }));
 
-import { validateEnvironment } from '@/config/environment.js';
-import { WebToolsService } from '@/config/web-tools';
-import { publicPageUrl } from '@/config/web-tools/web-tool.policy.js';
+import { validateEnvironment, WebToolsService, publicPageUrl } from '@/config';
 
 const enabled = {
   CONTEXT_DEV_ENABLED: true,

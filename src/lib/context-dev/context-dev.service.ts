@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import ContextDev from 'context.dev';
-import { contextSearchSchema, type WebToolOptions } from '@/config/schema';
+import { contextSearchSchema, type WebToolOptions } from '@/config';
 
 @Injectable()
 export class ContextDevService {

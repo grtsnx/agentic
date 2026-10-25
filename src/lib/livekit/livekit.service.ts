@@ -1,3 +1,4 @@
+import type { VoiceEnvironment, LiveKitVoiceCredentials } from '@/config';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -11,25 +12,9 @@ import {
   TrackSource,
 } from '@livekit/protocol';
 import { AccessToken } from 'livekit-server-sdk';
-import type { Environment } from '@/config';
 
 const require = createRequire(import.meta.url);
 let clientScript: string | undefined;
-
-type VoiceEnvironment = Pick<
-  Environment,
-  | 'VOICE_PROVIDER'
-  | 'VOICE_MODEL'
-  | 'VOICE_NAME'
-  | 'LIVEKIT_API_KEY'
-  | 'LIVEKIT_API_SECRET'
-  | 'OPENAI_API_KEY'
->;
-
-export interface LiveKitVoiceCredentials {
-  serverUrl: string;
-  participantToken: string;
-}
 
 export function createLiveKitVoiceModel(
   environment: VoiceEnvironment,

@@ -1,6 +1,5 @@
-import { environmentSchema, type Environment } from '@/config/schema';
-
-export type { Environment } from '@/config/schema';
+import { environmentSchema } from './schema/environment.schema.js';
+import type { Environment } from '@/config';
 
 export function validateEnvironment(
   values: Record<string, unknown>,

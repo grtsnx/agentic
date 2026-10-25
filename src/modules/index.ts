@@ -4,3 +4,5 @@ export { ChatV1Service } from './v1/chat/chat.service.js';
 export { V2Module } from './v2/v2.module.js';
 export { VoiceModule } from './v1/voice/voice.module.js';
 export { VoiceService } from './v1/voice/voice.service.js';
+export { ChatSessionService } from './v1/chat/chat-session.service.js';
+export { ChatV1Gateway } from './v1/chat/chat.gateway.js';

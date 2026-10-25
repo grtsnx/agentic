@@ -10,14 +10,6 @@ export {
   createLiveKitVoiceModel,
   getLiveKitClientScript,
   LiveKitService,
-  type LiveKitVoiceCredentials,
 } from './livekit/livekit.service.js';
 export { OpenaiModule } from './openai/openai.module.js';
 export { OpenaiService } from './openai/openai.service.js';
-export type { OpenaiStreamOptions } from './openai/openai.service.js';
-export { mapProviderError } from './openai/provider-error.js';
-export {
-  OPENAI_MODELS,
-  routeOpenaiModel,
-  type OpenaiModel,
-} from './openai/openai-model-router.js';

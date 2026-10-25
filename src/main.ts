@@ -1,5 +1,5 @@
 import { ConsoleLogger } from '@nestjs/common';
-import { createApplication } from '@/bootstrap/application.js';
+import { createApplication } from '@/bootstrap';
 
 const { app, environment } = await createApplication();
 await app.listen(environment.PORT, '0.0.0.0');

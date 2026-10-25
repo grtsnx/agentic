@@ -224,7 +224,7 @@ Open `http://localhost:3001/playground`, wait for **Online**, enter a message, a
 
 The conversation shows a thinking orb, shimmering activity, elapsed time, and plain-language progress, then hides that activity when response text begins. It never exposes private chain-of-thought. Runtime chips show total time, tokens, estimated cost, and models after completion. Internal tool names stay out of conversation progress, playground chips, and CLI output; structured API runtime metadata remains available for diagnostics. Use the stop button to cancel the active turn.
 
-All channels use the Agentic identity and shared instructions to keep internal implementation details out of replies. Text runs, including hosted search, use `MODEL_TIMEOUT_MS` as their total deadline; the old `WEB_SEARCH_TIMEOUT_MS` setting is no longer used. External calls retain their separate `EXTERNAL_TOOLS_TIMEOUT_MS` limit. Interrupted text replies retain received text with an incomplete-response notice. Voice filters microphone noise before speech detection, retains intentional interruptions, and offers a new connection if the agent leaves. Noise filtering follows the [LiveKit realtime audio options](https://docs.livekit.io/agents/models/realtime/openai/); actual microphone behavior depends on the room, device, and connection.
+All channels use the Agentic identity and shared instructions to keep internal implementation details out of replies. Chat can use light, contextual emojis; voice adds natural laughter, expressive delivery, and friendly, cheeky banter when welcome. Both stay calm and direct on serious topics. Voice inherits the shared instructions with a short delivery-specific addition, following [OpenAI voice prompting guidance](https://developers.openai.com/api/docs/guides/voice-prompting#personality-and-tone). Actual laughter and delivery depend on the selected voice model. Text runs, including hosted search, use `MODEL_TIMEOUT_MS` as their total deadline; the old `WEB_SEARCH_TIMEOUT_MS` setting is no longer used. External calls retain their separate `EXTERNAL_TOOLS_TIMEOUT_MS` limit. Interrupted text replies retain received text with an incomplete-response notice. Voice filters microphone noise before speech detection, retains intentional interruptions, and offers a new connection if the agent leaves. Noise filtering follows the [LiveKit realtime audio options](https://docs.livekit.io/agents/models/realtime/openai/); actual microphone behavior depends on the room, device, and connection.
 
 | Direction       | Event             | Data                                                                    |
 | --------------- | ----------------- | ----------------------------------------------------------------------- |
@@ -289,13 +289,14 @@ src/                      # Application source.
 ├── config/               # Runtime configuration and executable application setup.
 │   ├── agent/            # Shared Agentic identity and channel-specific delivery rules.
 │   ├── livekit/          # LiveKit agent, worker, and native console launcher.
-│   ├── schema/           # All Zod schemas, grouped by feature; shared inferred types.
+│   ├── openai/           # Model routing and stable provider error mapping.
+│   ├── schema/           # Runtime Zod schemas; categorized application types in types/.
 │   ├── web-tools/        # Tool registration, limits, source policy, and Nest wiring.
 │   └── playground/       # Same-origin chat and voice playground.
 ├── dto/                  # Versioned API input and output contracts.
 ├── lib/                  # Shared provider and infrastructure adapters.
 │   ├── livekit/          # Reusable LiveKit SDK adapter and Nest provider.
-│   ├── openai/           # OpenAI agent execution, streaming, and model routing.
+│   ├── openai/           # OpenAI SDK service and Nest module.
 │   └── context-dev/, firecrawl/, valyu/ # Optional provider modules and services.
 ├── middleware/           # Global HTTP behavior.
 │   ├── commons/         # Shared response and request utilities.
@@ -308,6 +309,7 @@ src/                      # Application source.
 ├── cli.ts                # Standalone CLI entry point.
 ├── main.ts               # HTTP and Socket.IO application entry point.
 └── voice.ts              # LiveKit Agents worker entry point.
+AGENTS.md                 # Standing development rules and owner preferences.
 compose.yaml              # Local API and optional voice-worker services.
 Dockerfile                # Shared non-root Linux application image.
 test/                     # All automated tests.
@@ -315,6 +317,8 @@ test/                     # All automated tests.
 ├── smoke/                # Explicit opt-in tests against real providers.
 └── unit/                 # Isolated unit tests grouped by feature.
 ```
+
+Public imports use top-level barrels such as `@/config`, `@/lib`, `@/dto`, `@/middleware`, `@/modules`, `@/app`, `@/bootstrap`, and `@/cli`. Schemas and web tools are exported by `@/config`. Internal wiring uses relative imports where a barrel would create a circular dependency; entrypoint and private implementation tests can import their subject directly.
 
 ## Agent platform roadmap
 

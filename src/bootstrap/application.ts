@@ -7,7 +7,7 @@ import {
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { AppModule, ObserveInstrument } from '@/app';
-import type { Environment } from '@/config';
+import { type Environment } from '@/config';
 import { RequestIdMiddleware } from '@/middleware';
 import { SecureSocketIoAdapter } from './socket-io.adapter.js';
 import { configureSwagger } from './swagger.js';

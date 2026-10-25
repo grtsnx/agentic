@@ -17,13 +17,13 @@ vi.mock('@openai/agents', () => ({
 }));
 
 import { OpenaiService } from '@/lib';
-import { WebToolsService } from '@/config/web-tools';
-import { ConfigService } from '@nestjs/config';
-import { webToolInputSchema } from '@/config/schema';
 import {
+  WebToolsService,
+  webToolInputSchema,
   AGENT_INSTRUCTIONS,
   AGENT_NAME,
-} from '@/config/agent/agent-instructions.js';
+} from '@/config';
+import { ConfigService } from '@nestjs/config';
 
 describe('OpenaiService', () => {
   const output = {

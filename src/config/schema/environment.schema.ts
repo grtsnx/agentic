@@ -232,4 +232,3 @@ export const environmentSchema = z
   }));
 
 // Keep the validated runtime type in sync with the schema.
-export type Environment = z.infer<typeof environmentSchema>;
