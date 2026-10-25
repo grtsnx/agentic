@@ -82,14 +82,17 @@ export class WorkspaceFilesService {
       }
       parsed = { text, kind: 'text' };
     }
+    const content = parsed.content
+      ? Buffer.from(parsed.content)
+      : Buffer.from(file.buffer);
+    const bytes = Math.max(content.length, file.buffer.length);
     // Parsing yields: recheck expiry and quotas before the synchronous commit.
     scope.abort.signal.throwIfAborted();
     if (scope.expiresAt <= Date.now())
       throw new BadRequestException('Workspace expired.');
     if (
       scope.files.size >= 5 ||
-      [...scope.files.values()].reduce((n, f) => n + f.bytes, 0) +
-        file.buffer.length >
+      [...scope.files.values()].reduce((n, f) => n + f.bytes, 0) + bytes >
         WORKSPACE_MAX_BYTES
     )
       throw new PayloadTooLargeException('Workspace file limit reached.');
@@ -101,13 +104,11 @@ export class WorkspaceFilesService {
       id: randomUUID(),
       filename,
       mime,
-      content: parsed.content
-        ? Buffer.from(parsed.content)
-        : Buffer.from(file.buffer),
+      content,
       text,
       kind: parsed.kind,
       pages: parsed.pages,
-      bytes: file.buffer.length,
+      bytes,
       chunks,
     };
     scope.files.set(record.id, record);

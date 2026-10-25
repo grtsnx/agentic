@@ -26,6 +26,9 @@ export const WORKSPACE_SHEET = `
   <footer id="attachment-preview-pager" hidden><button id="attachment-previous" type="button" aria-label="Previous page">←</button><span id="attachment-page"></span><button id="attachment-next" type="button" aria-label="Next page">→</button></footer>
 </dialog>`;
 export const WORKSPACE_STYLES = `
+/* A bounded grid column keeps attachment overflow inside its scrolling row. */
+.app-shell {grid-template-columns:minmax(0,1fr);}
+.composer-wrap,.composer,.composer-files {min-width:0;}
 .attach-button {display:grid;place-items:center;flex:none;width:44px;height:44px;border:0;padding:10px;background:transparent;color:var(--muted);cursor:pointer;border-radius:10px;}
 .attach-button svg {width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;transition:transform .18s,color .18s;}
 .attach-button:hover svg {color:var(--text);transform:scale(1.12);}
@@ -91,6 +94,7 @@ function createWorkspacePanel() {
   const previewBody=document.querySelector('#attachment-preview-body');
   let previewVersion=0;
   let previewDocument;
+  let previewLoading;
   let previewRender;
   let previewPage=1;
   let previewFileId;
@@ -148,7 +152,8 @@ function createWorkspacePanel() {
   function clearPreview() {
     previewVersion++;previewFileId=undefined;
     previewRender?.cancel();previewRender=undefined;
-    if(previewDocument)void previewDocument.destroy().catch(()=>{});
+    if(previewLoading)void previewLoading.destroy().catch(()=>{});
+    previewLoading=undefined;
     previewDocument=undefined;previewBody?.replaceChildren();
     document.querySelector('#attachment-preview-pager').hidden=true;
   }
@@ -186,8 +191,9 @@ function createWorkspacePanel() {
         const pdfjs=await import('/playground/pdf.js');if(current!==previewVersion)return;
         pdfjs.GlobalWorkerOptions.workerSrc='/playground/pdf.worker.js';
         const loading=pdfjs.getDocument({data:new Uint8Array(await blob.arrayBuffer()),isEvalSupported:false,useSystemFonts:true,verbosity:0,maxImageSize:12000000});
+        previewLoading=loading;
         const doc=await loading.promise;
-        if(current!==previewVersion){await doc.destroy();return;}
+        if(current!==previewVersion){await loading.destroy();return;}
         previewDocument=doc;previewPage=1;document.querySelector('#attachment-preview-pager').hidden=false;
         await renderPdfPage();
       } else {
@@ -276,7 +282,7 @@ function createWorkspacePanel() {
     const file=fileInput.files?.[0];if(!file||uploading)return;
     const current=generation;
     try {
-      const ext=file.name.split('.').pop().toLowerCase();const mime=${JSON.stringify(FILE_MIME_TYPES)}[ext];
+      const ext=file.name.split('.').pop().toLowerCase();const mimes=${JSON.stringify(FILE_MIME_TYPES)};const mime=Object.hasOwn(mimes,ext)?mimes[ext]:undefined;
       if(!mime)throw new Error('Choose a JPG, PNG, PDF, DOCX, TXT, Markdown, CSV, or JSON file.');
       if(file.size>1048576)throw new Error('Choose a file no larger than 1 MiB.');
       uploading=true;attach.disabled=true;pendingFile=file;renderFiles();uploadStatus('Uploading '+file.name+'…');
