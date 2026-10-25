@@ -11,7 +11,8 @@ export class FirecrawlService {
     const client = new Firecrawl({
       apiKey: this.config.getOrThrow<string>('FIRECRAWL_API_KEY'),
       timeoutMs: options.timeoutMs,
-      maxRetries: 0,
+      // In Firecrawl 4.51, this counts total attempts; 1 sends once without retrying.
+      maxRetries: 1,
     });
     const page = firecrawlPageSchema.parse(
       await client.scrape(url, {

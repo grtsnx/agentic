@@ -156,7 +156,7 @@ describe('optional external tools', () => {
       autoResume: false,
     });
     expect(sdk.firecrawlOptions).toHaveBeenCalledWith(
-      expect.objectContaining({ maxRetries: 0, timeoutMs: 15_000 }),
+      expect.objectContaining({ maxRetries: 1, timeoutMs: 15_000 }),
     );
   });
 

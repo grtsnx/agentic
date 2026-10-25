@@ -56,6 +56,27 @@ Create an API key in the provider's dashboard, add it to `.env`, enable that pro
 
 Calls share a budget of `EXTERNAL_TOOLS_MAX_CALLS` per chat run or voice conversation, including failures. Parallel calls reserve their slot before starting. Results are limited by count and total content characters, with public URL/title/domain source metadata attached to chat responses. The agent chooses a tool when needed; enabling several providers does not call them all automatically.
 
+### How the agent chooses a provider
+
+Chat and voice share one selection policy and the same tool descriptions in `config/web-tools/web-tool.instructions.ts`:
+
+| Task                                                                           | Preferred tool | Example                                                                |
+| ------------------------------------------------------------------------------ | -------------- | ---------------------------------------------------------------------- |
+| General web lookup, current fact, news, or official documentation discovery    | Context.dev    | “Find the official Node.js URL documentation.”                         |
+| Read, summarize, or extract from a specific URL                                | Firecrawl      | “Read this article and summarize it.”                                  |
+| Research or compare evidence from several sources                              | Valyu          | “Compare evidence for retrieval-augmented generation and fine-tuning.” |
+| Greeting, arithmetic, rewriting supplied text, or an answer already in context | No web tool    | “Rewrite this paragraph.”                                              |
+
+If the preferred search provider is unavailable, the agent uses the other configured search provider, then hosted OpenAI search if available. Firecrawl can read a relevant result after search when snippets are insufficient, or directly verify a known canonical official documentation URL. A direct page read is not a substitute for discovering current news or unknown sources. The agent distinguishes snippets from full page reads, respects domain restrictions and call budgets, and avoids repeating a successful query across providers. Valyu currently uses public web search only; licensed datasets and DeepResearch are not enabled.
+
+Selection is model-driven and flexible: Context.dev and Valyu are both valid search providers. The agent prefers Context.dev for lookups and Valyu for research, and may choose a suitable alternative. These preferences are not fixed routing rules. Test representative choices and disabled-provider fallbacks with:
+
+```bash
+bun run smoke:tool-selection
+```
+
+This makes seven small requests to the economical OpenAI model using the production instructions and tool definitions. It checks search, research, page reading, no-tool replies, disabled-provider fallbacks, and canonical documentation reads. Suitable alternatives pass the capability checks; logs separately report whether the preferred provider was selected. Tool execution is replaced with fixtures and stops at the first selection, so it does not charge the search providers. `bun run smoke:tools` separately verifies their real APIs.
+
 `EXTERNAL_TOOLS_TIMEOUT_MS` bounds how long the application waits for a tool. Cancellation stops waiting and discards late results. Context.dev supports request cancellation; Firecrawl has a request timeout with automatic resume disabled. The installed Valyu search SDK does not expose request cancellation or apply its general timeout option to search, so an already submitted provider request may continue after the application deadline. No adapter automatically retries. Provider charges are **not** included in the existing model-cost estimate.
 
 After configuring keys, verify the enabled providers with:
@@ -311,7 +332,8 @@ Completion: two concurrent sessions preserve separate context and every structur
 - ✅ Add optional Valyu web research through its official SDK.
 - ✅ Share optional tools across chat and voice with validated inputs, domain controls, bounded results, call budgets, and stable errors.
 - ✅ Add page retrieval that treats remote content as untrusted data rather than instructions.
-- ⬜ Configure external provider keys and pass `bun run smoke:tools` against all three live providers. Integration tests use mocks; local providers remain disabled until configured.
+- ✅ Verify Context.dev search and Firecrawl page reading with real API keys, non-empty content, and source metadata (`bun run smoke:tools`, 2026-10-25).
+- ✅ Configure Valyu and verify real search content and source metadata with its live smoke test (2026-10-25).
 - ⬜ Add file upload, type and size validation, extraction, and scoped retrieval.
 - ⬜ Add sandboxed code execution with CPU, memory, time, network, and filesystem limits.
 - ⬜ Record tool inputs, outputs, latency, cost, and failure state.
