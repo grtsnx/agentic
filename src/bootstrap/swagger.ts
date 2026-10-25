@@ -17,7 +17,10 @@ export function configureSwagger(
       .setTitle(environment.PLATFORM_NAME)
       .setDescription(`${environment.PLATFORM_NAME} API description`)
       .setVersion(`v${version}`)
-      .addTag('Server')
+      .addTag(
+        'Server',
+        'Core server status, health, and connectivity endpoints.',
+      )
       .build();
     const document = SwaggerModule.createDocument(app, options);
     const prefix = `/v${version}`;
