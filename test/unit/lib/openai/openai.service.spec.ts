@@ -51,7 +51,7 @@ describe('OpenaiService', () => {
           outputTokensDetails: [{ reasoning_tokens: 15 }],
         },
       },
-      rawResponses: [{ providerData: { model: 'gpt-6-astra' } }],
+      rawResponses: [{ providerData: { model: 'gpt-6-luna' } }],
       newItems: [
         { type: 'tool_call_item', toolName: 'web_search' },
         { type: 'tool_call_item', toolName: 'web_search' },
@@ -60,9 +60,11 @@ describe('OpenaiService', () => {
 
     const service = new OpenaiService();
     const config = agents.captureConfig.mock.calls[0]?.[0] as {
+      model?: string;
       outputType?: { safeParse(value: unknown): { success: boolean } };
     };
 
+    expect(config.model).toBe('gpt-6-luna');
     expect(config.outputType).toBeDefined();
     expect(config.outputType?.safeParse(output).success).toBe(true);
     await expect(service.generateReply('Question')).resolves.toEqual({
@@ -77,12 +79,12 @@ describe('OpenaiService', () => {
           reasoningOutput: 15,
         },
         cost: {
-          estimatedUsd: 0.00332,
+          estimatedUsd: 0.0000332,
           currency: 'USD',
           exact: false,
           includesToolCosts: false,
         },
-        models: [{ name: 'gpt-6-astra', calls: 1 }],
+        models: [{ name: 'gpt-6-luna', calls: 1 }],
         tools: [{ name: 'web_search', calls: 2 }],
       },
     });
@@ -128,7 +130,7 @@ describe('OpenaiService', () => {
           outputTokensDetails: [],
         },
       },
-      rawResponses: [{ providerData: { model: 'gpt-6-astra' } }],
+      rawResponses: [{ providerData: { model: 'gpt-6-luna' } }],
       newItems: [],
     };
     agents.run.mockResolvedValue(stream);
@@ -163,12 +165,12 @@ describe('OpenaiService', () => {
               reasoningOutput: 0,
             },
             cost: {
-              estimatedUsd: 0.0002,
+              estimatedUsd: 0.000002,
               currency: 'USD',
               exact: false,
               includesToolCosts: true,
             },
-            models: [{ name: 'gpt-6-astra', calls: 1 }],
+            models: [{ name: 'gpt-6-luna', calls: 1 }],
             tools: [],
           },
         },

@@ -11,10 +11,10 @@ import {
 } from './schema/openai-stream.schema.js';
 import type { OpenaiRuntime } from './schema/openai-runtime.schema.js';
 
-const MODEL_NAME = 'gpt-6-astra';
+const MODEL_NAME = 'gpt-6-luna';
 const TOKENS_PER_MILLION = 1_000_000;
 
-// GPT-6 Astra uses higher standard-tier rates when one request exceeds this input size.
+// GPT-6 Luna uses higher standard-tier rates when one request exceeds this input size.
 const LONG_CONTEXT_THRESHOLD = 272_000;
 
 // The SDK preserves provider-specific token breakdowns under dynamic keys.
@@ -316,7 +316,7 @@ export class OpenaiService {
     outputTokens: number;
     inputTokensDetails: TokenDetails[];
   }): number {
-    // Rates are USD per one million tokens for GPT-6 Astra's standard tier.
+    // Rates are USD per one million tokens for GPT-6 Luna's standard tier.
     // This is an estimate because the Agents SDK does not return the invoiced amount.
     const cachedInput = this.sumTokenDetail(
       usage.inputTokensDetails,
@@ -324,9 +324,9 @@ export class OpenaiService {
     );
     const uncachedInput = Math.max(0, usage.inputTokens - cachedInput);
     const longContext = usage.inputTokens > LONG_CONTEXT_THRESHOLD;
-    const inputRate = longContext ? 20 : 10;
-    const cachedInputRate = longContext ? 2 : 1;
-    const outputRate = longContext ? 75 : 50;
+    const inputRate = longContext ? 0.2 : 0.1;
+    const cachedInputRate = longContext ? 0.02 : 0.01;
+    const outputRate = longContext ? 0.75 : 0.5;
     const estimate =
       (uncachedInput * inputRate +
         cachedInput * cachedInputRate +

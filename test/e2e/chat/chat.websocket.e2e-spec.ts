@@ -40,7 +40,7 @@ describe('ChatGateway (e2e)', () => {
                 exact: false,
                 includesToolCosts: true,
               },
-              models: [{ name: 'gpt-6-astra', calls: 1 }],
+              models: [{ name: 'gpt-6-luna', calls: 1 }],
               tools: [],
             },
           },

@@ -32,7 +32,7 @@ class RuntimeCostDto {
 }
 
 class RuntimeCallDto {
-  @ApiProperty({ example: 'gpt-6-astra' })
+  @ApiProperty({ example: 'gpt-6-luna' })
   name!: string;
 
   @ApiProperty({ example: 1 })
