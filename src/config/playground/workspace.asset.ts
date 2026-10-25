@@ -223,8 +223,9 @@ function createWorkspacePanel() {
       if(file.kind==='image') {
         const image=document.createElement('img');image.className='composer-file-thumbnail';image.alt='';open.append(image);
         void imageUrl(file).then(url=>{if(image.isConnected)image.src=url;}).catch(()=>{image.remove();});
-      } else open.append(type);
-      open.append(text('strong',file.filename),text('small',file.pending?'Uploading…':Math.max(1,Math.ceil(file.bytes/1024))+' KB · Attached'));
+      }
+      open.append(type,text('strong',file.filename));
+      if(file.pending)open.append(text('small','Uploading…'));
       open.addEventListener('click',()=>void openPreview(file,open));card.append(open);
       if(!file.pending){const remove=text('button','×');remove.type='button';remove.className='composer-file-remove';remove.setAttribute('aria-label','Remove '+file.filename);remove.title='Remove attachment';remove.addEventListener('click',()=>void removeFile(file,remove));card.append(remove);}
       if(file.pending)card.setAttribute('data-uploading','');
