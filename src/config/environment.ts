@@ -81,7 +81,7 @@ function domainNames(value: unknown): string[] {
 const environmentSchema = z
   .object({
     NODE_ENV: z.enum(environments).default('development'),
-    PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
+    PORT: z.coerce.number().int().min(1).max(65_535).default(3001),
     PLATFORM_NAME: z.string().trim().min(1).default('Agentic'),
     CORS_ORIGINS: z.unknown().optional(),
     OBSERVE_ENABLED: booleanValue('OBSERVE_ENABLED').optional(),
@@ -100,6 +100,11 @@ const environmentSchema = z
     LIVEKIT_API_KEY: z.string().trim().optional(),
     LIVEKIT_API_SECRET: z.string().trim().optional(),
     LIVEKIT_AGENT_NAME: z.string().trim().min(1).default('agentic-voice'),
+    LIVEKIT_PHONE_NUMBER: z
+      .string()
+      .trim()
+      .regex(/^$|^\+[1-9]\d{6,14}$/, 'Use an international E.164 phone number')
+      .optional(),
     OPENAI_API_KEY: z.string().trim().optional(),
     MODEL_TIMEOUT_MS: z.coerce
       .number()
@@ -204,6 +209,7 @@ export interface Environment {
   LIVEKIT_API_KEY?: string;
   LIVEKIT_API_SECRET?: string;
   LIVEKIT_AGENT_NAME: string;
+  LIVEKIT_PHONE_NUMBER?: string;
   OPENAI_API_KEY?: string;
   MODEL_TIMEOUT_MS: number;
   WEB_SEARCH_ENABLED: boolean;

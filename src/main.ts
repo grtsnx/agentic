@@ -17,6 +17,11 @@ if (environment.VOICE_ENABLED) {
   logger.log(`LiveKit voice token: ${baseUrl}/v1/voice/token`);
   logger.log(`Voice provider: ${environment.VOICE_PROVIDER}`);
   logger.log('Voice worker: bun run voice:dev');
+  logger.log(
+    environment.LIVEKIT_PHONE_NUMBER
+      ? `Telephony number: ${environment.LIVEKIT_PHONE_NUMBER} (tel:${environment.LIVEKIT_PHONE_NUMBER})`
+      : 'Telephony: no phone number configured. See README → Phone calls.',
+  );
 }
 logger.log('CLI: bun run chat');
 

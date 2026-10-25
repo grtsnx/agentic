@@ -1,308 +1,166 @@
-export const LIVEKIT_BROWSER_APP = `(() => {
-  const elements = {
-    audio: document.querySelector('#voice-audio'),
-    aura: document.querySelector('#voice-aura'),
-    connect: document.querySelector('#voice-connect'),
-    elapsed: document.querySelector('#voice-elapsed'),
-    end: document.querySelector('#voice-end'),
-    label: document.querySelector('#voice-label'),
-    mute: document.querySelector('#voice-mute'),
-    quality: document.querySelector('#voice-quality'),
-    session: document.querySelector('#voice-session'),
-    sessionHint: document.querySelector('#voice-session-hint'),
-    sessionState: document.querySelector('#voice-session-state'),
-    status: document.querySelector('#voice-status'),
-    statusLabel: document.querySelector('#voice-status-label'),
-    transcript: document.querySelector('#voice-transcript'),
-    transcriptEmpty: document.querySelector('#voice-transcript-empty'),
-  };
+import { VOICE_AURA_FACTORY } from './voice-aura.asset.js';
 
-  const agentStateLabels = {
-    connecting: 'Connecting agent…',
-    'pre-connect-buffering': 'Preparing audio…',
-    initializing: 'Initializing agent…',
-    idle: 'Agent ready',
-    listening: 'Listening',
-    thinking: 'Agentic is thinking…',
-    speaking: 'Agentic is speaking',
-    disconnected: 'Voice ended',
-    failed: 'Agent unavailable',
-  };
-  const agentStateHints = {
-    connecting: 'Securing a realtime session.',
-    'pre-connect-buffering': 'Preparing clear, low-latency audio.',
-    initializing: 'Agentic is joining the conversation.',
-    idle: 'Say something whenever you are ready.',
-    listening: 'Go ahead—Agentic is listening.',
-    thinking: 'Working through what you said.',
-    speaking: 'Interrupt anytime. Agentic will listen.',
-    'agent-speaking': 'Interrupt anytime. Agentic will listen.',
-    'user-speaking': 'Agentic is listening to you.',
-    muted: 'Unmute when you are ready to continue.',
-    disconnected: 'Your completed transcript remains in the chat.',
-    error: 'Return to chat or try the microphone again.',
-    failed: 'Return to chat or try the microphone again.',
-  };
-  const transcriptRows = new Map();
+export const LIVEKIT_BROWSER_APP = `(() => {
+  ${VOICE_AURA_FACTORY}
+  const elements = Object.fromEntries([
+    'audio', 'aura', 'connect', 'elapsed', 'end', 'start', 'back', 'label',
+    'mute', 'quality', 'session', 'session-hint', 'session-state', 'title',
+    'status', 'status-label', 'transcript', 'transcript-empty', 'transcript-panel',
+    'transcript-toggle', 'live-label', 'user', 'agent', 'user-state', 'agent-state',
+    'user-meter', 'agent-meter', 'enable-audio',
+  ].map((name) => [name, document.querySelector('#voice-' + name)]));
+  const appShell = document.querySelector('.app-shell');
+  const rows = new Map();
   const pendingSegments = new Map();
   const committedSegments = new Set();
-  let connecting = false;
-  let elapsedTimer;
-  let ending = false;
   let room;
+  let attempt = 0;
+  let tokenRequest;
+  let connecting = false;
+  let reconnecting = false;
+  let microphoneReady = false;
   let transcriptFrame;
-  let voiceStartedAt;
+  let elapsedTimer;
+  let startedAt;
+  let activeSpeakers = new Set();
 
-  function createAudioReactiveAura(canvas) {
-    const context = canvas.getContext('2d');
-    const audioSources = [];
-    const connectedTracks = new WeakSet();
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    let animationFrame;
-    let audioContext;
-    let lastFrameAt = performance.now();
-    let phase = 0;
-    let smoothedVolume = 0;
-    let state = 'connecting';
+  const copy = {
+    idle: ['Ready when you are', "Let's talk.", 'A question, a big idea, or just a hello. Make yourself heard.'],
+    connecting: ['Connecting', 'A moment, together.', 'Getting your conversation ready.'],
+    initializing: ['Getting ready', 'Almost here.', 'Agentic is joining. Your conversation will begin shortly.'],
+    listening: ['Listening to you', "I'm all ears.", 'Take your time. You can speak naturally.'],
+    'user-speaking': ['Your turn', 'Keep going.', 'You have my attention.'],
+    'agent-speaking': ['Agentic is speaking', 'A thought for you.', 'You can jump in whenever you like.'],
+    thinking: ['Thinking it through', 'Let me think.', 'Making a little space for a good answer.'],
+    muted: ['Microphone muted', 'Take a moment.', "Unmute whenever you're ready to continue."],
+    disconnected: ['Conversation ended', 'Good talking with you.', 'Your conversation is still here. Start again whenever you like.'],
+    error: ['Something interrupted us', "Let's try again.", 'Check your connection, then start a new conversation.'],
+  };
 
-    const stateProfiles = {
-      connecting: { hue: 200, energy: 0.3, speed: 1.5 },
-      initializing: { hue: 190, energy: 0.36, speed: 1.8 },
-      idle: { hue: 185, energy: 0.25, speed: 0.65 },
-      listening: { hue: 166, energy: 0.38, speed: 1 },
-      thinking: { hue: 266, energy: 0.52, speed: 2.3 },
-      'agent-speaking': { hue: 196, energy: 0.48, speed: 1.7 },
-      'user-speaking': { hue: 152, energy: 0.42, speed: 1.35 },
-      muted: { hue: 220, energy: 0.18, speed: 0.45 },
-      disconnected: { hue: 220, energy: 0.12, speed: 0.3 },
-      error: { hue: 4, energy: 0.28, speed: 0.8 },
-      failed: { hue: 4, energy: 0.28, speed: 0.8 },
-    };
-
-    function resize() {
-      const bounds = canvas.getBoundingClientRect();
-      if (!bounds.width || !bounds.height) return;
-      const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = Math.round(bounds.width * pixelRatio);
-      canvas.height = Math.round(bounds.height * pixelRatio);
-      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-    }
-
-    function readVolume() {
-      let peak = 0;
-      const activeRole = state === 'agent-speaking' ? 'agent' : state === 'user-speaking' ? 'user' : undefined;
-      for (const source of audioSources) {
-        if (activeRole && source.role !== activeRole) continue;
-        source.analyser.getByteTimeDomainData(source.data);
-        let squareTotal = 0;
-        for (const sample of source.data) {
-          const centeredSample = (sample - 128) / 128;
-          squareTotal += centeredSample * centeredSample;
-        }
-        const rms = Math.sqrt(squareTotal / source.data.length);
-        peak = Math.max(peak, Math.max(0, rms - 0.012) * 8.5);
+  function renderLevels(levels, bands) {
+    for (const role of ['user', 'agent']) {
+      const level = levels[role];
+      const active = level > 0.035;
+      elements[role].dataset.active = String(active);
+      const bars = elements[role + '-meter'].children;
+      for (let i = 0; i < bars.length; i += 1) {
+        const spectrum = bands[role]?.[i * 2] || 0;
+        const scale = Math.min(1, 0.15 + level * (0.55 + spectrum * 0.65) * (i === 2 ? 1.4 : 1));
+        bars[i].style.transform = 'scaleY(' + scale.toFixed(3) + ')';
       }
-      return Math.min(1, peak);
     }
-
-    function traceAura(centerX, centerY, radius, amplitude, time, offset = 0) {
-      context.beginPath();
-      const points = reducedMotion ? 72 : 128;
-      for (let index = 0; index <= points; index += 1) {
-        const angle = (index / points) * Math.PI * 2;
-        const wave =
-          Math.sin(angle * 3 + time * 1.1 + offset) * 0.55 +
-          Math.sin(angle * 5 - time * 0.8 + offset * 2) * 0.3 +
-          Math.sin(angle * 9 + time * 0.45) * 0.15;
-        const pointRadius = radius + wave * amplitude;
-        const x = centerX + Math.cos(angle) * pointRadius;
-        const y = centerY + Math.sin(angle) * pointRadius;
-        if (index === 0) context.moveTo(x, y);
-        else context.lineTo(x, y);
-      }
-      context.closePath();
-    }
-
-    function draw(now) {
-      animationFrame = requestAnimationFrame(draw);
-      const width = canvas.clientWidth;
-      const height = canvas.clientHeight;
-      if (!width || !height) return;
-
-      const elapsed = Math.min(40, now - lastFrameAt) / 1000;
-      const profile = stateProfiles[state] ?? stateProfiles.idle;
-      const rawVolume = readVolume();
-      smoothedVolume += (rawVolume - smoothedVolume) * (rawVolume > smoothedVolume ? 0.32 : 0.09);
-      phase += elapsed * profile.speed * (reducedMotion ? 0.2 : 1);
-      lastFrameAt = now;
-
-      context.clearRect(0, 0, width, height);
-      const centerX = width / 2;
-      const centerY = height / 2;
-      const radius = Math.min(width, height) * (0.265 + smoothedVolume * 0.018);
-      const isSpeaking = state === 'agent-speaking' || state === 'user-speaking';
-      const energy = profile.energy + (isSpeaking ? smoothedVolume * 1.15 : smoothedVolume * 0.32);
-      const amplitude = radius * (0.045 + energy * 0.12);
-      const gradient = context.createLinearGradient(
-        centerX - radius,
-        centerY - radius,
-        centerX + radius,
-        centerY + radius,
-      );
-      gradient.addColorStop(0, 'hsla(' + (profile.hue + 34) + ', 96%, 68%, .95)');
-      gradient.addColorStop(0.46, 'hsla(' + profile.hue + ', 96%, 54%, 1)');
-      gradient.addColorStop(1, 'hsla(' + (profile.hue - 38) + ', 90%, 52%, .88)');
-
-      context.save();
-      context.lineCap = 'round';
-      context.lineJoin = 'round';
-      context.strokeStyle = gradient;
-      context.shadowColor = 'hsla(' + profile.hue + ', 95%, 55%, .72)';
-      context.shadowBlur = 22 + energy * 34;
-      context.globalAlpha = 0.18;
-      context.lineWidth = 14 + energy * 10;
-      traceAura(centerX, centerY, radius, amplitude * 1.25, phase, 0.9);
-      context.stroke();
-      context.globalAlpha = 0.88;
-      context.lineWidth = 3.5 + energy * 4.5;
-      traceAura(centerX, centerY, radius, amplitude, phase, 0);
-      context.stroke();
-      context.globalAlpha = 0.52;
-      context.lineWidth = 1.4;
-      traceAura(centerX, centerY, radius * 0.92, amplitude * 0.55, -phase * 0.72, 1.7);
-      context.stroke();
-      context.restore();
-    }
-
-    function addTrack(track, role) {
-      if (!track?.mediaStreamTrack || connectedTracks.has(track)) return;
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      if (!AudioContextClass) return;
-      audioContext ??= new AudioContextClass();
-      const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 256;
-      analyser.smoothingTimeConstant = 0.72;
-      const source = audioContext.createMediaStreamSource(new MediaStream([track.mediaStreamTrack]));
-      source.connect(analyser);
-      connectedTracks.add(track);
-      audioSources.push({
-        analyser,
-        data: new Uint8Array(analyser.fftSize),
-        role,
-        source,
-      });
-      if (audioContext.state === 'suspended') void audioContext.resume();
-    }
-
-    function reset() {
-      for (const source of audioSources) source.source.disconnect();
-      audioSources.length = 0;
-    }
-
-    function setState(nextState) {
-      state = nextState;
-      canvas.dataset.state = nextState;
-    }
-
-    function start() {
-      resize();
-      if (!animationFrame) animationFrame = requestAnimationFrame(draw);
-    }
-
-    function stop() {
-      cancelAnimationFrame(animationFrame);
-      animationFrame = undefined;
-      context.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
-      reset();
-    }
-
-    const resizeObserver = new ResizeObserver(resize);
-    resizeObserver.observe(canvas);
-    return { addTrack, reset, setState, start, stop };
   }
 
-  const aura = createAudioReactiveAura(elements.aura);
+  const aura = createAudioReactiveAura(elements.aura, renderLevels);
 
-  function openSession() {
-    document.body.classList.add('voice-active');
-    elements.session.hidden = false;
-    aura.start();
+  function isAgent(participant) {
+    return participant?.isAgent === true;
   }
 
-  function closeSession() {
-    document.body.classList.remove('voice-active');
-    elements.session.hidden = true;
-    aura.stop();
+  function currentAgent() {
+    return room ? Array.from(room.remoteParticipants.values()).find(isAgent) : undefined;
   }
 
-  function setStatus(label, state = 'idle', hint = agentStateHints[state]) {
-    elements.status.hidden = false;
-    elements.statusLabel.textContent = label;
-    elements.status.dataset.state = state;
+  function renderState(state, detail) {
+    const [label, title, hint] = copy[state] || copy.idle;
     elements.session.dataset.state = state;
-    elements.sessionState.textContent = label;
+    elements.status.hidden = false;
+    elements.status.dataset.state = state;
+    elements['status-label'].textContent = label;
+    elements['session-state'].textContent = label;
+    elements.title.textContent = title;
+    elements['session-hint'].textContent = detail || hint;
     aura.setState(state);
-    elements.sessionHint.textContent = hint ?? agentStateHints.idle;
   }
 
-  function showAgentState(participant) {
-    if (!participant || participant.identity === room?.localParticipant.identity) return false;
-    const state = participant.attributes?.['lk.agent.state'];
-    if (!state) return false;
-    const visualState = state === 'speaking' ? 'agent-speaking' : state;
-    setStatus(agentStateLabels[state] ?? 'Agent connected', visualState, agentStateHints[state]);
-    return true;
+  function syncState() {
+    const agent = currentAgent();
+    const user = room?.localParticipant;
+    aura.setParticipants(user, agent);
+    const agentState = agent?.attributes?.['lk.agent.state'];
+    const userSpeaking = user?.isMicrophoneEnabled &&
+      (activeSpeakers.has(user.identity) || user.isSpeaking);
+    const agentSpeaking = agent &&
+      (activeSpeakers.has(agent.identity) || agent.isSpeaking || agentState === 'speaking');
+    elements['user-state'].textContent = !microphoneReady ? 'Mic off' :
+      !user?.isMicrophoneEnabled ? 'Muted' : userSpeaking ? 'Speaking' : 'Connected';
+    elements['agent-state'].textContent = !agent ? (connecting ? 'Joining' : 'Ready') :
+      agentSpeaking ? 'Speaking' : agentState === 'thinking' ? 'Thinking' : 'Listening';
+    elements.session.dataset.connected = String(Boolean(room && !connecting));
+    elements['live-label'].textContent = reconnecting ? 'Reconnecting' : room && !connecting ? 'Live' : 'Ready';
+
+    // Derive one visual state from identified participants; late attributes cannot
+    // overwrite local speech, and unrelated remote participants never become Agentic.
+    const state = connecting || reconnecting ? 'connecting' :
+      !room ? 'idle' : !microphoneReady || !agent ? 'initializing' :
+      userSpeaking ? 'user-speaking' :
+      agentSpeaking ? 'agent-speaking' :
+      ['failed', 'disconnected'].includes(agentState) ? 'error' :
+      !user?.isMicrophoneEnabled ? 'muted' :
+      agentState === 'thinking' ? 'thinking' :
+      ['initializing', 'connecting', 'pre-connect-buffering'].includes(agentState) ? 'initializing' :
+      'listening';
+    renderState(state);
   }
 
   function formatElapsed(milliseconds) {
     const seconds = Math.max(0, Math.floor(milliseconds / 1000));
-    return String(Math.floor(seconds / 60)).padStart(2, '0') + ':' +
-      String(seconds % 60).padStart(2, '0');
+    return String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0');
   }
 
-  function startElapsed() {
-    voiceStartedAt = performance.now();
-    clearInterval(elapsedTimer);
-    elapsedTimer = setInterval(() => {
-      elements.elapsed.textContent = formatElapsed(performance.now() - voiceStartedAt);
-    }, 250);
+  function openSession() {
+    if (!elements.session.hidden) return;
+    elements.session.hidden = false;
+    appShell.inert = true;
+    document.body.classList.add('voice-active');
+    aura.start();
+    renderState('idle');
+    elements.start.focus();
   }
 
-  function stopElapsed() {
-    clearInterval(elapsedTimer);
-    elapsedTimer = undefined;
+  function closeSession() {
+    elements.session.hidden = true;
+    appShell.inert = false;
+    document.body.classList.remove('voice-active');
+    aura.stop();
+    elements.connect.focus();
   }
 
   function clearTranscript() {
-    transcriptRows.clear();
+    if (transcriptFrame) cancelAnimationFrame(transcriptFrame);
+    transcriptFrame = undefined;
+    rows.clear();
     pendingSegments.clear();
     committedSegments.clear();
-    for (const turn of elements.transcript.querySelectorAll('.voice-transcript-turn')) turn.remove();
-    elements.transcriptEmpty.hidden = false;
-  }
-
-  function createTranscriptTurn(segment) {
-    const article = document.createElement('article');
-    article.className = 'voice-transcript-turn ' + segment.role;
-    article.dataset.segmentId = segment.id;
-    const speaker = document.createElement('div');
-    speaker.className = 'speaker';
-    speaker.textContent = segment.role === 'assistant' ? 'Agentic' : 'You';
-    const words = document.createElement('p');
-    words.className = 'words';
-    article.append(speaker, words);
-    elements.transcript.append(article);
-    transcriptRows.set(segment.id, { article, words });
-    return { article, words };
+    for (const row of elements.transcript.querySelectorAll('.voice-transcript-turn')) row.remove();
+    elements['transcript-empty'].hidden = false;
   }
 
   function flushTranscript() {
     transcriptFrame = undefined;
+    const follow = elements.transcript.scrollHeight - elements.transcript.scrollTop -
+      elements.transcript.clientHeight < 80;
     for (const segment of pendingSegments.values()) {
-      elements.transcriptEmpty.hidden = true;
-      const turn = transcriptRows.get(segment.id) ?? createTranscriptTurn(segment);
-      turn.words.textContent = segment.text;
-      turn.article.classList.toggle('interim', !segment.final);
+      elements['transcript-empty'].hidden = true;
+      let row = rows.get(segment.id);
+      if (!row) {
+        const article = document.createElement('article');
+        article.className = 'voice-transcript-turn ' + segment.role;
+        const speaker = document.createElement('div');
+        speaker.className = 'speaker';
+        speaker.textContent = segment.role === 'assistant' ? 'Agentic' : 'You';
+        const time = document.createElement('time');
+        time.textContent = startedAt ? formatElapsed(performance.now() - startedAt) : '00:00';
+        speaker.append(time);
+        const words = document.createElement('p');
+        words.className = 'words';
+        article.append(speaker, words);
+        elements.transcript.append(article);
+        row = { article, words };
+        rows.set(segment.id, row);
+      }
+      row.words.textContent = segment.text;
+      row.article.classList.toggle('interim', !segment.final);
       if (segment.final && !committedSegments.has(segment.id) && segment.text.trim()) {
         committedSegments.add(segment.id);
         document.dispatchEvent(new CustomEvent('agentic:voice-transcript', {
@@ -311,148 +169,258 @@ export const LIVEKIT_BROWSER_APP = `(() => {
       }
     }
     pendingSegments.clear();
-    elements.transcript.scrollTop = elements.transcript.scrollHeight;
+    if (follow) elements.transcript.scrollTop = elements.transcript.scrollHeight;
   }
 
   function queueTranscript(segments, participant) {
-    const role = participant?.isAgent ? 'assistant' : 'user';
-    for (const segment of segments) pendingSegments.set(segment.id, { ...segment, role });
+    const role = participant?.identity === room?.localParticipant.identity ? 'user' :
+      isAgent(participant) ? 'assistant' : undefined;
+    if (!role) return;
+    for (const segment of segments) {
+      const id = participant.identity + ':' + segment.id;
+      if (!committedSegments.has(id)) pendingSegments.set(id, { ...segment, id, role });
+    }
     if (!transcriptFrame) transcriptFrame = requestAnimationFrame(flushTranscript);
-  }
-
-  function updateQuality(quality, participant) {
-    if (!participant || participant.identity !== room?.localParticipant.identity) return;
-    elements.quality.textContent = 'Connection ' + String(quality).replaceAll('_', ' ').toLowerCase();
   }
 
   function resetControls() {
     connecting = false;
-    elements.connect.disabled = false;
+    reconnecting = false;
+    microphoneReady = false;
+    activeSpeakers.clear();
     elements.connect.setAttribute('aria-pressed', 'false');
-    elements.connect.setAttribute('aria-label', 'Start voice chat');
-    elements.label.textContent = 'Start voice chat';
+    elements.start.hidden = false;
+    elements.start.disabled = false;
+    elements.end.hidden = true;
     elements.mute.disabled = true;
     elements.mute.setAttribute('aria-pressed', 'false');
-    elements.mute.querySelector('small').textContent = 'Mute';
-    stopElapsed();
+    elements.mute.setAttribute('aria-label', 'Mute microphone');
+    elements['enable-audio'].hidden = true;
+    elements.session.dataset.connected = 'false';
+    elements['live-label'].textContent = 'Ended';
+    elements['user-state'].textContent = 'Mic off';
+    elements['agent-state'].textContent = 'Offline';
+    clearInterval(elapsedTimer);
+    elapsedTimer = undefined;
+    aura.reset();
+    elements.audio.replaceChildren();
   }
 
-  async function disconnect({ close = true } = {}) {
-    ending = true;
-    const activeRoom = room;
+  async function disconnect(close = false) {
+    attempt += 1;
+    tokenRequest?.abort();
+    tokenRequest = undefined;
+    const previous = room;
     room = undefined;
+    if (pendingSegments.size) flushTranscript();
     resetControls();
-    if (activeRoom) await activeRoom.disconnect();
-    ending = false;
-    setStatus('Voice ended', 'disconnected');
+    renderState('disconnected');
+    elements.quality.textContent = 'Microphone off';
     if (close) closeSession();
+    if (previous) {
+      try { await previous.disconnect(); } finally { previous.removeAllListeners(); }
+    }
+  }
+
+  function syncTracks(nextRoom) {
+    const microphone = nextRoom.localParticipant.getTrackPublication(LivekitClient.Track.Source.Microphone)?.track;
+    if (microphone) aura.addTrack(microphone, 'user', nextRoom.localParticipant);
+    const agent = currentAgent();
+    if (agent) {
+      for (const publication of agent.audioTrackPublications.values()) {
+        if (publication.track) aura.addTrack(publication.track, 'agent', agent);
+      }
+    }
+    syncState();
   }
 
   function bindRoom(nextRoom) {
-    nextRoom.on(LivekitClient.RoomEvent.TrackSubscribed, (track, _publication, participant) => {
-      if (track.kind === LivekitClient.Track.Kind.Audio) {
-        elements.audio.append(track.attach());
-        const role = participant?.isAgent ? 'agent' : 'user';
-        aura.addTrack(track, role);
-      }
+    const on = (event, handler) => nextRoom.on(event, (...args) => {
+      if (room === nextRoom) handler(...args);
     });
-    nextRoom.on(LivekitClient.RoomEvent.TranscriptionReceived, queueTranscript);
-    nextRoom.on(LivekitClient.RoomEvent.ConnectionQualityChanged, updateQuality);
-    nextRoom.on(LivekitClient.RoomEvent.ActiveSpeakersChanged, (speakers) => {
-      const localIsSpeaking = speakers.some(
-        (participant) => participant.identity === nextRoom.localParticipant.identity,
-      );
-      const agentIsSpeaking = speakers.some(
-        (participant) => participant.identity !== nextRoom.localParticipant.identity,
-      );
-      if (localIsSpeaking) setStatus('You are speaking', 'user-speaking');
-      else if (agentIsSpeaking) setStatus('Agentic is speaking', 'agent-speaking');
-      else {
-        const agent = Array.from(nextRoom.remoteParticipants.values()).find(showAgentState);
-        if (!agent) setStatus('Listening', 'listening');
-      }
+    on(LivekitClient.RoomEvent.TrackSubscribed, (track, _publication, participant) => {
+      if (track.kind !== LivekitClient.Track.Kind.Audio || !isAgent(participant)) return;
+      elements.audio.append(track.attach());
+      aura.addTrack(track, 'agent', participant);
+      syncState();
     });
-    nextRoom.on(
-      LivekitClient.RoomEvent.ParticipantAttributesChanged,
-      (_changedAttributes, participant) => showAgentState(participant),
-    );
-    nextRoom.on(LivekitClient.RoomEvent.ParticipantConnected, showAgentState);
-    nextRoom.on(LivekitClient.RoomEvent.Disconnected, () => {
-      if (ending) return;
+    on(LivekitClient.RoomEvent.TrackUnsubscribed, (track) => {
+      aura.removeTrack(track);
+      for (const element of track.detach()) element.remove();
+    });
+    on(LivekitClient.RoomEvent.LocalTrackPublished, () => syncTracks(nextRoom));
+    on(LivekitClient.RoomEvent.LocalTrackUnpublished, (publication) => {
+      if (publication.track) aura.removeTrack(publication.track);
+      syncState();
+    });
+    on(LivekitClient.RoomEvent.TranscriptionReceived, queueTranscript);
+    on(LivekitClient.RoomEvent.ActiveSpeakersChanged, (speakers) => {
+      activeSpeakers = new Set(speakers.map((participant) => participant.identity));
+      syncState();
+    });
+    on(LivekitClient.RoomEvent.ParticipantAttributesChanged, (_changed, participant) => {
+      if (isAgent(participant)) syncTracks(nextRoom);
+    });
+    on(LivekitClient.RoomEvent.ParticipantConnected, () => syncTracks(nextRoom));
+    on(LivekitClient.RoomEvent.ParticipantDisconnected, () => syncTracks(nextRoom));
+    on(LivekitClient.RoomEvent.TrackMuted, syncState);
+    on(LivekitClient.RoomEvent.TrackUnmuted, syncState);
+    on(LivekitClient.RoomEvent.ConnectionQualityChanged, (quality, participant) => {
+      if (participant?.identity !== nextRoom.localParticipant.identity) return;
+      elements.quality.textContent = quality === 'poor' || quality === 'lost'
+        ? 'Connection is unstable. Audio may take a moment.' : 'Connected · You can interrupt anytime';
+    });
+    on(LivekitClient.RoomEvent.Reconnecting, () => {
+      reconnecting = true;
+      syncState();
+      elements.quality.textContent = 'Reconnecting your conversation…';
+    });
+    on(LivekitClient.RoomEvent.Reconnected, () => {
+      reconnecting = false;
+      syncTracks(nextRoom);
+      elements.quality.textContent = 'Connected · You can interrupt anytime';
+    });
+    on(LivekitClient.RoomEvent.AudioPlaybackStatusChanged, () => {
+      elements['enable-audio'].hidden = nextRoom.canPlaybackAudio;
+    });
+    on(LivekitClient.RoomEvent.Disconnected, () => {
       room = undefined;
+      attempt += 1;
       resetControls();
-      setStatus('Connection ended', 'disconnected', 'Your transcript is safe in the chat.');
+      renderState('disconnected');
+      elements.quality.textContent = 'Connection ended · Your transcript remains here';
+      nextRoom.removeAllListeners();
     });
   }
 
   async function connect() {
-    if (room) return disconnect();
-    if (connecting) return;
-
+    if (room || connecting) return;
+    const currentAttempt = ++attempt;
     connecting = true;
-    openSession();
     clearTranscript();
-    elements.connect.disabled = true;
+    aura.prepareAudio();
+    elements.start.hidden = true;
+    elements.end.hidden = false;
     elements.mute.disabled = true;
-    elements.quality.textContent = 'Checking connection…';
     elements.elapsed.textContent = '00:00';
-    setStatus('Connecting voice…', 'connecting', 'Securing a realtime session.');
-
+    elements.quality.textContent = 'Connecting your conversation…';
+    renderState('connecting');
+    const controller = new AbortController();
+    tokenRequest = controller;
+    const timeout = setTimeout(() => controller.abort(), 15000);
     let nextRoom;
     try {
       const response = await fetch('/v1/voice/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.message ?? 'Voice is unavailable');
-
+      if (!response.ok) throw new Error('Voice is unavailable. Check that the voice server is enabled.');
       const credentials = payload.data ?? payload;
-      nextRoom = new LivekitClient.Room({ adaptiveStream: true, dynacast: true });
+      if (attempt !== currentAttempt) return;
+      nextRoom = new LivekitClient.Room({
+        adaptiveStream: true,
+        dynacast: true,
+        audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      room = nextRoom;
       bindRoom(nextRoom);
       await nextRoom.connect(credentials.serverUrl, credentials.participantToken);
-      room = nextRoom;
+      if (attempt !== currentAttempt) { await nextRoom.disconnect(); return; }
       connecting = false;
-      elements.connect.disabled = false;
       elements.connect.setAttribute('aria-pressed', 'true');
-      elements.connect.setAttribute('aria-label', 'End voice chat');
-      elements.label.textContent = 'End voice chat';
-      elements.mute.disabled = false;
-      startElapsed();
-      setStatus('Enable microphone access…', 'initializing', 'Allow microphone access, then speak naturally.');
-
+      startedAt = performance.now();
+      elapsedTimer = setInterval(() => {
+        elements.elapsed.textContent = formatElapsed(performance.now() - startedAt);
+      }, 250);
+      // Autoplay restrictions should not tear down a healthy voice connection.
+      await nextRoom.startAudio().catch(() => {
+        elements['enable-audio'].hidden = false;
+      });
+      if (room !== nextRoom || attempt !== currentAttempt) return;
       await nextRoom.localParticipant.setMicrophoneEnabled(true);
-      if (room !== nextRoom) return;
-      const microphone = nextRoom.localParticipant.getTrackPublication(
-        LivekitClient.Track.Source.Microphone,
-      )?.track;
-      if (microphone) aura.addTrack(microphone, 'user');
-      setStatus('Waiting for agent…', 'initializing', 'The agent is joining your session.');
+      if (room !== nextRoom || attempt !== currentAttempt) {
+        // A microphone permission dialog may resolve after the user ends the call.
+        await nextRoom.localParticipant.setMicrophoneEnabled(false).catch(() => {});
+        return;
+      }
+      microphoneReady = true;
+      elements.mute.disabled = false;
+      elements.quality.textContent = 'Connected · You can interrupt anytime';
+      syncTracks(nextRoom);
     } catch (error) {
-      if (nextRoom) await nextRoom.disconnect();
+      if (attempt !== currentAttempt) return;
       room = undefined;
+      if (nextRoom) {
+        await nextRoom.disconnect().catch(() => {});
+        nextRoom.removeAllListeners();
+      }
       resetControls();
-      const message = error instanceof Error ? error.message : 'Voice connection failed';
-      const safeMessage = message.includes('Failed to fetch')
-        ? 'Cannot reach LiveKit Cloud. Check VPN or firewall access.'
-        : message.includes('Permission') || message.includes('NotAllowed')
-          ? 'Microphone access is required for voice chat.'
-          : message;
-      setStatus(safeMessage, 'error', 'Return to chat or try the microphone again.');
+      const name = error?.name || '';
+      const message = error instanceof Error ? error.message : '';
+      const detail = name === 'NotAllowedError' || /permission|notallowed/i.test(message)
+        ? 'Allow microphone access in your browser, then try again.'
+        : name === 'NotFoundError' ? 'Connect a microphone and try again.'
+        : name === 'AbortError' ? 'The connection took too long. Try again.'
+        : 'We could not connect to voice. Check your connection and that the voice worker is running.';
+      renderState('error', detail);
+      elements.quality.textContent = 'Microphone off';
+    } finally {
+      clearTimeout(timeout);
+      if (tokenRequest === controller) tokenRequest = undefined;
     }
   }
 
   async function toggleMute() {
-    if (!room) return;
-    const enabled = room.localParticipant.isMicrophoneEnabled;
-    await room.localParticipant.setMicrophoneEnabled(!enabled);
-    elements.mute.setAttribute('aria-pressed', String(enabled));
-    elements.mute.querySelector('small').textContent = enabled ? 'Unmute' : 'Mute';
-    setStatus(enabled ? 'Microphone muted' : 'Listening', enabled ? 'muted' : 'listening');
+    const activeRoom = room;
+    if (!activeRoom || !microphoneReady) return;
+    elements.mute.disabled = true;
+    try {
+      const wasEnabled = activeRoom.localParticipant.isMicrophoneEnabled;
+      await activeRoom.localParticipant.setMicrophoneEnabled(!wasEnabled);
+      if (room !== activeRoom) return;
+      elements.mute.setAttribute('aria-pressed', String(wasEnabled));
+      elements.mute.setAttribute('aria-label', wasEnabled ? 'Unmute microphone' : 'Mute microphone');
+      syncTracks(activeRoom);
+    } catch {
+      elements.quality.textContent = 'Microphone could not be changed. Try again.';
+    } finally {
+      elements.mute.disabled = !microphoneReady;
+    }
   }
 
-  elements.connect.addEventListener('click', connect);
-  elements.end.addEventListener('click', () => disconnect());
+  elements.connect.addEventListener('click', openSession);
+  elements.start.addEventListener('click', connect);
+  elements.end.addEventListener('click', () => void disconnect());
+  elements.back.addEventListener('click', () => void disconnect(true));
   elements.mute.addEventListener('click', toggleMute);
-  window.addEventListener('beforeunload', () => room?.disconnect());
+  elements['enable-audio'].addEventListener('click', () => {
+    aura.prepareAudio();
+    void room?.startAudio().catch(() => {
+      elements.quality.textContent = 'Audio is blocked. Check your browser sound permission.';
+    });
+  });
+  elements['transcript-toggle'].addEventListener('click', () => {
+    const hidden = !elements['transcript-panel'].hidden;
+    elements['transcript-panel'].hidden = hidden;
+    elements.session.dataset.transcript = hidden ? 'hidden' : 'visible';
+    elements['transcript-toggle'].setAttribute('aria-pressed', String(!hidden));
+  });
+  elements.session.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') void disconnect(true);
+    if (event.key !== 'Tab') return;
+    const controls = Array.from(elements.session.querySelectorAll('button')).filter(
+      (button) => !button.disabled && button.getClientRects().length,
+    );
+    const first = controls[0];
+    const last = controls.at(-1);
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  });
+  window.addEventListener('pagehide', () => {
+    tokenRequest?.abort();
+    void room?.disconnect();
+    aura.stop();
+  });
 })();`;

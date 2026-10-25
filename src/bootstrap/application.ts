@@ -109,6 +109,7 @@ export async function createApplication(): Promise<{
     LIVEKIT_API_KEY: config.get<string>('LIVEKIT_API_KEY'),
     LIVEKIT_API_SECRET: config.get<string>('LIVEKIT_API_SECRET'),
     LIVEKIT_AGENT_NAME: config.getOrThrow<string>('LIVEKIT_AGENT_NAME'),
+    LIVEKIT_PHONE_NUMBER: config.get<string>('LIVEKIT_PHONE_NUMBER'),
     OPENAI_API_KEY: config.get<string>('OPENAI_API_KEY'),
     MODEL_TIMEOUT_MS: config.getOrThrow<number>('MODEL_TIMEOUT_MS'),
     WEB_SEARCH_ENABLED: config.getOrThrow<boolean>('WEB_SEARCH_ENABLED'),

@@ -307,22 +307,19 @@ describe('AppController (e2e)', () => {
     expect(livekitApp.text).toContain('requestAnimationFrame(flushTranscript)');
     expect(livekitApp.text).toContain('createAudioReactiveAura');
     expect(livekitApp.text).toContain('audioContext.createAnalyser()');
-    expect(livekitApp.text).toContain('track.mediaStreamTrack');
-    expect(livekitApp.text).toContain(
-      "participant?.isAgent ? 'agent' : 'user'",
-    );
-    expect(livekitApp.text).toContain('aura.addTrack(track, role)');
-    expect(livekitApp.text).toContain("aura.addTrack(microphone, 'user')");
     expect(livekitApp.text).toContain('aura.setState(state)');
     expect(livekitApp.text).toContain("'agent-speaking'");
     expect(livekitApp.text).toContain("'user-speaking'");
-    expect(livekitApp.text).toContain('agentStateHints');
     expect(livekitApp.text).toContain("'agentic:voice-transcript'");
     expect(script.text).toContain("'agentic:voice-transcript'");
+    expect(page.text).toContain('id="voice-start"');
+    expect(page.text).toContain('id="voice-user-meter"');
+    expect(page.text).toContain('id="voice-agent-meter"');
+    expect(page.text).toContain('aria-modal="true"');
     expect(livekit.text).toContain('LivekitClient');
     expect(page.text).not.toContain('https://hoppscotch.io');
     expect(page.text).not.toContain('/v1/chat');
-    expect(page.text).toContain('How can I help you today?');
+    expect(page.text).toContain("What's on your mind?");
     expect(page.text).not.toContain('Activity log');
     expect(page.text).not.toContain('id="events"');
     expect(() => new Function(script.text)).not.toThrow();
@@ -338,7 +335,6 @@ describe('AppController (e2e)', () => {
     expect(styles.text).toContain('.voice-aura-canvas');
     expect(styles.text).toContain("[data-state='agent-speaking']");
     expect(styles.text).toContain("[data-state='user-speaking']");
-    expect(styles.text).toContain('width: min(220px, 52vw)');
     expect(styles.text).toContain('@keyframes shimmer');
     expect(styles.text).toContain('.user .message-body');
     expect(styles.text).toContain('justify-self: end');

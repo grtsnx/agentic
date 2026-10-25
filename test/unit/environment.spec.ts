@@ -5,7 +5,7 @@ describe('validateEnvironment', () => {
   it('uses secure, stateless defaults', () => {
     expect(validateEnvironment({})).toMatchObject({
       NODE_ENV: 'development',
-      PORT: 3000,
+      PORT: 3001,
       PLATFORM_NAME: 'Agentic',
       CORS_ORIGINS: [],
       OBSERVE_ENABLED: false,
@@ -113,6 +113,25 @@ describe('validateEnvironment', () => {
       VOICE_PROVIDER: 'livekit',
       LIVEKIT_AGENT_NAME: 'agentic-voice',
     });
+  });
+
+  it('accepts an optional E.164 phone number and rejects unsafe log content', () => {
+    expect(
+      validateEnvironment({ LIVEKIT_PHONE_NUMBER: '' }).LIVEKIT_PHONE_NUMBER,
+    ).toBe('');
+    expect(
+      validateEnvironment({ LIVEKIT_PHONE_NUMBER: '+12025550123' })
+        .LIVEKIT_PHONE_NUMBER,
+    ).toBe('+12025550123');
+    for (const number of [
+      '202-555-0123',
+      '+01234567',
+      '+12025550123\nFake log',
+    ]) {
+      expect(() =>
+        validateEnvironment({ LIVEKIT_PHONE_NUMBER: number }),
+      ).toThrow(/LIVEKIT_PHONE_NUMBER/);
+    }
   });
 
   it('requires an OpenAI key only for the direct OpenAI voice provider', () => {
