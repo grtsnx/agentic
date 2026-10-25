@@ -260,10 +260,25 @@ describe('AppController (e2e)', () => {
       .get('/playground/styles.css')
       .expect('Content-Type', /text\/css/)
       .expect(200);
+    const livekit = await request(app.getHttpServer())
+      .get('/playground/livekit-client.js')
+      .expect('Content-Type', /javascript/)
+      .expect(200);
+    const livekitApp = await request(app.getHttpServer())
+      .get('/playground/livekit-app.js')
+      .expect('Content-Type', /javascript/)
+      .expect(200);
 
     expect(page.text).toContain('<title>Agentic</title>');
     expect(page.text).toContain('/socket.io/socket.io.js');
     expect(page.text).toContain('/playground/app.js');
+    expect(page.text).toContain('/playground/livekit-client.js');
+    expect(page.text).toContain('/playground/livekit-app.js');
+    expect(page.text).toContain('id="voice-connect"');
+    expect(livekitApp.text).toContain("fetch('/v1/voice/token'");
+    expect(script.text).not.toContain('LivekitClient.Room');
+    expect(livekitApp.text).toContain('LivekitClient.Room');
+    expect(livekit.text).toContain('LivekitClient');
     expect(page.text).not.toContain('https://hoppscotch.io');
     expect(page.text).not.toContain('/v1/chat');
     expect(page.text).toContain('How can I help you today?');

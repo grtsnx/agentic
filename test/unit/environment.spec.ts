@@ -10,6 +10,8 @@ describe('validateEnvironment', () => {
       CORS_ORIGINS: [],
       OBSERVE_ENABLED: false,
       SWAGGER_ENABLED: true,
+      VOICE_ENABLED: false,
+      VOICE_PROVIDER: 'livekit',
     });
   });
 
@@ -71,5 +73,40 @@ describe('validateEnvironment', () => {
         OBSERVE_SERVICE_ID: 'service',
       }).OBSERVE_ENABLED,
     ).toBe(true);
+  });
+
+  it('requires LiveKit Cloud credentials when voice is enabled', () => {
+    expect(() => validateEnvironment({ VOICE_ENABLED: 'true' })).toThrow(
+      /LIVEKIT_URL/,
+    );
+
+    expect(
+      validateEnvironment({
+        VOICE_ENABLED: 'true',
+        LIVEKIT_URL: 'wss://agentic.livekit.cloud',
+        LIVEKIT_API_KEY: 'key',
+        LIVEKIT_API_SECRET: 'secret',
+      }),
+    ).toMatchObject({
+      VOICE_ENABLED: true,
+      VOICE_PROVIDER: 'livekit',
+      LIVEKIT_AGENT_NAME: 'agentic-voice',
+    });
+  });
+
+  it('requires an OpenAI key only for the direct OpenAI voice provider', () => {
+    const base = {
+      VOICE_ENABLED: 'true',
+      VOICE_PROVIDER: 'openai',
+      LIVEKIT_URL: 'wss://agentic.livekit.cloud',
+      LIVEKIT_API_KEY: 'key',
+      LIVEKIT_API_SECRET: 'secret',
+    };
+
+    expect(() => validateEnvironment(base)).toThrow(/OPENAI_API_KEY/);
+    expect(
+      validateEnvironment({ ...base, OPENAI_API_KEY: 'openai-key' })
+        .VOICE_PROVIDER,
+    ).toBe('openai');
   });
 });

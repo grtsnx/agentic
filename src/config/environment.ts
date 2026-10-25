@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 const environments = ['development', 'production', 'test'] as const;
+const voiceProviders = ['livekit', 'openai'] as const;
 
 const booleanValue = (name: string) =>
   z.preprocess(
@@ -61,22 +62,69 @@ const environmentSchema = z
     REALTIME_PLAYGROUND_ENABLED: booleanValue(
       'REALTIME_PLAYGROUND_ENABLED',
     ).optional(),
+    VOICE_ENABLED: booleanValue('VOICE_ENABLED').optional(),
+    VOICE_PROVIDER: z.enum(voiceProviders).default('livekit'),
+    VOICE_MODEL: z.string().trim().min(1).default('gpt-realtime-2.1'),
+    VOICE_NAME: z.string().trim().min(1).default('marin'),
+    LIVEKIT_URL: z.string().trim().optional(),
+    LIVEKIT_API_KEY: z.string().trim().optional(),
+    LIVEKIT_API_SECRET: z.string().trim().optional(),
+    LIVEKIT_AGENT_NAME: z.string().trim().min(1).default('agentic-voice'),
+    OPENAI_API_KEY: z.string().trim().optional(),
   })
   .superRefine((environment, context) => {
-    if (!environment.OBSERVE_ENABLED) return;
+    if (environment.OBSERVE_ENABLED) {
+      for (const key of [
+        'OBSERVE_APP_KEY',
+        'OBSERVE_APP_SECRET',
+        'OBSERVE_SERVICE_ID',
+      ] as const) {
+        if (!environment[key]) {
+          context.addIssue({
+            code: 'custom',
+            message: `${key} is required when OBSERVE_ENABLED is true`,
+            path: [key],
+          });
+        }
+      }
+    }
+
+    if (!environment.VOICE_ENABLED) return;
 
     for (const key of [
-      'OBSERVE_APP_KEY',
-      'OBSERVE_APP_SECRET',
-      'OBSERVE_SERVICE_ID',
+      'LIVEKIT_URL',
+      'LIVEKIT_API_KEY',
+      'LIVEKIT_API_SECRET',
     ] as const) {
       if (!environment[key]) {
         context.addIssue({
           code: 'custom',
-          message: `${key} is required when OBSERVE_ENABLED is true`,
+          message: `${key} is required when VOICE_ENABLED is true`,
           path: [key],
         });
       }
+    }
+
+    if (
+      environment.LIVEKIT_URL &&
+      !/^wss?:\/\/[a-z\d.-]+(?::\d+)?\/?$/i.test(environment.LIVEKIT_URL)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'LIVEKIT_URL must be an exact ws(s) server URL',
+        path: ['LIVEKIT_URL'],
+      });
+    }
+
+    if (
+      environment.VOICE_PROVIDER === 'openai' &&
+      !environment.OPENAI_API_KEY
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'OPENAI_API_KEY is required when VOICE_PROVIDER is openai',
+        path: ['OPENAI_API_KEY'],
+      });
     }
   });
 
@@ -91,6 +139,15 @@ export interface Environment {
   OBSERVE_SERVICE_ID?: string;
   SWAGGER_ENABLED: boolean;
   REALTIME_PLAYGROUND_ENABLED: boolean;
+  VOICE_ENABLED: boolean;
+  VOICE_PROVIDER: (typeof voiceProviders)[number];
+  VOICE_MODEL: string;
+  VOICE_NAME: string;
+  LIVEKIT_URL?: string;
+  LIVEKIT_API_KEY?: string;
+  LIVEKIT_API_SECRET?: string;
+  LIVEKIT_AGENT_NAME: string;
+  OPENAI_API_KEY?: string;
 }
 
 export function validateEnvironment(
@@ -104,5 +161,6 @@ export function validateEnvironment(
     SWAGGER_ENABLED: parsed.SWAGGER_ENABLED ?? parsed.NODE_ENV !== 'production',
     REALTIME_PLAYGROUND_ENABLED:
       parsed.REALTIME_PLAYGROUND_ENABLED ?? parsed.NODE_ENV !== 'production',
+    VOICE_ENABLED: parsed.VOICE_ENABLED ?? false,
   };
 }

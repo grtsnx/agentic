@@ -4,9 +4,9 @@ import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { createObserveModule } from '@nestjs/observe';
 import { TerminusModule } from '@nestjs/terminus';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { validateEnvironment } from '@/config';
+import { PlaygroundModule, validateEnvironment } from '@/config';
 import { HttpExceptionFilter, ResponseInterceptor } from '@/middleware';
-import { RealtimeModule, V1Module, V2Module } from '@/modules';
+import { V1Module, V2Module } from '@/modules';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 
@@ -36,7 +36,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     TerminusModule,
     V1Module,
     V2Module,
-    RealtimeModule,
+    PlaygroundModule,
   ],
   controllers: [AppController],
   providers: [

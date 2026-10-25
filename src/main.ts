@@ -10,7 +10,12 @@ logger.log(`Application: ${baseUrl}`);
 logger.log(`REST chat v1: ${baseUrl}/v1/chat`);
 logger.log(`Socket.IO v1 namespace: ${baseUrl}/v1/chat`);
 if (environment.REALTIME_PLAYGROUND_ENABLED) {
-  logger.log(`Socket.IO playground: ${baseUrl}/playground`);
+  logger.log(`Chat and voice playground: ${baseUrl}/playground`);
+}
+if (environment.VOICE_ENABLED) {
+  logger.log(`LiveKit voice token: ${baseUrl}/v1/voice/token`);
+  logger.log(`Voice provider: ${environment.VOICE_PROVIDER}`);
+  logger.log('Voice worker: bun run voice:dev');
 }
 logger.log('CLI: bun run chat');
 

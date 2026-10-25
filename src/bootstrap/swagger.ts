@@ -157,6 +157,10 @@ export function configureSwagger(
         'Chat',
         'Version 1 agent chat endpoints for validated, structured responses.',
       );
+      builder.addTag(
+        'Voice',
+        'Version 1 short-lived credentials for LiveKit voice sessions.',
+      );
     }
 
     const options = builder.build();

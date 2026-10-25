@@ -28,6 +28,32 @@ The REST endpoint remains `POST /v1/chat`. Socket.IO streams on the `/v1/chat` n
 
 Chat requests are automatically routed without an extra model call. Lightweight requests use `gpt-5-nano`; complex code, architecture, security, multi-step, or large requests use `gpt-6-luna`. The router is capped at Luna, and the runtime metadata reports the model actually called.
 
+## LiveKit Cloud voice
+
+Create a LiveKit Cloud project, copy its WebSocket URL and API credentials into `.env`, and enable voice:
+
+```env
+VOICE_ENABLED=true
+VOICE_PROVIDER=livekit
+VOICE_MODEL=gpt-realtime-2.1
+VOICE_NAME=marin
+LIVEKIT_URL=wss://your-project.livekit.cloud
+LIVEKIT_API_KEY=your-livekit-key
+LIVEKIT_API_SECRET=your-livekit-secret
+LIVEKIT_AGENT_NAME=agentic-voice
+```
+
+Start the API and voice worker in separate terminals:
+
+```bash
+bun run start:dev
+bun run voice:dev
+```
+
+Open `http://localhost:3000/playground` and select **Voice**. The server issues a unique ten-minute token that can join only its generated room, publish only microphone audio and data, subscribe to the agent, and dispatch only `LIVEKIT_AGENT_NAME`. API secrets are never sent to the browser.
+
+To use your OpenAI account directly while retaining LiveKit's WebRTC transport, set `VOICE_PROVIDER=openai` and provide `OPENAI_API_KEY`. With `VOICE_PROVIDER=livekit`, realtime inference is billed through LiveKit Cloud instead.
+
 ## Socket.IO chat
 
 Open `http://localhost:3000/playground`, wait for **Online**, enter a message, and send it. The conversation shows a thinking orb, shimmering activity, elapsed time, and safe phases such as tool use, handoffs, and approvals, then hides that activity when response text begins. It never exposes private chain-of-thought. Runtime chips show total time, tokens, estimated cost, models, and tools after completion. Use the stop button to cancel the active turn.
@@ -59,32 +85,43 @@ The application validates configuration before it starts. Invalid ports, boolean
 | `SWAGGER_ENABLED`             | on outside production | Enables Swagger, Scalar, and OpenAPI JSON. Set it explicitly in production. |
 | `REALTIME_PLAYGROUND_ENABLED` | on outside production | Enables the embedded same-origin Socket.IO chat tester.                     |
 | `OBSERVE_ENABLED`             | `false`               | Enables NestJS Observe when valid credentials are present.                  |
+| `VOICE_ENABLED`               | `false`               | Enables LiveKit Cloud voice credentials and the voice worker.               |
+| `VOICE_PROVIDER`              | `livekit`             | Chooses LiveKit Inference or the direct `openai` adapter.                   |
+| `VOICE_MODEL`                 | `gpt-realtime-2.1`    | Selects the realtime speech-to-speech model.                                |
+| `VOICE_NAME`                  | `marin`               | Selects the realtime model voice.                                           |
+| `LIVEKIT_URL`                 | empty                 | LiveKit Cloud WebSocket URL; required when voice is enabled.                |
+| `LIVEKIT_API_KEY`             | empty                 | Server-side LiveKit key; required when voice is enabled.                    |
+| `LIVEKIT_API_SECRET`          | empty                 | Server-side LiveKit secret; required when voice is enabled.                 |
+| `LIVEKIT_AGENT_NAME`          | `agentic-voice`       | Explicit dispatch name shared by tokens and the worker.                     |
 
 Never use `*` in `CORS_ORIGINS`. The server accepts only complete HTTP or HTTPS origins without paths.
 
 ## Project structure
 
-Implemented API versions own their controllers, services, modules, and DTOs. V2 stays empty until a contract changes. Shared provider integrations stay under `lib/` so future versions can evolve without duplicating infrastructure.
+API versions own their transport contracts and controllers. Reusable feature logic stays in unversioned modules, while provider SDK adapters stay under `lib/`. V2 remains empty until a contract or implementation genuinely changes.
 
 ```text
 src/                      # Application source.
 ├── app/                  # Root application and health endpoints.
 ├── bootstrap/            # Security, validation, documentation, and startup setup.
 ├── cli/                  # Standalone Nest application context for terminal commands.
-├── config/               # Validated runtime configuration.
+├── config/               # Runtime configuration and executable application setup.
+│   ├── livekit/          # LiveKit voice agent and worker configuration.
+│   └── playground/       # Same-origin chat and voice playground.
 ├── dto/                  # Versioned API input and output contracts.
 ├── lib/                  # Shared provider and infrastructure adapters.
+│   ├── livekit/          # Reusable LiveKit SDK adapter and Nest provider.
 │   └── openai/           # OpenAI integration with feature-owned Zod schemas.
 ├── middleware/           # Global HTTP behavior.
 │   ├── commons/         # Shared response and request utilities.
 │   ├── filters/         # Global exception handling.
 │   └── interceptors/    # Global response transformation.
 ├── modules/              # Feature modules separated by API version.
-│   ├── realtime/         # Embedded same-origin Socket.IO playground.
-│   ├── v1/              # Stable version 1 feature boundary.
-│   └── v2/              # Clean boundary reserved for changed v2 contracts.
+│   ├── v1/              # Stable version 1 features, including chat and voice.
+│   ├── v2/              # Clean boundary reserved for changed v2 contracts.
 ├── cli.ts                # Standalone CLI entry point.
-└── main.ts               # HTTP and Socket.IO application entry point.
+├── main.ts               # HTTP and Socket.IO application entry point.
+└── voice.ts              # LiveKit Agents worker entry point.
 test/                     # All automated tests.
 ├── e2e/                  # Assembled HTTP and Socket.IO tests.
 └── unit/                 # Isolated unit tests grouped by feature.
@@ -123,6 +160,8 @@ Completion: v1 returns a live model response, rejects invalid input, and exposes
 - ✅ Add a CLI that uses the same application services as the REST API.
 - ✅ Stream model output over the CLI and a versioned Socket.IO namespace.
 - ✅ Provide an embedded same-origin playground for testing Socket.IO streams.
+- ✅ Add LiveKit Cloud voice with environment-switched LiveKit Inference and direct OpenAI adapters.
+- ✅ Issue short-lived, room-scoped, microphone-only voice tokens without exposing secrets.
 - ✅ Cancel active CLI and Socket.IO turns without persisting partial sessions.
 - ✅ Display tokens, estimated cost, model calls, tool calls, and safe provider errors.
 - ⬜ Add configurable model timeouts and explicit non-zero CLI exit codes.

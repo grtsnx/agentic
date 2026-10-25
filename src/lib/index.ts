@@ -1,4 +1,11 @@
 export { LibModule } from './lib.module.js';
+export { LiveKitModule } from './livekit/livekit.module.js';
+export {
+  createLiveKitVoiceModel,
+  getLiveKitClientScript,
+  LiveKitService,
+  type LiveKitVoiceCredentials,
+} from './livekit/livekit.service.js';
 export { OpenaiModule } from './openai/openai.module.js';
 export {
   openaiOutputSchema,

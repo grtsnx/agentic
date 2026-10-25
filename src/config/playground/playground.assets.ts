@@ -1,4 +1,4 @@
-export const REALTIME_PAGE = `<!doctype html>
+export const PLAYGROUND_PAGE = `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -36,8 +36,16 @@ export const REALTIME_PAGE = `<!doctype html>
           <label class="sr-only" for="message">Message Agentic</label>
           <textarea id="message" rows="1" maxlength="8000" placeholder="Message Agentic"></textarea>
           <div class="composer-actions">
-            <span class="composer-hint">Enter to send · Shift + Enter for a new line</span>
+            <div class="composer-status">
+              <span class="composer-hint">Enter to send · Shift + Enter for a new line</span>
+              <span id="voice-status" class="voice-status" role="status" hidden>Voice offline</span>
+            </div>
             <div class="composer-buttons">
+              <button id="voice-mute" class="voice-mute-button" type="button" hidden>Mute</button>
+              <button id="voice-connect" class="voice-button" type="button" aria-pressed="false" aria-label="Start voice chat">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Z"/><path d="M18 11v1a6 6 0 0 1-12 0v-1M12 18v3M9 21h6"/></svg>
+                <span id="voice-label" class="sr-only">Start voice chat</span>
+              </button>
               <button id="stop" class="stop-button" type="button" aria-label="Stop response" hidden>■</button>
               <button id="send" class="send-button" type="button" aria-label="Send message">↑</button>
             </div>
@@ -51,12 +59,15 @@ export const REALTIME_PAGE = `<!doctype html>
       </footer>
     </div>
 
+    <div id="voice-audio" aria-hidden="true"></div>
     <script src="/socket.io/socket.io.js"></script>
+    <script src="/playground/livekit-client.js"></script>
     <script src="/playground/app.js"></script>
+    <script src="/playground/livekit-app.js"></script>
   </body>
 </html>`;
 
-export const REALTIME_APP = `(() => {
+export const PLAYGROUND_APP = `(() => {
   const socket = io('/v1/chat', { transports: ['websocket'] });
   const elements = {
     connection: document.querySelector('#connection'),
@@ -318,7 +329,7 @@ export const REALTIME_APP = `(() => {
   });
 })();`;
 
-export const REALTIME_STYLES = `:root {
+export const PLAYGROUND_STYLES = `:root {
   color-scheme: light;
   --background: #ffffff;
   --surface: #ffffff;
@@ -343,6 +354,14 @@ button { color: inherit; }
 .brand-mark, .agent-orb { display: grid; place-items: center; color: #fff; background: var(--accent); }
 .brand-mark { width: 30px; height: 30px; border-radius: 9px; font-size: .85rem; }
 .topbar-actions { display: flex; align-items: center; gap: 14px; }
+.voice-status { color: var(--muted); font-size: .7rem; }
+.voice-status[data-state='speaking'] { color: var(--success); }
+.voice-status[data-state='error'] { color: var(--danger); }
+.voice-button { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 10px; color: var(--muted); background: transparent; cursor: pointer; }
+.voice-button:hover { color: var(--text); background: var(--surface-subtle); }
+.voice-button svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
+.voice-button[aria-pressed='true'] { color: #fff; background: var(--danger); animation: orb-breathe 1.4s ease-in-out infinite; }
+.voice-button:disabled { cursor: wait; opacity: .55; }
 .connection { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: .78rem; }
 .connection-dot { width: 7px; height: 7px; border-radius: 999px; background: #a1a1aa; }
 .connection[data-state='online'] .connection-dot { background: var(--success); box-shadow: 0 0 0 3px #dcfce7; }
@@ -384,8 +403,10 @@ button { color: inherit; }
 textarea { display: block; width: 100%; max-height: 180px; resize: none; padding: 3px 4px 12px; border: 0; outline: 0; background: transparent; color: var(--text); line-height: 1.5; }
 textarea::placeholder { color: #a1a1aa; }
 .composer-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.composer-status { display: flex; min-width: 0; align-items: center; gap: 10px; }
 .composer-hint { color: #a1a1aa; font-size: .7rem; }
 .composer-buttons { display: flex; gap: 8px; }
+.voice-mute-button { padding: 0 9px; border: 1px solid var(--border); border-radius: 9px; color: var(--muted); background: var(--surface); cursor: pointer; font-size: .7rem; font-weight: 600; }
 .send-button, .stop-button { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 10px; cursor: pointer; }
 .send-button[hidden], .stop-button[hidden] { display: none; }
 .send-button { color: #fff; background: var(--accent); font-size: 1.25rem; }
@@ -397,10 +418,11 @@ textarea::placeholder { color: #a1a1aa; }
 .developer-details summary { cursor: pointer; user-select: none; }
 .developer-details pre { max-height: 180px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-subtle); font: .65rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+#voice-audio { display: none; }
 @keyframes shimmer { to { background-position: -220% 0; } }
 @keyframes orb-spin { to { transform: rotate(360deg); } }
 @keyframes orb-breathe { 50% { opacity: .3; transform: scale(.65); } }
 @media (max-width: 1120px) { .developer-details { position: static; transform: none; width: 100%; margin-top: 7px; } }
-@media (max-width: 640px) { .topbar { padding: 0 16px; } .connection { font-size: 0; } .connection-dot { margin-right: 2px; } .messages { padding-top: 28px; } .composer-hint { display: none; } }
+@media (max-width: 640px) { .topbar { padding: 0 16px; } .connection, .voice-status { font-size: 0; } .connection-dot { margin-right: 2px; } .messages { padding-top: 28px; } .composer-hint { display: none; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
 `;

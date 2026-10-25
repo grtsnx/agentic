@@ -81,6 +81,16 @@ export async function createApplication(): Promise<{
     REALTIME_PLAYGROUND_ENABLED: config.getOrThrow<boolean>(
       'REALTIME_PLAYGROUND_ENABLED',
     ),
+    VOICE_ENABLED: config.getOrThrow<boolean>('VOICE_ENABLED'),
+    VOICE_PROVIDER:
+      config.getOrThrow<Environment['VOICE_PROVIDER']>('VOICE_PROVIDER'),
+    VOICE_MODEL: config.getOrThrow<string>('VOICE_MODEL'),
+    VOICE_NAME: config.getOrThrow<string>('VOICE_NAME'),
+    LIVEKIT_URL: config.get<string>('LIVEKIT_URL'),
+    LIVEKIT_API_KEY: config.get<string>('LIVEKIT_API_KEY'),
+    LIVEKIT_API_SECRET: config.get<string>('LIVEKIT_API_SECRET'),
+    LIVEKIT_AGENT_NAME: config.getOrThrow<string>('LIVEKIT_AGENT_NAME'),
+    OPENAI_API_KEY: config.get<string>('OPENAI_API_KEY'),
   };
   configureApplication(app, environment);
   return { app, environment };

@@ -8,34 +8,51 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
+import { getLiveKitClientScript } from '@/lib';
 import {
-  REALTIME_APP,
-  REALTIME_PAGE,
-  REALTIME_STYLES,
-} from './realtime.assets.js';
+  PLAYGROUND_APP,
+  PLAYGROUND_PAGE,
+  PLAYGROUND_STYLES,
+} from './playground.assets.js';
+import { LIVEKIT_BROWSER_APP } from './voice-playground.asset.js';
 
 @ApiExcludeController()
 @SkipThrottle()
 @Controller('playground')
-export class RealtimeController {
+export class PlaygroundController {
   constructor(private readonly config: ConfigService) {}
 
   @Get()
   @Header('Cache-Control', 'no-store')
   page(): StreamableFile {
-    return this.file(REALTIME_PAGE, 'text/html; charset=utf-8');
+    return this.file(PLAYGROUND_PAGE, 'text/html; charset=utf-8');
   }
 
   @Get('app.js')
   @Header('Cache-Control', 'no-store')
   script(): StreamableFile {
-    return this.file(REALTIME_APP, 'text/javascript; charset=utf-8');
+    return this.file(PLAYGROUND_APP, 'text/javascript; charset=utf-8');
+  }
+
+  @Get('livekit-client.js')
+  @Header('Cache-Control', 'public, max-age=86400, immutable')
+  livekitClient(): StreamableFile {
+    return this.file(
+      getLiveKitClientScript(),
+      'text/javascript; charset=utf-8',
+    );
+  }
+
+  @Get('livekit-app.js')
+  @Header('Cache-Control', 'no-store')
+  livekitApp(): StreamableFile {
+    return this.file(LIVEKIT_BROWSER_APP, 'text/javascript; charset=utf-8');
   }
 
   @Get('styles.css')
   @Header('Cache-Control', 'no-store')
   styles(): StreamableFile {
-    return this.file(REALTIME_STYLES, 'text/css; charset=utf-8');
+    return this.file(PLAYGROUND_STYLES, 'text/css; charset=utf-8');
   }
 
   private file(content: string, type: string): StreamableFile {
