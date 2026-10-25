@@ -6,22 +6,8 @@ await app.listen(environment.PORT, '0.0.0.0');
 
 const baseUrl = `http://localhost:${environment.PORT}`;
 const logger = new ConsoleLogger('Bootstrap');
-logger.log(`Application: ${baseUrl}`);
-logger.log(`REST chat v1: ${baseUrl}/v1/chat`);
-logger.log(`REST chat sessions v1: ${baseUrl}/v1/chat/sessions`);
-logger.log(`Socket.IO v1 namespace: ${baseUrl}/v1/chat`);
 if (environment.REALTIME_PLAYGROUND_ENABLED) {
-  logger.log(`Chat and voice playground: ${baseUrl}/playground`);
-}
-if (environment.VOICE_ENABLED) {
-  logger.log(`LiveKit voice token: ${baseUrl}/v1/voice/token`);
-  logger.log(`Voice provider: ${environment.VOICE_PROVIDER}`);
-  logger.log('Voice worker: bun run voice:dev');
-  logger.log(
-    environment.LIVEKIT_PHONE_NUMBER
-      ? `Telephony number: ${environment.LIVEKIT_PHONE_NUMBER} (tel:${environment.LIVEKIT_PHONE_NUMBER})`
-      : 'Telephony: no phone number configured. See README → Phone calls.',
-  );
+  logger.log(`Playground: ${baseUrl}/playground`);
 }
 logger.log('CLI: bun run chat');
 
