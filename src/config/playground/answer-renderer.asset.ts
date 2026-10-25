@@ -48,7 +48,7 @@ export const ANSWER_RENDERER = String.raw`
 
     function inline(parent, value) {
       // Match only supported inline syntax. Code wins before links or emphasis.
-      const tokens = /\x60([^\x60\n]+)\x60|\[([^\]\n]+)\]\(\s*((?:[^\s()]|\([^\s()]*\))+)\s*\)|\*\*([^*\n]+)\*\*|\*([^*\n]+)\*/g;
+      const tokens = /\x60([^\x60\n]+)\x60|\[([^\]\n]+)\]\(\s*((?:[^\s()]|\([^\s()]*\))+)\s*\)|\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|(\[[^\]\n]+,\s*chunk\s+\d+\]|【[^】\n]+,\s*chunk\s+\d+】)/gi;
       let offset = 0;
       for (const match of value.matchAll(tokens)) {
         let start = match.index;
@@ -74,6 +74,10 @@ export const ANSWER_RENDERER = String.raw`
           } else {
             node = sourceLink(label, url);
           }
+        } else if (match[6] !== undefined) {
+          const citation = /^(.*),\s*chunk\s+(\d+)$/i.exec(match[6].slice(1, -1));
+          node = workspacePanel.fileCitation(citation[1].trim(), citation[2]);
+          if (!node) continue;
         } else {
           node = document.createElement(match[4] !== undefined ? 'strong' : 'em');
           node.textContent = match[4] ?? match[5];

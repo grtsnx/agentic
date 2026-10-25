@@ -7,8 +7,8 @@ export const CHATKIT_STYLES = `
 .chat-history::backdrop{background:#10182855;}
 .chat-history header,.history-row{display:flex;align-items:center;justify-content:space-between;gap:12px;}
 .chat-history h2{font-size:18px;}.chat-history button{border:0;background:transparent;cursor:pointer;color:inherit;min-height:44px;}
-.history-row{border-bottom:1px solid var(--border);padding:8px 0;}.history-row button:first-child{flex:1;min-width:0;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-#history-notice{font-size:13px;color:var(--muted);}.chat-history button:hover{color:var(--success);}
+.history-row{border-bottom:1px solid var(--border);padding:8px 0;}.history-row button{color:var(--muted);}.history-row button:first-child{flex:1;min-width:0;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#history-notice{font-size:13px;color:var(--muted);}.chat-history button:hover{color:var(--text);}
 `;
 export const CHATKIT_APP = String.raw`
 function createChatkitTransport() {

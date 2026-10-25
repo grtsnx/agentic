@@ -65,34 +65,47 @@ function setup(deferFrames = false) {
     if (!nodes.has(selector)) nodes.set(selector, new Element());
     return nodes.get(selector)!;
   };
-  const socket = Object.assign(new EventEmitter(), { connected: true });
-  const writeText = vi.fn().mockResolvedValue(undefined);
-  runInNewContext(PLAYGROUND_APP.replace(CHATKIT_APP, ''), {
-    createChatkitTransport: () => socket,
-    document: {
-      querySelector: query,
-      querySelectorAll: () => [],
-      createElement: (tagName: string) =>
-        Object.assign(new Element(), { tagName }),
-      createTextNode: (text: string) =>
-        Object.assign(new Element(), { textContent: text }),
-      addEventListener() {},
-    },
-    URL,
-    AbortSignal,
-    fetch: vi.fn().mockResolvedValue({
-      ok: true,
-      status: 201,
-      json: async () => ({ data: { id: 'workspace', token: 'token' } }),
-    }),
-    navigator: { clipboard: { writeText } },
-    setTimeout: vi.fn(),
-    performance,
-    requestAnimationFrame: (callback: () => void) =>
-      deferFrames ? frames.push(callback) : callback(),
-    setInterval: vi.fn(),
-    clearInterval: vi.fn(),
+  const socket = Object.assign(new EventEmitter(), {
+    connected: true,
+    files: [],
   });
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  const fetchMock = vi.fn().mockResolvedValue({
+    ok: true,
+    status: 201,
+    json: async () => ({
+      data: { id: 'workspace', token: 'token', files: [], approvals: [] },
+    }),
+    blob: async () => new Blob(['Uploaded document contents.']),
+  });
+  const workspace = runInNewContext(
+    PLAYGROUND_APP.replace(CHATKIT_APP, '').replace(
+      /\}\)\(\);$/,
+      'return workspacePanel;})();',
+    ),
+    {
+      createChatkitTransport: () => socket,
+      document: {
+        querySelector: query,
+        querySelectorAll: () => [],
+        createElement: (tagName: string) =>
+          Object.assign(new Element(), { tagName }),
+        createTextNode: (text: string) =>
+          Object.assign(new Element(), { textContent: text }),
+        addEventListener() {},
+      },
+      URL,
+      AbortSignal,
+      fetch: fetchMock,
+      navigator: { clipboard: { writeText } },
+      setTimeout: vi.fn(),
+      performance,
+      requestAnimationFrame: (callback: () => void) =>
+        deferFrames ? frames.push(callback) : callback(),
+      setInterval: vi.fn(),
+      clearInterval: vi.fn(),
+    },
+  );
   query('#message').value = 'Hello';
   query('#send').emit('click');
   socket.emit('chat.delta', { delta: 'An answer in progress.' });
@@ -102,7 +115,16 @@ function setup(deferFrames = false) {
   const content = body.children.find(
     (node) => node.className === 'message-content',
   )!;
-  return { query, socket, body, content, flushFrames, writeText };
+  return {
+    query,
+    socket,
+    body,
+    content,
+    flushFrames,
+    writeText,
+    workspace,
+    fetchMock,
+  };
 }
 
 function descendants(element: Element): Element[] {
@@ -431,5 +453,63 @@ describe('answer actions and sources sheet', () => {
     await vi.waitFor(() =>
       expect(ui.body.textContent).toContain('Could not copy'),
     );
+  });
+});
+
+describe('uploaded file citations', () => {
+  const file = {
+    id: 'file-1',
+    filename: 'letter.pdf',
+    kind: 'text',
+    bytes: 12,
+  };
+  it('replaces both bracket forms with accessible file badges and opens the scoped preview', async () => {
+    const ui = setup();
+    await ui.workspace.prepare();
+    ui.workspace.useFiles([file]);
+    ui.socket.emit('chat.completed', {
+      response: {
+        message: 'First 【letter.pdf, chunk 1】. Second [letter.pdf, chunk 2].',
+      },
+    });
+    const badges = descendants(ui.content).filter(
+      (node) => node.className === 'citation-badge file-citation',
+    );
+    expect(badges).toHaveLength(2);
+    expect(badges[0]!.attributes.get('aria-label')).toBe(
+      'Preview letter.pdf, cited chunk 1',
+    );
+    expect(ui.content.textContent).not.toContain('chunk');
+    badges[0]!.emit('click');
+    await vi.waitFor(() =>
+      expect(ui.query('#attachment-preview-body').textContent).toContain(
+        'Uploaded document contents.',
+      ),
+    );
+    expect(ui.query('#attachment-preview').open).toBe(true);
+    expect(ui.fetchMock).toHaveBeenCalledWith(
+      '/v1/chatkit/workspace/files/file-1',
+      expect.objectContaining({ headers: { Authorization: 'Bearer token' } }),
+    );
+  });
+  it('preserves code and unknown or ambiguous references as inert text', () => {
+    const ui = setup();
+    ui.workspace.useFiles([file, { ...file, id: 'file-2' }]);
+    ui.socket.emit('chat.completed', {
+      response: {
+        message:
+          '[letter.pdf, chunk 1] 【other.pdf, chunk 2】 `[letter.pdf, chunk 3]`',
+      },
+    });
+    expect(
+      descendants(ui.content).filter(
+        (node) => node.className === 'citation-badge file-citation',
+      ),
+    ).toHaveLength(0);
+    expect(ui.content.textContent).toContain('[letter.pdf, chunk 1]');
+    expect(ui.content.textContent).toContain('【other.pdf, chunk 2】');
+    expect(
+      descendants(ui.content).filter((node) => node.tagName === 'code'),
+    ).toHaveLength(1);
   });
 });

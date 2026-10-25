@@ -79,6 +79,7 @@ export const WORKSPACE_STYLES = `
 `;
 export const WORKSPACE_APP = `
 function createWorkspacePanel() {
+  const fileIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H5v20h14V7Z M14 2v6h5 M8 12h8 M8 16h6"/></svg>';
   let credentials;
   let creating;
   let generation=0;
@@ -223,7 +224,7 @@ function createWorkspacePanel() {
       const card=text('div','');card.className='composer-file';card.setAttribute('role','listitem');card.title=file.filename;
       const type=text('span','');type.className='composer-file-type';
       // Only this fixed SVG is markup; filenames and provider values stay text nodes.
-      type.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H5v20h14V7Z M14 2v6h5 M8 12h8 M8 16h6"/></svg>';
+      type.innerHTML=fileIcon;
       type.append(text('span',file.filename.split('.').pop().toUpperCase()));
       const open=text('button','');open.type='button';open.className='composer-file-open';open.setAttribute('aria-label','Preview '+file.filename);open.disabled=!!file.pending;
       if(file.kind==='image') {
@@ -236,6 +237,20 @@ function createWorkspacePanel() {
       if(removable&&!file.pending){const remove=text('button','×');remove.type='button';remove.className='composer-file-remove';remove.setAttribute('aria-label','Remove '+file.filename);remove.title='Remove attachment';remove.addEventListener('click',()=>void removeFile(file,remove));card.append(remove);}
       if(file.pending)card.setAttribute('data-uploading','');
       return card;
+  }
+  function fileCitation(filename,chunk) {
+    // Resolve only an exact, unambiguous filename in this conversation. Model
+    // text cannot supply a file URL, capability token, or another chat's file ID.
+    const matches=attachedFiles.filter(file=>file.filename===filename);
+    if(matches.length!==1)return;
+    const file=matches[0];
+    const button=text('button','');button.type='button';button.className='citation-badge file-citation';
+    button.innerHTML=fileIcon;
+    button.append(text('span',file.filename));
+    button.title=file.filename+' · Chunk '+chunk;
+    button.setAttribute('aria-label','Preview '+file.filename+', cited chunk '+chunk);
+    button.addEventListener('click',()=>void openPreview(file,button));
+    return button;
   }
   function moveToMessage(body,content) {
     const files=attachedFiles.filter(file=>!sentFileIds.has(file.id));
@@ -335,7 +350,7 @@ function createWorkspacePanel() {
       if(current===generation){uploading=false;attach.disabled=false;pendingFiles=[];fileInput.value='';renderFiles();}
     }
   });
-  return {moveToMessage,
+  return {moveToMessage,fileCitation,
     renderSent(body,content,ids){const files=attachedFiles.filter(file=>ids.includes(file.id));if(!files.length)return;const row=text('div','');row.className='message-attachments';row.setAttribute('role','list');row.setAttribute('aria-label','Sent attachments');for(const file of files)row.append(createFileCard(file,false));body.insertBefore(row,content);},
     useFiles(files){attachedFiles=files;sentFileIds.clear();for(const file of files)sentFileIds.add(file.id);renderFiles();},
     clearDrafts:async()=>{if(!credentials)return;for(const file of attachedFiles.filter(file=>!sentFileIds.has(file.id)))await request('/'+credentials.id+'/files/'+file.id,{method:'DELETE'});},

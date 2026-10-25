@@ -545,7 +545,6 @@ ${ANSWER_ACTIONS_STYLES}:root {
   --muted: #737b8b;
   --border: #e9ebf0;
   --accent: #303746;
-  --success: #16a34a;
   --danger: #dc2626;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -559,7 +558,6 @@ button { color: inherit; }
 .topbar { display: flex; align-items: center; justify-content: space-between; padding: 0 34px; background: #ffffffd9; }
 .brand { display: inline-flex; align-items: center; gap: 12px; color: var(--text); text-decoration: none; font-size: .94rem; font-weight: 650; letter-spacing: -.035em; }
 .brand-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 11px; color: #fff; background: var(--accent); transition: background .2s ease; }
-html[data-connection='online'] .brand-mark { background: var(--success); }
 html[data-connection='reconnecting'] .brand-mark { background: #d97706; }
 .agentic-symbol { display: block; width: 26px; height: 26px; }
 .welcome-aura .agentic-symbol { width: 34px; height: 34px; }
@@ -683,6 +681,10 @@ ${ACTIVITY_INDICATOR_STYLES}
 .runtime-chips span { padding: 4px 7px; border: 1px solid #edf0f5; border-radius: 6px; color: #788294; background: #fbfcfe; font: 400 .62rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .message-content a { color: var(--text); text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
 .message-content .citation-badge { display: inline-block; vertical-align: baseline; max-width: min(100%, 200px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 7px; margin: 0 2px; border: 1px solid var(--border); border-radius: 99px; background: var(--surface-subtle); color: var(--muted); font-family: inherit; font-size: .65rem; line-height: 1.6; font-weight: 500; text-decoration: none; }
+.message-content .file-citation { display: inline-flex; align-items: center; gap: 4px; vertical-align: text-bottom; cursor: pointer; }
+.message-content .file-citation svg { width: 13px; height: 15px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
+.message-content .file-citation span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.message-content .file-citation:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 .message-content .citation-badge:hover { color: var(--text); border-color: var(--muted); background: var(--surface-subtle); }
 .message-content a:focus-visible, .source-card:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
 @media (max-width: 480px) { .message-content .citation-badge { max-width: 160px; } }
@@ -776,6 +778,5 @@ html[data-theme='dark'] .voice-transcript-turn .speaker,
 html[data-theme='dark'] .voice-transcript-turn.interim .words { color: #a3a3a3; }
 html[data-theme='dark'] .voice-participant,
 html[data-theme='dark'] .voice-transcript-turn.user .words { border-color: #262626; background: #141414; }
-html[data-connection='online'] .brand-mark,
-html[data-connection='online'] .voice-session-brand .brand-mark { background: var(--success); }
+
 `;
