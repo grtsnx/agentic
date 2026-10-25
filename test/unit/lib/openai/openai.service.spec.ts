@@ -2,6 +2,7 @@ const agents = vi.hoisted(() => ({
   captureConfig: vi.fn(),
   run: vi.fn(),
   webSearchTool: vi.fn((options) => ({ name: 'web_search', options })),
+  tool: vi.fn((options) => options),
 }));
 
 vi.mock('@openai/agents', () => ({
@@ -12,9 +13,13 @@ vi.mock('@openai/agents', () => ({
   },
   run: agents.run,
   webSearchTool: agents.webSearchTool,
+  tool: agents.tool,
 }));
 
 import { OpenaiService } from '@/lib';
+import { WebToolsService } from '@/config/web-tools';
+import { ConfigService } from '@nestjs/config';
+import { webToolInputSchema } from '@/config/schema';
 import {
   AGENT_INSTRUCTIONS,
   AGENT_NAME,
@@ -39,6 +44,93 @@ describe('OpenaiService', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
+
+  it.each([false, true])(
+    'collects external citations and usage with hosted search disabled (stream=%s)',
+    async (streaming) => {
+      const webTools = WebToolsService.fromEnvironment({});
+      const source = {
+        title: 'Reference',
+        url: 'https://example.com/',
+        domain: 'example.com',
+      };
+      vi.spyOn(webTools, 'createTools').mockImplementation(
+        (onSources = () => {}) => [
+          {
+            name: 'context_dev_search',
+            description: 'Search',
+            parameters: webToolInputSchema,
+            execute: async (_input: unknown, signal?: AbortSignal) => {
+              expect(signal).toBeInstanceOf(AbortSignal);
+              onSources([source]);
+              return {
+                ok: true,
+                provider: 'context.dev',
+                contentTrust: 'untrusted',
+                results: [
+                  { ...source, content: 'reference', truncated: false },
+                ],
+              };
+            },
+          },
+        ],
+      );
+      agents.run.mockImplementation(async () => {
+        const config = agents.captureConfig.mock.calls.at(-1)![0] as {
+          tools: Array<{
+            name: string;
+            execute(input: unknown): Promise<unknown>;
+          }>;
+        };
+        expect(config.tools.map((tool) => tool.name)).toEqual([
+          'context_dev_search',
+        ]);
+        await config.tools[0]!.execute({ input: 'reference' });
+        return {
+          finalOutput: streaming ? 'The answer.' : output,
+          state: {
+            usage: {
+              requests: 1,
+              inputTokens: 10,
+              outputTokens: 5,
+              totalTokens: 15,
+              inputTokensDetails: [],
+              outputTokensDetails: [],
+            },
+          },
+          rawResponses: [],
+          newItems: [
+            { type: 'tool_call_item', toolName: 'context_dev_search' },
+          ],
+          completed: Promise.resolve(),
+          async *[Symbol.asyncIterator]() {
+            yield {
+              type: 'raw_model_stream_event',
+              data: { type: 'output_text_delta', delta: 'The answer.' },
+            };
+          },
+        };
+      });
+      const service = new OpenaiService(
+        new ConfigService({ WEB_SEARCH_ENABLED: false }),
+        webTools,
+      );
+      const events = [];
+      if (streaming) {
+        for await (const event of service.streamReply('Question'))
+          events.push(event);
+      }
+      const response = streaming
+        ? events.find((event) => event.type === 'completed')?.response
+        : await service.generateReply('Question');
+      expect(response?.sources).toEqual([source]);
+      expect(response?.runtime.tools).toEqual([
+        { name: 'context_dev_search', calls: 1 },
+      ]);
+      expect(response?.runtime.cost.includesToolCosts).toBe(false);
+      expect(agents.webSearchTool).not.toHaveBeenCalled();
+    },
+  );
 
   it('uses a Zod output type and returns validated structured output', async () => {
     vi.spyOn(performance, 'now')

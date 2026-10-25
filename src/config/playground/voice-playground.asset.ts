@@ -218,7 +218,9 @@ export const LIVEKIT_BROWSER_APP = `(() => {
     elements.quality.textContent = 'Microphone off';
     if (close) closeSession();
     if (previous) {
-      try { await previous.disconnect(); } finally { previous.removeAllListeners(); }
+      try { await previous.disconnect(); } catch {
+        // The UI is already detached; an unavailable signaling server cannot block exit.
+      } finally { previous.removeAllListeners(); }
     }
   }
 

@@ -219,6 +219,10 @@ export function configureSwagger(
       'html.dark-mode .swagger-ui .api-version-picker select { background: #1c2022; color: #e4e6e6; }',
       '.swagger-ui .info .title .api-theme-toggle { align-items: center; background: transparent; border: 1px solid currentColor; border-radius: 999px; color: inherit; cursor: pointer; display: inline-flex; font-size: 13px; height: 26px; justify-content: center; margin-left: 8px; padding: 0; vertical-align: super; width: 26px; }',
       '.swagger-ui .info .title .api-theme-toggle:hover { opacity: .75; }',
+      '.swagger-ui .opblock-body, .swagger-ui .responses-wrapper { min-width: 0; }',
+      '.swagger-ui .responses-inner, .swagger-ui .parameters-container { max-width: 100%; overflow-x: auto; }',
+      '.swagger-ui .opblock-summary-path { min-width: 0; overflow-wrap: anywhere; }',
+      '@media (max-width: 640px) { .swagger-ui .wrapper { padding: 0 12px; } .swagger-ui .info .title { overflow-wrap: anywhere; } .swagger-ui .opblock-tag { flex-wrap: wrap; gap: 8px; } .swagger-ui .opblock-tag small { flex-basis: calc(100% - 48px); padding-left: 0; } }',
     ].join('\n'),
     swaggerOptions: {
       defaultModelsExpandDepth: -1,

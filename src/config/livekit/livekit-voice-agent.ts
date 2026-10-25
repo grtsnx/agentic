@@ -1,6 +1,7 @@
-import { defineAgent, type JobContext, voice } from '@livekit/agents';
-import { validateEnvironment } from '../environment.js';
+import { defineAgent, type JobContext, voice, llm } from '@livekit/agents';
+import { validateEnvironment, type Environment } from '../environment.js';
 import { createLiveKitVoiceModel } from '@/lib';
+import { WebToolsService } from '@/config/web-tools';
 import {
   VOICE_AGENT_INSTRUCTIONS,
   VOICE_GREETING_INSTRUCTIONS,
@@ -16,8 +17,24 @@ export const VOICE_RECORDING_OPTIONS = {
   inputDelta: false,
 } as const;
 
-export function createLiveKitVoiceAssistant(): voice.Agent {
-  return voice.Agent.create({ instructions: VOICE_AGENT_INSTRUCTIONS });
+export function createLiveKitVoiceAssistant(
+  environment?: Environment,
+): voice.Agent {
+  const definitions = environment
+    ? WebToolsService.fromEnvironment({ ...environment }).createTools()
+    : [];
+  const tools = Object.fromEntries(
+    definitions.map((definition) => [
+      definition.name,
+      llm.tool({
+        description: definition.description,
+        parameters: definition.parameters,
+        execute: (input, { abortSignal }) =>
+          definition.execute(input, abortSignal),
+      }),
+    ]),
+  );
+  return voice.Agent.create({ instructions: VOICE_AGENT_INSTRUCTIONS, tools });
 }
 
 export default defineAgent({
@@ -32,7 +49,7 @@ export default defineAgent({
     });
 
     await session.start({
-      agent: createLiveKitVoiceAssistant(),
+      agent: createLiveKitVoiceAssistant(environment),
       room: context.room,
       record: VOICE_RECORDING_OPTIONS,
     });

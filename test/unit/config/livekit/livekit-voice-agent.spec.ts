@@ -3,8 +3,26 @@ import liveKitVoiceAgent, {
   VOICE_RECORDING_OPTIONS,
 } from '@/config/livekit/livekit-voice-agent.js';
 import { AGENT_INSTRUCTIONS } from '@/config/agent/agent-instructions.js';
+import { validateEnvironment } from '@/config/environment.js';
 
 describe('voice agent', () => {
+  it('registers only enabled optional tools with the real LiveKit SDK', () => {
+    const assistant = createLiveKitVoiceAssistant(
+      validateEnvironment({
+        FIRECRAWL_ENABLED: true,
+        FIRECRAWL_API_KEY: 'test-key',
+      }),
+    );
+    expect(Object.keys(assistant.toolCtx.functionTools)).toEqual([
+      'firecrawl_read_page',
+    ]);
+    expect(
+      Object.keys(
+        createLiveKitVoiceAssistant(validateEnvironment({})).toolCtx
+          .functionTools,
+      ),
+    ).toEqual([]);
+  });
   it('exports a LiveKit worker entrypoint', () => {
     expect(liveKitVoiceAgent.entry).toBeTypeOf('function');
   });

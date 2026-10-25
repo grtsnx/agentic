@@ -1,7 +1,8 @@
 import { createInterface } from 'node:readline';
 import type { Readable, Writable } from 'node:stream';
 import { Injectable } from '@nestjs/common';
-import { OpenaiService, type OpenaiRuntime } from '@/lib';
+import { OpenaiService } from '@/lib';
+import type { OpenaiRuntime } from '@/config/schema';
 
 type CliInput = Readable & { isTTY?: boolean };
 type CliOutput = Writable & { isTTY?: boolean };

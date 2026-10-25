@@ -40,6 +40,32 @@ Hosted web search follows the [official OpenAI web-search contract](https://deve
 
 Chat requests are automatically routed without an extra model call. Lightweight requests use `gpt-5-nano`; complex code, architecture, security, multi-step, or large requests use `gpt-6-luna`. The router is capped at Luna, and the runtime metadata reports the model actually called.
 
+## Optional external tools
+
+These tools are available to REST, Socket.IO, CLI, and LiveKit voice. Each provider has its own module and service under `lib/`; shared tool registration and policies live in `config/web-tools/`. All Zod schemas live in `config/schema/`, grouped by feature, and are imported through `@/config/schema`. Each provider is disabled by default and can be enabled independently. They do not require a database or Redis.
+
+| Provider                                                | Agent tool                                       | Enable flag                | Server-side credential |
+| ------------------------------------------------------- | ------------------------------------------------ | -------------------------- | ---------------------- |
+| [Context.dev](https://docs.context.dev/sdks/typescript) | `context_dev_search`: search the public web      | `CONTEXT_DEV_ENABLED=true` | `CONTEXT_DEV_API_KEY`  |
+| [Firecrawl](https://docs.firecrawl.dev/sdks/node)       | `firecrawl_read_page`: read one page as Markdown | `FIRECRAWL_ENABLED=true`   | `FIRECRAWL_API_KEY`    |
+| [Valyu](https://docs.valyu.ai/)                         | `valyu_search`: research search over web sources | `VALYU_ENABLED=true`       | `VALYU_API_KEY`        |
+
+Create an API key in the provider's dashboard, add it to `.env`, enable that provider, and restart the API, CLI, and voice worker you use. Missing keys fail startup validation when enabled. Keys remain server-side. Hosted OpenAI search is controlled separately by `WEB_SEARCH_ENABLED`; you can turn it off and use these search tools instead.
+
+`WEB_SEARCH_ALLOWED_DOMAINS` applies to these providers too, including page reads and returned sources. Tools reject literal IP addresses, local hostnames, URL credentials, and non-HTTP(S) URLs. This input policy is not a network firewall: remote fetching and redirect enforcement belong to the provider. Treat retrieved text as untrusted evidence, and use an allowlist when the agent must stay within specific sites.
+
+Calls share a budget of `EXTERNAL_TOOLS_MAX_CALLS` per chat run or voice conversation, including failures. Parallel calls reserve their slot before starting. Results are limited by count and total content characters, with public URL/title/domain source metadata attached to chat responses. The agent chooses a tool when needed; enabling several providers does not call them all automatically.
+
+`EXTERNAL_TOOLS_TIMEOUT_MS` bounds how long the application waits for a tool. Cancellation stops waiting and discards late results. Context.dev supports request cancellation; Firecrawl has a request timeout with automatic resume disabled. The installed Valyu search SDK does not expose request cancellation or apply its general timeout option to search, so an already submitted provider request may continue after the application deadline. No adapter automatically retries. Provider charges are **not** included in the existing model-cost estimate.
+
+After configuring keys, verify the enabled providers with:
+
+```bash
+bun run smoke:tools
+```
+
+This makes one billable read/search per enabled provider, restricted to `example.com`. It checks real source results, logs only tool names and source counts, and exits non-zero for missing configuration or provider failures. Unit tests use SDK mocks and make no paid requests.
+
 ## LiveKit Cloud voice
 
 ### Get your credentials
@@ -132,7 +158,9 @@ The connected Cloud project currently has no deployed Cloud agent and no purchas
 
 ## Socket.IO chat
 
-Open `http://localhost:3001/playground`, wait for **Online**, enter a message, and send it. The conversation shows a thinking orb, shimmering activity, elapsed time, and safe phases such as tool use, handoffs, and approvals, then hides that activity when response text begins. It never exposes private chain-of-thought. Runtime chips show total time, tokens, estimated cost, models, and tools after completion. Use the stop button to cancel the active turn.
+Open `http://localhost:3001/playground`, wait for **Online**, enter a message, and send it. Prompt starter cards fill the composer so you can edit before sending. The light chat and voice screens share an original SVG Agentic mark; its geometry lives in `src/config/playground/brand.asset.ts` and also supplies the favicon and assistant avatars.
+
+The conversation shows a thinking orb, shimmering activity, elapsed time, and safe phases such as tool use, handoffs, and approvals, then hides that activity when response text begins. It never exposes private chain-of-thought. Runtime chips show total time, tokens, estimated cost, models, and tools after completion. Use the stop button to cancel the active turn.
 
 | Direction       | Event             | Data                                                                    |
 | --------------- | ----------------- | ----------------------------------------------------------------------- |
@@ -152,31 +180,37 @@ The embedded playground is same-origin, so it works without adding a public webs
 
 The application validates configuration before it starts. Invalid ports, booleans, and CORS origins stop startup.
 
-| Variable                      | Default               | Purpose                                                                             |
-| ----------------------------- | --------------------- | ----------------------------------------------------------------------------------- |
-| `NODE_ENV`                    | `development`         | Selects development, test, or production behavior.                                  |
-| `PORT`                        | `3001`                | Sets the HTTP port.                                                                 |
-| `PLATFORM_NAME`               | `Agentic`             | Names the API and OpenAPI document.                                                 |
-| `CORS_ORIGINS`                | empty                 | Lists exact, comma-separated browser origins. Empty disables CORS.                  |
-| `SWAGGER_ENABLED`             | on outside production | Enables Swagger, Scalar, and OpenAPI JSON. Set it explicitly in production.         |
-| `REALTIME_PLAYGROUND_ENABLED` | on outside production | Enables the embedded same-origin Socket.IO chat tester.                             |
-| `OBSERVE_ENABLED`             | `false`               | Enables NestJS Observe when valid credentials are present.                          |
-| `VOICE_ENABLED`               | `false`               | Enables LiveKit Cloud voice credentials and the voice worker.                       |
-| `VOICE_PROVIDER`              | `livekit`             | Chooses LiveKit Inference or the direct `openai` adapter.                           |
-| `VOICE_MODEL`                 | `gpt-realtime-2.1`    | Selects the realtime speech-to-speech model.                                        |
-| `VOICE_NAME`                  | `marin`               | Selects the realtime model voice.                                                   |
-| `LIVEKIT_URL`                 | empty                 | LiveKit Cloud WebSocket URL; required when voice is enabled.                        |
-| `LIVEKIT_API_KEY`             | empty                 | Server-side LiveKit key; required when voice is enabled.                            |
-| `LIVEKIT_API_SECRET`          | empty                 | Server-side LiveKit secret; required when voice is enabled.                         |
-| `LIVEKIT_AGENT_NAME`          | `agentic-voice`       | Explicit dispatch name shared by tokens and the worker.                             |
-| `LIVEKIT_PHONE_NUMBER`        | empty                 | Optional provisioned E.164 number displayed at startup; does not provision routing. |
-| `MODEL_TIMEOUT_MS`            | `60000`               | Maximum duration of a normal model run.                                             |
-| `WEB_SEARCH_ENABLED`          | `true`                | Makes hosted web search available for model-selected use.                           |
-| `WEB_SEARCH_TIMEOUT_MS`       | `30000`               | Bounds runs that can invoke hosted web search.                                      |
-| `WEB_SEARCH_ALLOWED_DOMAINS`  | empty                 | Optional comma-separated allowlist of up to 100 domain names.                       |
-| `SESSION_TTL_MS`              | `1800000`             | Sliding lifetime of an in-memory REST chat session.                                 |
-| `SESSION_MAX_TURNS`           | `50`                  | Maximum completed turns in one in-memory session.                                   |
-| `SESSION_MAX_TOKENS`          | `32000`               | Estimated context budget that triggers bounded summarization.                       |
+| Variable                                                    | Default               | Purpose                                                                             |
+| ----------------------------------------------------------- | --------------------- | ----------------------------------------------------------------------------------- |
+| `NODE_ENV`                                                  | `development`         | Selects development, test, or production behavior.                                  |
+| `PORT`                                                      | `3001`                | Sets the HTTP port.                                                                 |
+| `PLATFORM_NAME`                                             | `Agentic`             | Names the API and OpenAPI document.                                                 |
+| `CORS_ORIGINS`                                              | empty                 | Lists exact, comma-separated browser origins. Empty disables CORS.                  |
+| `SWAGGER_ENABLED`                                           | on outside production | Enables Swagger, Scalar, and OpenAPI JSON. Set it explicitly in production.         |
+| `REALTIME_PLAYGROUND_ENABLED`                               | on outside production | Enables the embedded same-origin Socket.IO chat tester.                             |
+| `OBSERVE_ENABLED`                                           | `false`               | Enables NestJS Observe when valid credentials are present.                          |
+| `VOICE_ENABLED`                                             | `false`               | Enables LiveKit Cloud voice credentials and the voice worker.                       |
+| `VOICE_PROVIDER`                                            | `livekit`             | Chooses LiveKit Inference or the direct `openai` adapter.                           |
+| `VOICE_MODEL`                                               | `gpt-realtime-2.1`    | Selects the realtime speech-to-speech model.                                        |
+| `VOICE_NAME`                                                | `marin`               | Selects the realtime model voice.                                                   |
+| `LIVEKIT_URL`                                               | empty                 | LiveKit Cloud WebSocket URL; required when voice is enabled.                        |
+| `LIVEKIT_API_KEY`                                           | empty                 | Server-side LiveKit key; required when voice is enabled.                            |
+| `LIVEKIT_API_SECRET`                                        | empty                 | Server-side LiveKit secret; required when voice is enabled.                         |
+| `LIVEKIT_AGENT_NAME`                                        | `agentic-voice`       | Explicit dispatch name shared by tokens and the worker.                             |
+| `LIVEKIT_PHONE_NUMBER`                                      | empty                 | Optional provisioned E.164 number displayed at startup; does not provision routing. |
+| `MODEL_TIMEOUT_MS`                                          | `60000`               | Maximum duration of a normal model run.                                             |
+| `WEB_SEARCH_ENABLED`                                        | `true`                | Makes hosted web search available for model-selected use.                           |
+| `WEB_SEARCH_TIMEOUT_MS`                                     | `30000`               | Bounds runs that can invoke hosted web search.                                      |
+| `WEB_SEARCH_ALLOWED_DOMAINS`                                | empty                 | Optional comma-separated allowlist of up to 100 domain names.                       |
+| `CONTEXT_DEV_ENABLED`, `FIRECRAWL_ENABLED`, `VALYU_ENABLED` | `false`               | Independently enable optional external tools.                                       |
+| `CONTEXT_DEV_API_KEY`, `FIRECRAWL_API_KEY`, `VALYU_API_KEY` | empty                 | Required only for the corresponding enabled provider.                               |
+| `EXTERNAL_TOOLS_TIMEOUT_MS`                                 | `15000`               | Maximum wait per external tool call (1–60 seconds).                                 |
+| `EXTERNAL_TOOLS_MAX_CALLS`                                  | `5`                   | Shared call budget per chat run or voice conversation (1–20).                       |
+| `EXTERNAL_TOOLS_MAX_RESULTS`                                | `5`                   | Maximum sources returned by one tool call (1–10).                                   |
+| `EXTERNAL_TOOLS_MAX_CHARS`                                  | `12000`               | Total content characters returned by one tool call (1,000–30,000).                  |
+| `SESSION_TTL_MS`                                            | `1800000`             | Sliding lifetime of an in-memory REST chat session.                                 |
+| `SESSION_MAX_TURNS`                                         | `50`                  | Maximum completed turns in one in-memory session.                                   |
+| `SESSION_MAX_TOKENS`                                        | `32000`               | Estimated context budget that triggers bounded summarization.                       |
 
 Never use `*` in `CORS_ORIGINS`. The server accepts only complete HTTP or HTTPS origins without paths.
 
@@ -192,11 +226,14 @@ src/                      # Application source.
 ├── config/               # Runtime configuration and executable application setup.
 │   ├── agent/            # Shared Agentic identity and channel-specific delivery rules.
 │   ├── livekit/          # LiveKit voice agent and worker configuration.
+│   ├── schema/           # All Zod schemas, grouped by feature; shared inferred types.
+│   ├── web-tools/        # Tool registration, limits, source policy, and Nest wiring.
 │   └── playground/       # Same-origin chat and voice playground.
 ├── dto/                  # Versioned API input and output contracts.
 ├── lib/                  # Shared provider and infrastructure adapters.
 │   ├── livekit/          # Reusable LiveKit SDK adapter and Nest provider.
-│   └── openai/           # OpenAI integration with feature-owned Zod schemas.
+│   ├── openai/           # OpenAI agent execution, streaming, and model routing.
+│   └── context-dev/, firecrawl/, valyu/ # Optional provider modules and services.
 ├── middleware/           # Global HTTP behavior.
 │   ├── commons/         # Shared response and request utilities.
 │   ├── filters/         # Global exception handling.
@@ -269,7 +306,12 @@ Completion: two concurrent sessions preserve separate context and every structur
 ### 5. Hosted tools: web, files, and code
 
 - ✅ Add web search with citations, source metadata, domain controls, and timeout limits.
-- ⬜ Add page retrieval that treats remote content as untrusted data rather than instructions.
+- ✅ Add optional Context.dev web search through its official SDK.
+- ✅ Add optional Firecrawl page reading through its official SDK.
+- ✅ Add optional Valyu web research through its official SDK.
+- ✅ Share optional tools across chat and voice with validated inputs, domain controls, bounded results, call budgets, and stable errors.
+- ✅ Add page retrieval that treats remote content as untrusted data rather than instructions.
+- ⬜ Configure external provider keys and pass `bun run smoke:tools` against all three live providers. Integration tests use mocks; local providers remain disabled until configured.
 - ⬜ Add file upload, type and size validation, extraction, and scoped retrieval.
 - ⬜ Add sandboxed code execution with CPU, memory, time, network, and filesystem limits.
 - ⬜ Record tool inputs, outputs, latency, cost, and failure state.

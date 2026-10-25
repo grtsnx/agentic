@@ -118,6 +118,24 @@ export async function createApplication(): Promise<{
       'WEB_SEARCH_ALLOWED_DOMAINS',
     ),
     SESSION_TTL_MS: config.getOrThrow<number>('SESSION_TTL_MS'),
+    CONTEXT_DEV_ENABLED: config.getOrThrow<boolean>('CONTEXT_DEV_ENABLED'),
+    CONTEXT_DEV_API_KEY: config.get<string>('CONTEXT_DEV_API_KEY'),
+    FIRECRAWL_ENABLED: config.getOrThrow<boolean>('FIRECRAWL_ENABLED'),
+    FIRECRAWL_API_KEY: config.get<string>('FIRECRAWL_API_KEY'),
+    VALYU_ENABLED: config.getOrThrow<boolean>('VALYU_ENABLED'),
+    VALYU_API_KEY: config.get<string>('VALYU_API_KEY'),
+    EXTERNAL_TOOLS_TIMEOUT_MS: config.getOrThrow<number>(
+      'EXTERNAL_TOOLS_TIMEOUT_MS',
+    ),
+    EXTERNAL_TOOLS_MAX_CALLS: config.getOrThrow<number>(
+      'EXTERNAL_TOOLS_MAX_CALLS',
+    ),
+    EXTERNAL_TOOLS_MAX_RESULTS: config.getOrThrow<number>(
+      'EXTERNAL_TOOLS_MAX_RESULTS',
+    ),
+    EXTERNAL_TOOLS_MAX_CHARS: config.getOrThrow<number>(
+      'EXTERNAL_TOOLS_MAX_CHARS',
+    ),
     SESSION_MAX_TURNS: config.getOrThrow<number>('SESSION_MAX_TURNS'),
     SESSION_MAX_TOKENS: config.getOrThrow<number>('SESSION_MAX_TOKENS'),
   };

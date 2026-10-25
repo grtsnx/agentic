@@ -294,6 +294,102 @@ describe('voice playground lifecycle', () => {
 });
 
 describe('audio-reactive Aura', () => {
+  it('reads PCM from the selected participant and cleans up replaced audio tracks', () => {
+    let frame!: (time: number) => void;
+    const meters = vi.fn();
+    const cleanup = vi.fn();
+    const close = vi.fn(async () => {});
+    const gradient = { addColorStop() {} };
+    const context = new Proxy(
+      {},
+      {
+        get: (_, name) =>
+          String(name).includes('Gradient') ? () => gradient : () => {},
+        set: () => true,
+      },
+    );
+    type Media = { id: string; amplitude: number };
+    let current: { media?: Media };
+    const factory = runInNewContext(
+      VOICE_AURA_FACTORY + '; createAudioReactiveAura',
+      {
+        window: {
+          matchMedia: () => ({ matches: false }),
+          devicePixelRatio: 1,
+          AudioContext: class {
+            state = 'running';
+            close = close;
+            createAnalyser() {
+              const analyser = {
+                media: undefined as Media | undefined,
+                fftSize: 512,
+                frequencyBinCount: 256,
+                disconnect: cleanup,
+                getFloatTimeDomainData(samples: Float32Array) {
+                  samples.fill(analyser.media?.amplitude ?? 0);
+                },
+                getByteFrequencyData(bins: Uint8Array) {
+                  bins.fill(128);
+                },
+              };
+              current = analyser;
+              return analyser;
+            }
+            createMediaStreamSource(stream: { tracks: Media[] }) {
+              current.media = stream.tracks[0];
+              return { connect() {}, disconnect: cleanup };
+            }
+          },
+        },
+        document: { hidden: false },
+        MediaStream: class {
+          constructor(public tracks: Media[]) {}
+        },
+        ResizeObserver: class {
+          observe() {}
+        },
+        requestAnimationFrame: (callback: typeof frame) => {
+          frame = callback;
+          return 1;
+        },
+        cancelAnimationFrame: vi.fn(),
+      },
+    );
+    const aura = factory(
+      {
+        dataset: {},
+        getContext: () => context,
+        getBoundingClientRect: () => ({ width: 300, height: 300 }),
+      },
+      meters,
+    );
+    const user = { isMicrophoneEnabled: true, audioLevel: 0 };
+    const microphone = {
+      mediaStreamTrack: { id: 'mic', amplitude: 0 },
+      isMuted: false,
+    };
+    aura.setParticipants(user, undefined);
+    aura.addTrack({ mediaStreamTrack: { id: 'other', amplitude: 1 } }, 'user', {
+      isMicrophoneEnabled: true,
+    });
+    aura.addTrack(microphone, 'user', user);
+    aura.start();
+    frame(40);
+    expect(meters.mock.lastCall![0].user).toBe(0);
+    microphone.mediaStreamTrack.amplitude = 0.1;
+    frame(80);
+    expect(meters.mock.lastCall![0].user).toBeGreaterThan(0.6);
+    aura.removeTrack(microphone);
+    for (let time = 120; time <= 800; time += 40) frame(time);
+    expect(meters.mock.lastCall![0].user).toBeLessThan(0.01);
+    aura.addTrack(microphone, 'user', user);
+    frame(840);
+    expect(meters.mock.lastCall![0].user).toBeGreaterThan(0.6);
+    aura.reset();
+    expect(close).toHaveBeenCalledOnce();
+    expect(cleanup).toHaveBeenCalledTimes(6);
+  });
+
   it('responds quickly to the identified speaker, ignores bystanders, and releases muted audio', () => {
     const paths: number[][] = [];
     const onLevels = vi.fn();

@@ -4,6 +4,7 @@ import {
   Agent,
   MemorySession,
   run,
+  tool,
   webSearchTool,
   type RunStreamEvent,
 } from '@openai/agents';
@@ -11,12 +12,11 @@ import {
   openaiOutputSchema,
   openaiResponseSchema,
   type OpenaiResponse,
-} from './schema/openai-output.schema.js';
-import {
   openaiStreamResponseSchema,
   type OpenaiStreamEvent,
-} from './schema/openai-stream.schema.js';
-import type { OpenaiRuntime } from './schema/openai-runtime.schema.js';
+  type OpenaiRuntime,
+  type WebSource,
+} from '@/config/schema';
 import {
   OPENAI_MODELS,
   routeOpenaiModel,
@@ -28,6 +28,7 @@ import {
 } from '@/config/agent/agent-instructions.js';
 import { ApplicationException } from '@/middleware/errors/application.exception.js';
 import { mapProviderError } from './provider-error.js';
+import { WebToolsService } from '@/config/web-tools';
 
 const TOKENS_PER_MILLION = 1_000_000;
 
@@ -63,7 +64,10 @@ export interface OpenaiReplyOptions extends OpenaiStreamOptions {}
 
 @Injectable()
 export class OpenaiService {
-  constructor(@Optional() private readonly config?: ConfigService) {}
+  constructor(
+    @Optional() private readonly config?: ConfigService,
+    @Optional() private readonly webTools?: WebToolsService,
+  ) {}
 
   createSession(): MemorySession {
     return new MemorySession();
@@ -76,14 +80,15 @@ export class OpenaiService {
     const startedAt = performance.now();
     const model = routeOpenaiModel(message);
     const searchEnabled = this.setting('WEB_SEARCH_ENABLED', true);
+    const signal = this.runSignal(options.signal, searchEnabled);
+    const sources: WebSource[] = [];
     const agent = new Agent({
       name: AGENT_NAME,
       instructions: AGENT_INSTRUCTIONS,
       model,
       outputType: openaiOutputSchema,
-      tools: this.createTools(searchEnabled),
+      tools: this.createTools(searchEnabled, signal, sources),
     });
-    const signal = this.runSignal(options.signal, searchEnabled);
 
     try {
       const result = await run(agent, message, {
@@ -103,7 +108,7 @@ export class OpenaiService {
       const output = openaiOutputSchema.parse(result.finalOutput);
       return openaiResponseSchema.parse({
         ...output,
-        sources: this.extractSources(result),
+        sources: this.extractSources(result, sources),
         runtime: this.buildRuntime(
           result,
           performance.now() - startedAt,
@@ -131,18 +136,20 @@ export class OpenaiService {
 
     const model = routeOpenaiModel(message);
     const searchEnabled = this.setting('WEB_SEARCH_ENABLED', true);
+    const signal = this.runSignal(options.signal, searchEnabled);
+    const sources: WebSource[] = [];
     const agent = new Agent({
       name: AGENT_NAME,
       instructions: AGENT_INSTRUCTIONS,
       model,
-      tools: this.createTools(searchEnabled),
+      tools: this.createTools(searchEnabled, signal, sources),
     });
     let stream;
     try {
       stream = await run(agent, message, {
         stream: true,
         session: options.session,
-        signal: this.runSignal(options.signal, searchEnabled),
+        signal,
       });
     } catch (error) {
       throw mapProviderError(error);
@@ -187,7 +194,7 @@ export class OpenaiService {
         type: 'completed',
         response: openaiStreamResponseSchema.parse({
           message: stream.finalOutput,
-          sources: this.extractSources(stream),
+          sources: this.extractSources(stream, sources),
           runtime: this.buildRuntime(
             stream,
             performance.now() - startedAt,
@@ -200,8 +207,23 @@ export class OpenaiService {
     }
   }
 
-  private createTools(searchEnabled: boolean) {
+  private createTools(
+    searchEnabled: boolean,
+    signal: AbortSignal,
+    sources: WebSource[],
+  ) {
     const domains = this.setting<string[]>('WEB_SEARCH_ALLOWED_DOMAINS', []);
+    const external =
+      this.webTools
+        ?.createTools((found) => sources.push(...found))
+        .map((definition) =>
+          tool({
+            name: definition.name,
+            description: definition.description,
+            parameters: definition.parameters,
+            execute: (input) => definition.execute(input, signal),
+          }),
+        ) ?? [];
     return searchEnabled
       ? [
           webSearchTool({
@@ -210,8 +232,9 @@ export class OpenaiService {
               ? { filters: { allowedDomains: domains } }
               : {}),
           }),
+          ...external,
         ]
-      : [];
+      : external;
   }
 
   private runSignal(
@@ -230,7 +253,10 @@ export class OpenaiService {
     return this.config?.get<T>(key) ?? fallback;
   }
 
-  private extractSources(result: RuntimeSource): Array<{
+  private extractSources(
+    result: RuntimeSource,
+    external: WebSource[] = [],
+  ): Array<{
     title: string;
     url: string;
     domain: string;
@@ -241,6 +267,7 @@ export class OpenaiService {
       string,
       ReturnType<OpenaiService['extractSources']>[number]
     >();
+    for (const source of external) found.set(source.url, source);
     const visit = (value: unknown): void => {
       if (!value || typeof value !== 'object') return;
       const record = value as Record<string, unknown>;

@@ -1,3 +1,4 @@
+import { AGENTIC_FAVICON, AGENTIC_SYMBOL } from './brand.asset.js';
 import {
   VOICE_PLAYGROUND_VIEW,
   VOICE_PLAYGROUND_STYLES,
@@ -7,15 +8,16 @@ export const PLAYGROUND_PAGE = `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
     <title>Agentic</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,${encodeURIComponent(AGENTIC_FAVICON)}" />
     <link rel="stylesheet" href="/playground/styles.css" />
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
         <a class="brand" href="/playground" aria-label="Agentic home">
-          <span class="brand-mark" aria-hidden="true">A</span>
+          <span class="brand-mark" aria-hidden="true">${AGENTIC_SYMBOL}</span>
           <span>Agentic</span><span class="brand-divider" aria-hidden="true">/</span><span class="workspace-label">Your workspace</span>
         </a>
         <div class="topbar-actions">
@@ -29,7 +31,7 @@ export const PLAYGROUND_PAGE = `<!doctype html>
 
       <main id="conversation" class="conversation">
         <section id="empty-state" class="empty-state">
-          <span class="welcome-aura" aria-hidden="true"><i></i><i></i><i></i><span>✦</span></span>
+          <span class="welcome-aura" aria-hidden="true"><i></i><i></i><i></i><span>${AGENTIC_SYMBOL}</span></span>
           <span class="welcome-eyebrow">A little space for big ideas</span>
           <h1>What's on your mind?</h1>
           <p>Work through an idea, find an answer, or talk it out.</p>
@@ -151,7 +153,8 @@ export const PLAYGROUND_APP = `(() => {
     article.className = 'message ' + role;
     const avatar = document.createElement('div');
     avatar.className = 'avatar';
-    avatar.textContent = role === 'user' ? 'Y' : '✦';
+    if (role === 'user') avatar.textContent = 'Y';
+    else avatar.innerHTML = ${JSON.stringify(AGENTIC_SYMBOL)};
     avatar.setAttribute('aria-hidden', 'true');
     const body = document.createElement('div');
     body.className = 'message-body';
@@ -382,12 +385,15 @@ export const PLAYGROUND_STYLES = `:root {
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body { margin: 0; overflow: hidden; background: var(--background); color: var(--text); }
-button, textarea { display: block; width: 100%; max-height: 180px; min-height: 55px; resize: none; padding: 2px 1px 14px; border: 0; outline: 0; background: transparent; color: var(--text); font-size: .88rem; line-height: 1.65; }
+button, textarea { font: inherit; }
 button { color: inherit; }
-.app-shell { display: grid; grid-template-rows: 76px minmax(0, 1fr) auto; height: 100%; background: radial-gradient(ellipse 45% 50% at 50% 45%, #f5f7fc85, transparent 100%), #fff; }
+.app-shell { display: grid; grid-template-rows: 76px minmax(0, 1fr) auto; height: 100%; height: 100dvh; background: radial-gradient(ellipse 45% 50% at 50% 45%, #f5f7fc85, transparent 100%), #fff; }
 .topbar { display: flex; align-items: center; justify-content: space-between; padding: 0 34px; border-bottom: 1px solid #f0f0f1; background: #ffffffd9; }
 .brand { display: inline-flex; align-items: center; gap: 12px; color: var(--text); text-decoration: none; font-size: .94rem; font-weight: 650; letter-spacing: -.035em; }
-.brand-mark, .brand-mark { width: 32px; height: 32px; border-radius: 11px; font-size: .85rem; }
+.brand-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 11px; color: #fff; background: var(--accent); }
+.agentic-symbol { display: block; width: 26px; height: 26px; }
+.welcome-aura .agentic-symbol { width: 38px; height: 38px; filter: drop-shadow(0 2px 8px #5f74b744); }
+.avatar .agentic-symbol { width: 24px; height: 24px; }
 .topbar-actions { display: flex; align-items: center; gap: 14px; }
 .voice-status { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: .7rem; }
 .voice-status[hidden] { display: none; }
@@ -447,7 +453,6 @@ button:focus-visible, a:focus-visible { outline: 3px solid #9aaee9; outline-offs
 .conversation { overflow-y: auto; scroll-behavior: smooth; }
 .empty-state { display: flex; min-height: 100%; flex-direction: column; align-items: center; justify-content: center; padding: 34px 24px 42px; text-align: center; }
 .empty-state[hidden] { display: none; }
-.agent-orb { width: 52px; height: 52px; margin-bottom: 22px; border-radius: 16px; font-size: 1.3rem; box-shadow: 0 10px 30px rgba(0, 0, 0, .12); }
 .empty-state h1 { margin: 0 0 15px; font-size: clamp(2rem, 4vw, 3rem); font-weight: 480; line-height: 1.12; letter-spacing: -.055em; }
 .empty-state p { margin: 0; color: #7a8292; font-size: .88rem; line-height: 1.7; }
 .messages { width: min(800px, calc(100% - 48px)); margin: 0 auto; padding: 44px 0 32px; }
@@ -478,7 +483,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid #9aaee9; outline-offs
 .message-sources a { color: #2563eb; text-underline-offset: 3px; }
 .composer-wrap { position: relative; width: min(800px, calc(100% - 48px)); margin: 0 auto; padding: 0 0 22px; background: linear-gradient(to top, #fff 78%, #ffffff00); }
 .composer { padding: 17px 18px 12px; border: 1px solid #e0e5ef; border-radius: 23px; background: #fff; box-shadow: 0 4px 8px #30405b03, 0 16px 45px -22px #46577938; transition: border-color .2s, box-shadow .2s; }
-textarea { display: block; width: 100%; max-height: 180px; resize: none; padding: 3px 4px 12px; border: 0; outline: 0; background: transparent; color: var(--text); line-height: 1.5; }
+textarea { display: block; width: 100%; max-height: 180px; min-height: 55px; resize: none; padding: 2px 1px 14px; border: 0; outline: 0; background: transparent; color: var(--text); font-size: .88rem; line-height: 1.65; }
 textarea::placeholder { color: #8a93a5; }
 .composer-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .composer-status { display: flex; min-width: 0; align-items: center; gap: 10px; }
@@ -502,5 +507,7 @@ textarea::placeholder { color: #8a93a5; }
 @keyframes voice-session-enter { from { opacity: 0; transform: scale(.985); } }
 @media (max-width: 640px) { .app-shell { grid-template-rows: 62px minmax(0, 1fr) auto; } .workspace-label, .brand-divider { display: none; } .empty-state { padding: 30px 20px; } .welcome-aura { width: 62px; height: 62px; margin-bottom: 18px; } .prompt-starters { gap: 8px; margin-top: 26px; } .prompt-starter { padding: 12px; border-radius: 13px; } .prompt-starter strong { font-size: .66rem; } .prompt-starter > span:not(.starter-icon):not(.starter-arrow), .starter-arrow { display: none; } .empty-state p { font-size: .8rem; max-width: 270px; } .composer-wrap, .messages { width: calc(100% - 28px); } .composer-wrap { padding-bottom: 12px; } .composer { padding: 14px 13px 10px; border-radius: 20px; } .topbar { padding: 0 18px; } .connection, .voice-status { font-size: 0; } .connection-dot { margin-right: 2px; } .messages { padding-top: 28px; } .composer-hint { display: none; } }
 
+@media (max-width: 640px) { textarea { font-size: 16px; } .send-button, .stop-button, .voice-button { width: 44px; height: 44px; } .quiet-button { min-height: 44px; } .composer-wrap { padding-bottom: max(12px, env(safe-area-inset-bottom)); } }
+@media (max-height: 500px) { .empty-state { justify-content: flex-start; padding-top: 24px; padding-bottom: 24px; } .welcome-aura { width: 48px; height: 48px; margin-bottom: 14px; } .welcome-eyebrow { margin-bottom: 10px; } .prompt-starters { margin-top: 20px; } textarea { max-height: 100px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
 `;
