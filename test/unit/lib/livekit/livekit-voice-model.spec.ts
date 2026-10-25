@@ -14,6 +14,9 @@ describe('createLiveKitVoiceModel', () => {
 
     expect(model.model).toBe('openai/gpt-realtime-2.1');
     expect(model.provider).toBe('livekit');
+    expect(model).toMatchObject({
+      _options: { inputAudioNoiseReduction: { type: 'far_field' } },
+    });
   });
 
   it('switches to the direct OpenAI provider from the environment', () => {
@@ -27,5 +30,8 @@ describe('createLiveKitVoiceModel', () => {
 
     expect(model.model).toBe('gpt-realtime-2.1');
     expect(model.provider).toBe('api.openai.com');
+    expect(model).toMatchObject({
+      _options: { inputAudioNoiseReduction: { type: 'far_field' } },
+    });
   });
 });

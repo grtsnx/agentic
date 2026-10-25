@@ -113,7 +113,6 @@ export async function createApplication(): Promise<{
     OPENAI_API_KEY: config.get<string>('OPENAI_API_KEY'),
     MODEL_TIMEOUT_MS: config.getOrThrow<number>('MODEL_TIMEOUT_MS'),
     WEB_SEARCH_ENABLED: config.getOrThrow<boolean>('WEB_SEARCH_ENABLED'),
-    WEB_SEARCH_TIMEOUT_MS: config.getOrThrow<number>('WEB_SEARCH_TIMEOUT_MS'),
     WEB_SEARCH_ALLOWED_DOMAINS: config.getOrThrow<string[]>(
       'WEB_SEARCH_ALLOWED_DOMAINS',
     ),

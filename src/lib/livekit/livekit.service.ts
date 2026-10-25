@@ -34,8 +34,14 @@ export interface LiveKitVoiceCredentials {
 export function createLiveKitVoiceModel(
   environment: VoiceEnvironment,
 ): llm.RealtimeModel {
+  // Filter room noise before speech detection so laptop/speakerphone input is
+  // less likely to trigger an accidental interruption. Keep real barge-in enabled.
+  const audioOptions = {
+    inputAudioNoiseReduction: { type: 'far_field' as const },
+  };
   if (environment.VOICE_PROVIDER === 'openai') {
     return new openai.realtime.RealtimeModel({
+      ...audioOptions,
       model: environment.VOICE_MODEL,
       voice: environment.VOICE_NAME,
       apiKey: environment.OPENAI_API_KEY,
@@ -43,6 +49,7 @@ export function createLiveKitVoiceModel(
   }
 
   return new inference.RealtimeModel({
+    ...audioOptions,
     model: `openai/${environment.VOICE_MODEL}`,
     voice: environment.VOICE_NAME,
     apiKey: environment.LIVEKIT_API_KEY ?? '',

@@ -13,7 +13,6 @@ describe('validateEnvironment', () => {
       VOICE_ENABLED: false,
       VOICE_PROVIDER: 'livekit',
       MODEL_TIMEOUT_MS: 60_000,
-      WEB_SEARCH_TIMEOUT_MS: 30_000,
       WEB_SEARCH_ALLOWED_DOMAINS: [],
       SESSION_TTL_MS: 1_800_000,
       SESSION_MAX_TURNS: 50,

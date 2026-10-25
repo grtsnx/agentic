@@ -113,12 +113,6 @@ export const environmentSchema = z
       .max(300_000)
       .default(60_000),
     WEB_SEARCH_ENABLED: booleanValue('WEB_SEARCH_ENABLED').default(true),
-    WEB_SEARCH_TIMEOUT_MS: z.coerce
-      .number()
-      .int()
-      .min(1_000)
-      .max(120_000)
-      .default(30_000),
     WEB_SEARCH_ALLOWED_DOMAINS: z.unknown().optional(),
     CONTEXT_DEV_ENABLED: booleanValue('CONTEXT_DEV_ENABLED').default(false),
     CONTEXT_DEV_API_KEY: z.string().trim().optional(),

@@ -80,7 +80,7 @@ export class OpenaiService {
     const startedAt = performance.now();
     const model = routeOpenaiModel(message);
     const searchEnabled = this.setting('WEB_SEARCH_ENABLED', true);
-    const signal = this.runSignal(options.signal, searchEnabled);
+    const signal = this.runSignal(options.signal);
     const sources: WebSource[] = [];
     const agent = new Agent({
       name: AGENT_NAME,
@@ -136,7 +136,7 @@ export class OpenaiService {
 
     const model = routeOpenaiModel(message);
     const searchEnabled = this.setting('WEB_SEARCH_ENABLED', true);
-    const signal = this.runSignal(options.signal, searchEnabled);
+    const signal = this.runSignal(options.signal);
     const sources: WebSource[] = [];
     const agent = new Agent({
       name: AGENT_NAME,
@@ -237,15 +237,11 @@ export class OpenaiService {
       : external;
   }
 
-  private runSignal(
-    external: AbortSignal | undefined,
-    search: boolean,
-  ): AbortSignal {
+  private runSignal(external: AbortSignal | undefined): AbortSignal {
     const modelTimeout = this.setting('MODEL_TIMEOUT_MS', 60_000);
-    const searchTimeout = this.setting('WEB_SEARCH_TIMEOUT_MS', 30_000);
-    const timeout = AbortSignal.timeout(
-      search ? Math.min(modelTimeout, searchTimeout) : modelTimeout,
-    );
+    // Tool availability must not shorten the deadline for unrelated answers.
+    // External tools enforce their own per-call timeout inside this run budget.
+    const timeout = AbortSignal.timeout(modelTimeout);
     return external ? AbortSignal.any([external, timeout]) : timeout;
   }
 
@@ -308,23 +304,17 @@ export class OpenaiService {
       return {
         type: 'status',
         phase: 'handoff',
-        message: `Working with ${event.agent.name}`,
-        detail: event.agent.name,
+        message: 'Working on your request',
       };
     }
 
     if (event.type !== 'run_item_stream_event') return undefined;
 
     if (event.name === 'tool_called' || event.name === 'tool_search_called') {
-      const toolName =
-        'toolName' in event.item && typeof event.item.toolName === 'string'
-          ? event.item.toolName
-          : 'tool';
       return {
         type: 'status',
         phase: 'tool',
-        message: `Using ${this.readableName(toolName)}`,
-        detail: toolName,
+        message: 'Checking sources',
       };
     }
 
@@ -335,7 +325,7 @@ export class OpenaiService {
       return {
         type: 'status',
         phase: 'thinking',
-        message: 'Reviewing tool result',
+        message: 'Reviewing information',
       };
     }
 
@@ -343,21 +333,15 @@ export class OpenaiService {
       return {
         type: 'status',
         phase: 'handoff',
-        message: 'Preparing handoff',
+        message: 'Working on your request',
       };
     }
 
     if (event.name === 'handoff_occurred') {
-      const agentName =
-        'targetAgent' in event.item &&
-        typeof event.item.targetAgent?.name === 'string'
-          ? event.item.targetAgent.name
-          : undefined;
       return {
         type: 'status',
         phase: 'handoff',
-        message: agentName ? `Handed off to ${agentName}` : 'Handoff complete',
-        ...(agentName ? { detail: agentName } : {}),
+        message: 'Working on your request',
       };
     }
 
@@ -394,10 +378,6 @@ export class OpenaiService {
     }
 
     return undefined;
-  }
-
-  private readableName(value: string): string {
-    return value.replaceAll(/[_-]+/g, ' ').trim();
   }
 
   private statusKey(

@@ -17,7 +17,6 @@ export const VOICE_PLAYGROUND_VIEW = `
       <div class="voice-session-layout">
         <main class="voice-stage">
           <div class="voice-stage-topline">
-            <span class="voice-eyebrow"><i class="voice-presence-dot"></i> A space to think out loud</span>
             <span id="voice-elapsed" class="voice-elapsed" aria-label="Call duration">00:00</span>
           </div>
           <div class="voice-center">
@@ -92,10 +91,8 @@ export const VOICE_PLAYGROUND_STYLES = `
 .voice-session-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(310px, 30%); min-height: 0; padding: 14px; gap: 14px; }
 .voice-session[data-transcript='hidden'] .voice-session-layout { grid-template-columns: 1fr; }
 .voice-stage { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; min-width: 0; min-height: 0; padding: 26px 32px 30px; overflow: hidden; border: 1px solid #f0f0f2; border-radius: 24px; background: radial-gradient(ellipse at 50% 40%, #f0f6fd85 0%, transparent 58%), #fcfcfd; }
-.voice-stage-topline { display: flex; align-items: center; justify-content: space-between; gap: 10px; z-index: 1; }
+.voice-stage-topline { display: flex; align-items: center; justify-content: flex-end; gap: 10px; z-index: 1; }
 .voice-eyebrow { display: inline-flex; align-items: center; gap: 8px; color: #8b909b; font-size: .65rem; font-weight: 500; letter-spacing: .04em; }
-.voice-presence-dot { width: 5px; height: 5px; border-radius: 50%; background: #b8bdc7; }
-.voice-session[data-connected='true'] .voice-presence-dot { background: #4baf96; box-shadow: 0 0 0 4px #4baf9612; }
 .voice-elapsed { color: #969ba7; font: .7rem/1.2 ui-monospace, monospace; font-variant-numeric: tabular-nums; }
 .voice-center { display: flex; min-width: 0; min-height: 0; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
 .voice-agent-visual { position: relative; flex-shrink: 1; min-height: 100px; width: min(440px, 58vh, 100%); aspect-ratio: 1; margin: -22px 0 -18px; isolation: isolate; }
@@ -168,7 +165,7 @@ export const VOICE_PLAYGROUND_STYLES = `
 .voice-session[data-state='error'] .voice-state-label { color: #c06262; }
 .voice-session[data-state='thinking'] .voice-state-label { animation: voice-pulse 1.5s ease-in-out infinite; }
 @media (max-width: 1000px) { .voice-session-layout { grid-template-columns: minmax(0, 1fr) 300px; padding: 10px; gap: 10px; } .voice-stage { padding: 22px 20px; } .voice-participants { gap: 9px; } .voice-participant { padding: 8px; } .voice-level-meter { margin-left: 1px; } }
-@media (max-width: 760px) { .voice-session { grid-template-rows: 62px minmax(0, 1fr); } .voice-session-header { padding: 0 20px; } .voice-session-layout { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; } .voice-stage { flex-shrink: 0; min-height: 570px; padding: 20px 18px; } .voice-agent-visual { width: min(300px, 65vw); margin: -8px 0 -14px; } .voice-stage h1 { font-size: 2.3rem; } .voice-center { padding: 8px 0; } .voice-stage-bottom { padding-top: 26px; } .voice-transcript-panel { flex: 1 0 330px; max-height: 480px; } .voice-transcript-panel > header { padding: 22px; } .voice-transcript-empty { min-height: 140px; padding: 12px 0; } .voice-empty-lines { display: none; } .voice-transcript-empty h3 { margin-top: 12px; } .voice-stage-topline .voice-eyebrow { font-size: .59rem; } .voice-session[data-transcript='hidden'] .voice-stage { flex: 1; } }
+@media (max-width: 760px) { .voice-session { grid-template-rows: 62px minmax(0, 1fr); } .voice-session-header { padding: 0 20px; } .voice-session-layout { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; } .voice-stage { flex-shrink: 0; min-height: 570px; padding: 20px 18px; } .voice-agent-visual { width: min(300px, 65vw); margin: -8px 0 -14px; } .voice-stage h1 { font-size: 2.3rem; } .voice-center { padding: 8px 0; } .voice-stage-bottom { padding-top: 26px; } .voice-transcript-panel { flex: 1 0 330px; max-height: 480px; } .voice-transcript-panel > header { padding: 22px; } .voice-transcript-empty { min-height: 140px; padding: 12px 0; } .voice-empty-lines { display: none; } .voice-transcript-empty h3 { margin-top: 12px; } .voice-session[data-transcript='hidden'] .voice-stage { flex: 1; } }
 @media (max-height: 720px) and (min-width: 761px) { .voice-agent-visual { width: min(290px, 43vh, 100%); } .voice-stage { padding: 18px 26px; } .voice-participants { margin-top: 18px; } .voice-stage-bottom { padding-top: 18px; } .voice-stage h1 { font-size: 2rem; } }
 @media (max-width: 400px) {
   .voice-session-header { padding: 0 15px; gap: 8px; }

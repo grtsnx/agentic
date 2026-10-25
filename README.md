@@ -181,7 +181,9 @@ The connected Cloud project currently has no deployed Cloud agent and no purchas
 
 Open `http://localhost:3001/playground`, wait for **Online**, enter a message, and send it. Prompt starter cards fill the composer so you can edit before sending. The light chat and voice screens share an original SVG Agentic mark; its geometry lives in `src/config/playground/brand.asset.ts` and also supplies the favicon and assistant avatars.
 
-The conversation shows a thinking orb, shimmering activity, elapsed time, and safe phases such as tool use, handoffs, and approvals, then hides that activity when response text begins. It never exposes private chain-of-thought. Runtime chips show total time, tokens, estimated cost, models, and tools after completion. Use the stop button to cancel the active turn.
+The conversation shows a thinking orb, shimmering activity, elapsed time, and plain-language progress, then hides that activity when response text begins. It never exposes private chain-of-thought. Runtime chips show total time, tokens, estimated cost, and models after completion. Internal tool names stay out of conversation progress, playground chips, and CLI output; structured API runtime metadata remains available for diagnostics. Use the stop button to cancel the active turn.
+
+All channels use the Agentic identity and shared instructions to keep internal implementation details out of replies. Text runs, including hosted search, use `MODEL_TIMEOUT_MS` as their total deadline; the old `WEB_SEARCH_TIMEOUT_MS` setting is no longer used. External calls retain their separate `EXTERNAL_TOOLS_TIMEOUT_MS` limit. Interrupted text replies retain received text with an incomplete-response notice. Voice filters microphone noise before speech detection, retains intentional interruptions, and offers a new connection if the agent leaves. Noise filtering follows the [LiveKit realtime audio options](https://docs.livekit.io/agents/models/realtime/openai/); actual microphone behavior depends on the room, device, and connection.
 
 | Direction       | Event             | Data                                                                    |
 | --------------- | ----------------- | ----------------------------------------------------------------------- |
@@ -219,9 +221,8 @@ The application validates configuration before it starts. Invalid ports, boolean
 | `LIVEKIT_API_SECRET`                                        | empty                 | Server-side LiveKit secret; required when voice is enabled.                         |
 | `LIVEKIT_AGENT_NAME`                                        | `agentic-voice`       | Explicit dispatch name shared by tokens and the worker.                             |
 | `LIVEKIT_PHONE_NUMBER`                                      | empty                 | Optional provisioned E.164 number displayed at startup; does not provision routing. |
-| `MODEL_TIMEOUT_MS`                                          | `60000`               | Maximum duration of a normal model run.                                             |
+| `MODEL_TIMEOUT_MS`                                          | `60000`               | Maximum duration of a text model run, including hosted search.                      |
 | `WEB_SEARCH_ENABLED`                                        | `true`                | Makes hosted web search available for model-selected use.                           |
-| `WEB_SEARCH_TIMEOUT_MS`                                     | `30000`               | Bounds runs that can invoke hosted web search.                                      |
 | `WEB_SEARCH_ALLOWED_DOMAINS`                                | empty                 | Optional comma-separated allowlist of up to 100 domain names.                       |
 | `CONTEXT_DEV_ENABLED`, `FIRECRAWL_ENABLED`, `VALYU_ENABLED` | `false`               | Independently enable optional external tools.                                       |
 | `CONTEXT_DEV_API_KEY`, `FIRECRAWL_API_KEY`, `VALYU_API_KEY` | empty                 | Required only for the corresponding enabled provider.                               |

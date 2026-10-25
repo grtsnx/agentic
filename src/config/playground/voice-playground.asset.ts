@@ -264,7 +264,13 @@ export const LIVEKIT_BROWSER_APP = `(() => {
       if (isAgent(participant)) syncTracks(nextRoom);
     });
     on(LivekitClient.RoomEvent.ParticipantConnected, () => syncTracks(nextRoom));
-    on(LivekitClient.RoomEvent.ParticipantDisconnected, () => syncTracks(nextRoom));
+    on(LivekitClient.RoomEvent.ParticipantDisconnected, (participant) => {
+      if (!isAgent(participant)) { syncTracks(nextRoom); return; }
+      // A departed worker cannot resume this call. Release the microphone and
+      // offer a new connection instead of leaving the user waiting indefinitely.
+      void disconnect();
+      renderState('error', 'The conversation was interrupted. Your transcript is still here. Start again to reconnect.');
+    });
     on(LivekitClient.RoomEvent.TrackMuted, syncState);
     on(LivekitClient.RoomEvent.TrackUnmuted, syncState);
     on(LivekitClient.RoomEvent.ConnectionQualityChanged, (quality, participant) => {

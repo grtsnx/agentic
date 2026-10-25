@@ -214,7 +214,6 @@ export const PLAYGROUND_APP = `(() => {
       runtime.tokens ? runtime.tokens.total + ' tokens' : undefined,
       runtime.cost ? '$' + Number(runtime.cost.estimatedUsd ?? 0).toFixed(6) : undefined,
       runtime.models?.[0]?.name,
-      runtime.tools?.length ? runtime.tools.map((tool) => tool.name).join(', ') : undefined,
     ].filter(Boolean);
     for (const value of values) {
       const chip = document.createElement('span');
@@ -241,6 +240,23 @@ export const PLAYGROUND_APP = `(() => {
       list.append(link);
     }
     assistantMessage.body.append(list);
+  }
+
+  function interruptResponse(detail) {
+    const message = ensureAssistant();
+    stopElapsed();
+    setActive(false);
+    message.status.hidden = true;
+    // Keep received text visible: a transport failure must not erase the answer.
+    const notice = document.createElement('div');
+    notice.className = 'response-notice';
+    notice.setAttribute('role', 'status');
+    notice.textContent = detail;
+    message.body.append(notice);
+    assistantMessage = undefined;
+    startedAt = undefined;
+    responseStarted = false;
+    scrollToLatest();
   }
 
   function send() {
@@ -276,6 +292,7 @@ export const PLAYGROUND_APP = `(() => {
   });
 
   socket.on('disconnect', () => {
+    if (active) interruptResponse('Connection interrupted. This answer is incomplete; send your request again once connected.');
     stopElapsed();
     elements.connection.lastChild.textContent = ' Offline';
     elements.connection.dataset.state = 'offline';
@@ -335,14 +352,7 @@ export const PLAYGROUND_APP = `(() => {
   });
 
   socket.on('chat.error', (data) => {
-    const message = ensureAssistant();
-    stopElapsed();
-    setActive(false);
-    message.status.hidden = true;
-    message.content.textContent = data.message ?? 'The response could not be completed.';
-    message.article.classList.add('error');
-    assistantMessage = undefined;
-    startedAt = undefined;
+    interruptResponse(data.message ?? 'The response could not be completed. Please try again.');
   });
 
   elements.send.addEventListener('click', send);
@@ -467,6 +477,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid #9aaee9; outline-offs
 .user .message-body { display: flex; width: min(78%, 620px); flex-direction: column; align-items: flex-end; justify-self: end; }
 .user .message-content { display: inline-block; padding: 13px 18px; border: 1px solid #e9edf6; border-radius: 20px 20px 5px 20px; color: #454e60; background: #f2f4fa; }
 .message.error .message-content { color: var(--danger); }
+.response-notice { margin-top: 12px; color: var(--danger); font-size: .85rem; }
 .agent-status { display: flex; align-items: center; gap: 8px; min-height: 28px; color: var(--muted); font-size: .9rem; }
 .agent-status[hidden] { display: none; }
 .thinking-orb { position: relative; width: 20px; height: 20px; flex: 0 0 20px; animation: orb-spin 2.2s linear infinite; }

@@ -174,6 +174,17 @@ afterEach(() => {
 });
 
 describe('voice playground lifecycle', () => {
+  it('offers a fresh connection when the agent leaves instead of waiting forever', async () => {
+    const ui = setup();
+    await ui.start();
+    ui.room.remoteParticipants.delete('agent');
+    ui.room.emit('ParticipantDisconnected', ui.agent);
+    await ui.settle();
+    expect(ui.room.disconnect).toHaveBeenCalledOnce();
+    expect(ui.element('session').dataset.state).toBe('error');
+    expect(ui.element('start').hidden).toBe(false);
+    expect(ui.element('transcript').children).toEqual([]);
+  });
   it('opens without recording, then preserves an agent already speaking during connection', async () => {
     const ui = setup();
     await ui.click('connect');

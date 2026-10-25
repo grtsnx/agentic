@@ -272,6 +272,54 @@ describe('OpenaiService', () => {
     );
   });
 
+  it.each([false, true])(
+    'does not shorten the model deadline just because search is enabled (stream=%s)',
+    async (streaming) => {
+      const config = new ConfigService({
+        MODEL_TIMEOUT_MS: 1000,
+        WEB_SEARCH_TIMEOUT_MS: 10,
+        WEB_SEARCH_ENABLED: true,
+      });
+      agents.run.mockImplementation(async (_agent, _message, { signal }) => {
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        expect(signal.aborted).toBe(false);
+        return {
+          finalOutput: streaming ? 'Complete answer' : output,
+          state: {
+            usage: {
+              requests: 1,
+              inputTokens: 1,
+              outputTokens: 1,
+              totalTokens: 2,
+              inputTokensDetails: [],
+              outputTokensDetails: [],
+            },
+          },
+          rawResponses: [],
+          newItems: [],
+          completed: Promise.resolve(),
+          async *[Symbol.asyncIterator]() {
+            yield {
+              type: 'raw_model_stream_event',
+              data: { type: 'output_text_delta', delta: 'Complete answer' },
+            };
+          },
+        };
+      });
+      const service = new OpenaiService(config);
+      if (streaming) {
+        const events = [];
+        for await (const event of service.streamReply('Explain this'))
+          events.push(event);
+        expect(events.at(-1)?.type).toBe('completed');
+      } else {
+        await expect(
+          service.generateReply('Explain this'),
+        ).resolves.toMatchObject({ message: output.message });
+      }
+    },
+  );
+
   it('extracts deduplicated citation metadata from provider annotations', async () => {
     agents.run.mockResolvedValue({
       finalOutput: output,
@@ -371,8 +419,7 @@ describe('OpenaiService', () => {
       {
         type: 'status',
         phase: 'tool',
-        message: 'Using web search',
-        detail: 'web_search',
+        message: 'Checking sources',
       },
       { type: 'status', phase: 'responding', message: 'Responding' },
       { type: 'delta', delta: 'Hello' },

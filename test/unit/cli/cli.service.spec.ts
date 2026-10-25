@@ -21,7 +21,7 @@ describe('CliService', () => {
               tokens: { input: 10, output: 2, total: 12 },
               cost: { estimatedUsd: 0.0002 },
               models: [{ name: 'gpt-6-luna', calls: 1 }],
-              tools: [],
+              tools: [{ name: 'context_dev_search', calls: 1 }],
             },
           },
         } as const;
@@ -47,6 +47,7 @@ describe('CliService', () => {
     expect(output).toContain('Tokens: 10 in / 2 out / 12 total');
     expect(output).toContain('Estimated cost: $0.00020000 USD');
     expect(output).toContain('Models: gpt-6-luna (1)');
+    expect(output).not.toContain('context_dev_search');
     expect(openaiService.streamReply).toHaveBeenCalledWith(
       'Hello',
       expect.objectContaining({ session: { id: 'session' } }),

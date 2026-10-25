@@ -135,16 +135,12 @@ export class CliService {
     const models = runtime.models
       .map(({ name, calls }) => `${name} (${calls})`)
       .join(', ');
-    const tools = runtime.tools
-      .map(({ name, calls }) => `${name} (${calls})`)
-      .join(', ');
 
     return [
       `Time: ${(runtime.durationMs / 1000).toFixed(2)}s`,
       `Tokens: ${runtime.tokens.input} in / ${runtime.tokens.output} out / ${runtime.tokens.total} total`,
       `Estimated cost: $${runtime.cost.estimatedUsd.toFixed(8)} USD`,
       `Models: ${models || 'none'}`,
-      `Tools: ${tools || 'none'}`,
     ].join('\n');
   }
 }
