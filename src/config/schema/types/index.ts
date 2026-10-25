@@ -34,3 +34,4 @@ export type {
   ResponseWithHeader,
   ApiVersion,
 } from './http/http.types.js';
+export type * from './workspaces/workspace.types.js';

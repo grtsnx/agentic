@@ -6,3 +6,6 @@ export { VoiceModule } from './v1/voice/voice.module.js';
 export { VoiceService } from './v1/voice/voice.service.js';
 export { ChatSessionService } from './v1/chat/chat-session.service.js';
 export { ChatV1Gateway } from './v1/chat/chat.gateway.js';
+
+export { WorkspaceModule } from './v1/workspaces/workspace.module.js';
+export { WorkspaceService } from './v1/workspaces/workspace.service.js';

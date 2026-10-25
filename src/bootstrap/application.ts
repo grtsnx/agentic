@@ -100,6 +100,7 @@ export async function createApplication(): Promise<{
     REALTIME_PLAYGROUND_ENABLED: config.getOrThrow<boolean>(
       'REALTIME_PLAYGROUND_ENABLED',
     ),
+    SANDBOX_ENABLED: config.getOrThrow<boolean>('SANDBOX_ENABLED'),
     VOICE_ENABLED: config.getOrThrow<boolean>('VOICE_ENABLED'),
     VOICE_PROVIDER:
       config.getOrThrow<Environment['VOICE_PROVIDER']>('VOICE_PROVIDER'),

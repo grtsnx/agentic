@@ -1,3 +1,4 @@
+import { SandboxModule } from './sandbox/sandbox.module.js';
 import { Module } from '@nestjs/common';
 import { LiveKitModule } from './livekit/livekit.module.js';
 import { OpenaiModule } from './openai/openai.module.js';
@@ -7,6 +8,7 @@ import { ValyuModule } from './valyu/valyu.module.js';
 
 @Module({
   imports: [
+    SandboxModule,
     LiveKitModule,
     OpenaiModule,
     ContextDevModule,
@@ -14,6 +16,7 @@ import { ValyuModule } from './valyu/valyu.module.js';
     ValyuModule,
   ],
   exports: [
+    SandboxModule,
     LiveKitModule,
     OpenaiModule,
     ContextDevModule,

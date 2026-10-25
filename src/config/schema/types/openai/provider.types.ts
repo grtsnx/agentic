@@ -1,4 +1,4 @@
-import type { MemorySession } from '@openai/agents';
+import type { Tool, MemorySession } from '@openai/agents';
 
 // SDK token details can contain provider-specific nested breakdowns.
 export interface TokenDetails {
@@ -21,6 +21,11 @@ export interface RuntimeSource {
 }
 
 export interface OpenaiStreamOptions {
+  tools?: Tool[];
+  toolInstructions?: string;
+  onToolAudit?: (event: import('../workspaces/workspace.types.js').ToolAudit) => void;
+  scopeId?: string;
+  traceId?: string;
   session?: MemorySession;
   signal?: AbortSignal;
 }

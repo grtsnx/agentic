@@ -61,17 +61,18 @@ export class OpenaiService {
     const sources: WebSource[] = [];
     const agent = new Agent({
       name: AGENT_NAME,
-      instructions: AGENT_INSTRUCTIONS,
+      instructions: AGENT_INSTRUCTIONS + (options.toolInstructions ?? ''),
       model,
       modelSettings: openaiModelSettings(model),
       outputType: openaiOutputSchema,
-      tools: this.createTools(model, searchEnabled, signal, sources),
+      tools: [...this.createTools(model, searchEnabled, signal, sources, options), ...(options.tools ?? [])],
     });
 
     try {
       const result = await run(agent, message, {
         ...(options.session ? { session: options.session } : {}),
         signal,
+        maxTurns: 8,
       });
       if (!result.finalOutput) {
         throw new ApplicationException(
@@ -118,10 +119,10 @@ export class OpenaiService {
     const sources: WebSource[] = [];
     const agent = new Agent({
       name: AGENT_NAME,
-      instructions: AGENT_INSTRUCTIONS,
+      instructions: AGENT_INSTRUCTIONS + (options.toolInstructions ?? ''),
       model,
       modelSettings: openaiModelSettings(model),
-      tools: this.createTools(model, searchEnabled, signal, sources),
+      tools: [...this.createTools(model, searchEnabled, signal, sources, options), ...(options.tools ?? [])],
     });
     let stream;
     try {
@@ -129,6 +130,7 @@ export class OpenaiService {
         stream: true,
         session: options.session,
         signal,
+        maxTurns: 8,
       });
     } catch (error) {
       throw mapProviderError(error);
@@ -191,11 +193,12 @@ export class OpenaiService {
     searchEnabled: boolean,
     signal: AbortSignal,
     sources: WebSource[],
+    options: OpenaiReplyOptions,
   ) {
     const domains = this.setting<string[]>('WEB_SEARCH_ALLOWED_DOMAINS', []);
     const external =
       this.webTools
-        ?.createTools((found) => sources.push(...found))
+        ?.createTools((found) => sources.push(...found), options.onToolAudit, options.scopeId, options.traceId)
         .map((definition) =>
           tool({
             name: definition.name,

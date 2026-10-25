@@ -13,3 +13,7 @@ export {
 } from './livekit/livekit.service.js';
 export { OpenaiModule } from './openai/openai.module.js';
 export { OpenaiService } from './openai/openai.service.js';
+
+export { SandboxModule } from './sandbox/sandbox.module.js';
+export { SandboxService } from './sandbox/sandbox.service.js';
+export { DelegationService } from './openai/delegation.service.js';

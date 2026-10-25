@@ -22,3 +22,5 @@ export {
   withinToolDeadline,
 } from './web-tools/web-tool.policy.js';
 export { PlaygroundModule } from './playground/playground.module.js';
+export { TOOL_PERMISSIONS, permissionFor, requiresApproval, auditSnapshot, auditedTool } from './agent-tools/tool-policy.js';
+export { BoundedAgentModel } from './openai/bounded-agent-model.js';

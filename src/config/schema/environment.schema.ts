@@ -92,6 +92,7 @@ export const environmentSchema = z
     REALTIME_PLAYGROUND_ENABLED: booleanValue(
       'REALTIME_PLAYGROUND_ENABLED',
     ).optional(),
+    SANDBOX_ENABLED: booleanValue('SANDBOX_ENABLED').default(false),
     VOICE_ENABLED: booleanValue('VOICE_ENABLED').optional(),
     VOICE_PROVIDER: z.enum(voiceProviders).default('livekit'),
     VOICE_MODEL: z.string().trim().min(1).default('gpt-realtime-2.1-mini'),

@@ -6,3 +6,4 @@ export {
   ChatSessionMessageDto,
 } from './v1/chat-session.dto.js';
 export { VoiceCredentialsDto } from './v1/voice-credentials.dto.js';
+export * from './v1/workspace.dto.js';

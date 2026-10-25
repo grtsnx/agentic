@@ -1,6 +1,7 @@
+import { WorkspaceService } from '../workspaces/workspace.service.js';
 import type { ConnectionState, ChatSocketResponse } from '@/config';
 import { randomUUID } from 'node:crypto';
-import { UseFilters } from '@nestjs/common';
+import { Optional, UseFilters } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -19,7 +20,7 @@ import {
   type Observable,
 } from 'rxjs';
 import type { Socket } from 'socket.io';
-import { ChatV1RequestDto } from '@/dto';
+import { WorkspaceSocketDto } from '@/dto';
 import { OpenaiService } from '@/lib';
 import { ApplicationException, WebsocketExceptionFilter } from '@/middleware';
 
@@ -35,7 +36,7 @@ export class ChatV1Gateway
   // Each socket owns ephemeral history that becomes unreachable after disconnect.
   private readonly connections = new WeakMap<Socket, ConnectionState>();
 
-  constructor(private readonly openaiService: OpenaiService) {}
+  constructor(private readonly openaiService: OpenaiService, @Optional() private readonly workspaces?: WorkspaceService) {}
 
   handleConnection(client: Socket): void {
     this.connections.set(client, {
@@ -51,7 +52,7 @@ export class ChatV1Gateway
   @SubscribeMessage('chat.send')
   sendMessage(
     @ConnectedSocket() client: Socket,
-    @MessageBody() request: ChatV1RequestDto,
+    @MessageBody() request: WorkspaceSocketDto,
   ): Observable<ChatSocketResponse> {
     const state = this.getConnectionState(client);
     // Prevent concurrent turns from interleaving deltas in one conversation.
@@ -65,12 +66,14 @@ export class ChatV1Gateway
       });
     }
 
+    const workspace = request.workspaceId && this.workspaces
+      ? this.workspaces.store.authorize(request.workspaceId,request.workspaceToken ?? '') : undefined;
     const requestId = randomUUID();
     const abortController = new AbortController();
     state.abortController = abortController;
 
     const response$ = from(
-      this.openaiService.streamReply(request.message.trim(), {
+      workspace && this.workspaces ? this.workspaces.stream(workspace,request.message.trim(),abortController.signal) : this.openaiService.streamReply(request.message.trim(), {
         session: state.session,
         signal: abortController.signal,
       }),

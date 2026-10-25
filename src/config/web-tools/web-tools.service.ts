@@ -1,4 +1,5 @@
-import type { WebSource, WebToolOptions } from '@/config';
+import type { WebSource, WebToolOptions, ToolAudit } from '@/config';
+import { auditedTool } from '../agent-tools/tool-policy.js';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 // These leaf imports prevent config → lib → OpenAI → config initialization cycles.
@@ -38,7 +39,7 @@ export class WebToolsService {
     );
   }
 
-  createTools(onSources: (sources: WebSource[]) => void = () => {}) {
+  createTools(onSources: (sources: WebSource[]) => void = () => {}, onAudit?: (event: ToolAudit) => void, scopeId = 'transient', traceId = 'transient') {
     let calls = 0;
     const definitions = [
       {
@@ -88,7 +89,7 @@ export class WebToolsService {
             ? ' Valyu is currently disabled: this is the active search provider for research and evidence comparisons as well as ordinary lookups.'
             : ''),
       parameters: webToolInputSchema,
-      execute: async (args: unknown, external?: AbortSignal) => {
+      execute: async (args: unknown, external?: AbortSignal) => auditedTool(scopeId, traceId, definition.name, args, onAudit ?? (() => {}), async () => {
         try {
           const parsed = webToolInputSchema.safeParse(args);
           if (!parsed.success) throw new WebToolError('TOOL_INPUT_INVALID');
@@ -159,7 +160,7 @@ export class WebToolsService {
         } catch (error) {
           return webToolFailure(error);
         }
-      },
+      }),
     }));
   }
 }

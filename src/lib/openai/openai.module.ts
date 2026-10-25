@@ -1,11 +1,12 @@
 import { Global, Module } from '@nestjs/common';
+import { DelegationService } from './delegation.service.js';
 import { OpenaiService } from './openai.service.js';
 import { WebToolsModule } from '@/config';
 
 @Global()
 @Module({
   imports: [WebToolsModule],
-  providers: [OpenaiService],
-  exports: [OpenaiService],
+  providers: [OpenaiService, DelegationService],
+  exports: [OpenaiService, DelegationService],
 })
 export class OpenaiModule {}
