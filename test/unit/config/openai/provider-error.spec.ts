@@ -3,6 +3,17 @@ import { mapProviderError } from '@/config';
 
 describe('mapProviderError', () => {
   it.each([
+    { status: 429, code: 'insufficient_quota' },
+    { status: 429, type: 'insufficient_quota' },
+    { cause: { status: 429, code: 'billing_hard_limit_reached' } },
+  ])('does not suggest retrying exhausted provider quota', (cause) => {
+    const error = mapProviderError(cause);
+    expect(error.code).toBe('PROVIDER_QUOTA_EXCEEDED');
+    expect(error.getStatus()).toBe(HttpStatus.SERVICE_UNAVAILABLE);
+    expect(error.retryable).toBe(false);
+  });
+
+  it.each([
     [
       { status: 401 },
       'PROVIDER_AUTHENTICATION_FAILED',

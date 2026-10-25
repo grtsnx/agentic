@@ -93,6 +93,12 @@ export const environmentSchema = z
       'REALTIME_PLAYGROUND_ENABLED',
     ).optional(),
     SANDBOX_ENABLED: booleanValue('SANDBOX_ENABLED').default(false),
+    CHATKIT_DOMAIN_KEY: z
+      .string()
+      .trim()
+      .max(256)
+      .regex(/^$|^domain_pk_[A-Za-z0-9_-]+$/)
+      .default(''),
     VOICE_ENABLED: booleanValue('VOICE_ENABLED').optional(),
     VOICE_PROVIDER: z.enum(voiceProviders).default('livekit'),
     VOICE_MODEL: z.string().trim().min(1).default('gpt-realtime-2.1-mini'),
@@ -124,6 +130,12 @@ export const environmentSchema = z
       .max(5000)
       .default(3000),
     CLEF_ROUTING_CONFIDENCE: z.coerce.number().min(0.6).max(0.99).default(0.75),
+    MODEL_MAX_OUTPUT_TOKENS: z.coerce
+      .number()
+      .int()
+      .min(256)
+      .max(32_768)
+      .default(8192),
     MODEL_TIMEOUT_MS: z.coerce
       .number()
       .int()

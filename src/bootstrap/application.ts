@@ -104,6 +104,7 @@ export async function createApplication(): Promise<{
       'REALTIME_PLAYGROUND_ENABLED',
     ),
     SANDBOX_ENABLED: config.getOrThrow<boolean>('SANDBOX_ENABLED'),
+    CHATKIT_DOMAIN_KEY: config.getOrThrow<string>('CHATKIT_DOMAIN_KEY'),
     VOICE_ENABLED: config.getOrThrow<boolean>('VOICE_ENABLED'),
     VOICE_PROVIDER:
       config.getOrThrow<Environment['VOICE_PROVIDER']>('VOICE_PROVIDER'),
@@ -123,6 +124,9 @@ export async function createApplication(): Promise<{
     ),
     CLEF_ROUTING_CONFIDENCE: config.getOrThrow<number>(
       'CLEF_ROUTING_CONFIDENCE',
+    ),
+    MODEL_MAX_OUTPUT_TOKENS: config.getOrThrow<number>(
+      'MODEL_MAX_OUTPUT_TOKENS',
     ),
     MODEL_TIMEOUT_MS: config.getOrThrow<number>('MODEL_TIMEOUT_MS'),
     WEB_SEARCH_ENABLED: config.getOrThrow<boolean>('WEB_SEARCH_ENABLED'),

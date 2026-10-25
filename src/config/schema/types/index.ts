@@ -1,4 +1,5 @@
 export type { Environment } from './environment.types.js';
+export type * from './chatkit/chatkit.types.js';
 export type {
   OpenaiOutput,
   OpenaiResponse,

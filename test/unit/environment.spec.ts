@@ -173,3 +173,21 @@ describe('Clef environment', () => {
     expect(() => validateEnvironment(input)).toThrow();
   });
 });
+
+describe('model output budget', () => {
+  it('provides a bounded default and accepts an explicit budget', () => {
+    expect(validateEnvironment({}).MODEL_MAX_OUTPUT_TOKENS).toBe(8192);
+    expect(
+      validateEnvironment({ MODEL_MAX_OUTPUT_TOKENS: '4096' })
+        .MODEL_MAX_OUTPUT_TOKENS,
+    ).toBe(4096);
+  });
+  it.each(['0', '-1', 'Infinity', '32769', '1.5'])(
+    'rejects invalid budget %s',
+    (value) => {
+      expect(() =>
+        validateEnvironment({ MODEL_MAX_OUTPUT_TOKENS: value }),
+      ).toThrow(/MODEL_MAX_OUTPUT_TOKENS/);
+    },
+  );
+});

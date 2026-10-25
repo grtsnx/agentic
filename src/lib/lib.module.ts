@@ -1,4 +1,5 @@
 import { ClefModule } from './clef/clef.module.js';
+import { ChatkitAdapterModule } from './chatkit/chatkit.module.js';
 import { DocumentsModule } from './documents/documents.module.js';
 import { SandboxModule } from './sandbox/sandbox.module.js';
 import { Module } from '@nestjs/common';
@@ -10,6 +11,7 @@ import { ValyuModule } from './valyu/valyu.module.js';
 
 @Module({
   imports: [
+    ChatkitAdapterModule,
     ClefModule,
     DocumentsModule,
     SandboxModule,
@@ -20,6 +22,7 @@ import { ValyuModule } from './valyu/valyu.module.js';
     ValyuModule,
   ],
   exports: [
+    ChatkitAdapterModule,
     ClefModule,
     DocumentsModule,
     SandboxModule,

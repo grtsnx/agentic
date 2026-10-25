@@ -11,7 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import {
   Agent,
   MemorySession,
-  run,
+  Runner,
   tool,
   webSearchTool,
   type RunStreamEvent,
@@ -43,11 +43,21 @@ const LONG_CONTEXT_THRESHOLD = 272_000;
 
 @Injectable()
 export class OpenaiService {
+  private readonly runner: Runner;
   constructor(
     @Optional() private readonly config?: ConfigService,
     @Optional() private readonly webTools?: WebToolsService,
     @Optional() private readonly clef?: ClefService,
-  ) {}
+  ) {
+    // Keep structural traces without exporting prompts, answers, or tool payloads.
+    // A per-call output cap bounds reasoning and visible output, not total run cost.
+    this.runner = new Runner({
+      traceIncludeSensitiveData: false,
+      modelSettings: {
+        maxTokens: this.setting('MODEL_MAX_OUTPUT_TOKENS', 8192),
+      },
+    });
+  }
 
   createSession(): MemorySession {
     return new MemorySession();
@@ -76,7 +86,7 @@ export class OpenaiService {
     });
 
     try {
-      const result = await run(agent, message, {
+      const result = await this.runner.run(agent, message, {
         ...(options.session ? { session: options.session } : {}),
         signal,
         maxTurns: 8,
@@ -138,7 +148,7 @@ export class OpenaiService {
     });
     let stream;
     try {
-      stream = await run(agent, message, {
+      stream = await this.runner.run(agent, message, {
         stream: true,
         session: options.session,
         signal,

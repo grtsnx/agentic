@@ -1,5 +1,6 @@
 const agents = vi.hoisted(() => ({
   captureConfig: vi.fn(),
+  captureRunner: vi.fn(),
   run: vi.fn(),
   webSearchTool: vi.fn((options) => ({ name: 'web_search', options })),
   tool: vi.fn((options) => options),
@@ -12,6 +13,12 @@ vi.mock('@openai/agents', () => ({
     }
   },
   run: agents.run,
+  Runner: class {
+    run = agents.run;
+    constructor(config: unknown) {
+      agents.captureRunner(config);
+    }
+  },
   webSearchTool: agents.webSearchTool,
   tool: agents.tool,
 }));
@@ -38,12 +45,26 @@ describe('OpenaiService', () => {
 
   beforeEach(() => {
     agents.captureConfig.mockClear();
+    agents.captureRunner.mockClear();
     agents.run.mockReset();
     agents.webSearchTool.mockClear();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('bounds main-agent output and excludes sensitive trace data', () => {
+    new OpenaiService(new ConfigService({ MODEL_MAX_OUTPUT_TOKENS: 4096 }));
+    expect(agents.captureRunner).toHaveBeenLastCalledWith({
+      traceIncludeSensitiveData: false,
+      modelSettings: { maxTokens: 4096 },
+    });
+    new OpenaiService();
+    expect(agents.captureRunner).toHaveBeenLastCalledWith({
+      traceIncludeSensitiveData: false,
+      modelSettings: { maxTokens: 8192 },
+    });
   });
 
   it.each([false, true])(

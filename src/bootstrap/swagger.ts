@@ -172,6 +172,10 @@ export function configureSwagger(
         'Agent chat endpoints for validated, structured responses.',
       );
       builder.addTag(
+        'ChatKit',
+        'Authenticated chat threads, streamed replies, history, and inline approvals.',
+      );
+      builder.addTag(
         'Voice',
         'Short-lived credentials for LiveKit voice sessions.',
       );

@@ -17,12 +17,13 @@ Add `OPENAI_API_KEY` to `.env`, then start the API:
 bun run start:dev
 ```
 
-| Interface  | URL or command                   |
-| ---------- | -------------------------------- |
-| Playground | http://localhost:3001/playground |
-| Swagger    | http://localhost:3001/api        |
-| Scalar     | http://localhost:3001/docs       |
-| Text CLI   | `bun run chat`                   |
+| Interface  | URL or command                           |
+| ---------- | ---------------------------------------- |
+| Playground | http://localhost:3001/playground         |
+| ChatKit    | http://localhost:3001/playground/chatkit |
+| Swagger    | http://localhost:3001/api                |
+| Scalar     | http://localhost:3001/docs               |
+| Text CLI   | `bun run chat`                           |
 
 Chat uses a local heuristic router: simple requests go to `gpt-5-nano`; engineering tasks, attachment questions, and complex follow-ups go to `gpt-6-luna`. Follow-ups use bounded recent user context, and ordinary new topics can return to Nano. Optional Clef-flash classification can override this local fallback. Responses include input/output tokens, model usage, and estimated model cost.
 
@@ -35,6 +36,18 @@ See [.env.example](.env.example) for settings and defaults. Configuration is val
 - `SESSION_TTL_MS`, `SESSION_MAX_TURNS`, `SESSION_MAX_TOKENS`: conversation lifetime and context limits.
 - `WEB_SEARCH_ENABLED`, `WEB_SEARCH_ALLOWED_DOMAINS`: hosted search and optional domain restrictions.
 - `SWAGGER_ENABLED`, `REALTIME_PLAYGROUND_ENABLED`: documentation and playground availability.
+
+## ChatKit
+
+Open `/playground/chatkit`, or choose **ChatKit** in the playground header. This additional view uses the official OpenAI web component and a NestJS adapter for the [custom-server ChatKit protocol](https://developers.openai.com/api/docs/guides/custom-chatkit). The existing workspace service runs the agent, shared instructions, tools, model routing, and approval policy. No Agent Builder workflow or Python server is needed.
+
+The view supports streamed replies, real processing updates, source annotations, token/cost metadata, thread history, rename/delete, cancellation, and inline approval cards. **Voice & files** returns to the original playground for LiveKit and uploads. ChatKit uploads, voice, feedback, and retry are not enabled in this first integration; unsupported protocol requests are rejected explicitly.
+
+Localhost works with the development domain-key placeholder. For a deployed site, register its origin in the [OpenAI domain allowlist](https://platform.openai.com/settings/organization/security/domain-allowlist), set the public `CHATKIT_DOMAIN_KEY` in `.env`, and restart. `REALTIME_PLAYGROUND_ENABLED` gates both the view and protocol endpoint. The component is loaded from OpenAI's CDN and requires internet access; application API keys stay on the server.
+
+Browser access uses an expiring workspace capability stored in that tab's session storage. Every thread has its own model session and is scoped to that capability. Histories are memory-only, expire within 30 minutes, and disappear on restart. The existing workspace capacity and turn/context limits still apply. For production, replace anonymous capability issuance with your application's user authentication before exposing this playground publicly.
+
+Verify the adapter without provider costs: `bun run test:e2e -- test/e2e/chatkit/chatkit.e2e-spec.ts`. For a live check, start the app, open the ChatKit URL, send a short greeting, then send a follow-up and confirm the response, usage card, and history. This uses your configured model provider and incurs normal usage charges.
 
 ## Optional Clef routing
 
@@ -217,6 +230,15 @@ Set `AGENTIC_ENV_FILE` to select another environment file or `AGENTIC_HTTP_PORT`
 
 [CI](.github/workflows/ci.yml) checks formatting, types, tests, dependencies, and the container image. The [release workflow](.github/workflows/release.yml) publishes AMD64/ARM64 images to GHCR for semantic-version tags, with an SBOM and provenance attestation. Configure the repository's `production` environment protections before releasing.
 
+## Production readiness
+
+Reviewed against [OpenAI's production guidance](https://developers.openai.com/api/docs/guides/production-best-practices). The application already has server-side keys, validated input, streaming, timeouts, economical routing, usage estimates, approval boundaries, and CI checks. This is still a single-instance development platform, not a completed production deployment.
+
+- Main chat runs omit prompt, response, and tool content from Agents SDK traces, matching specialist runs. This does not disable provider processing, response storage, or abuse-monitoring retention; review [OpenAI data controls](https://developers.openai.com/api/docs/guides/your-data) before accepting sensitive data.
+- `MODEL_MAX_OUTPUT_TOKENS=8192` caps each main-agent model call, including reasoning tokens. The existing eight-turn limit still applies; this is not a total token or dollar budget. Specialists keep their separate, tighter shared budget. Billing-quota failures are non-retryable application errors, while transient rate limits remain retryable. Do not blindly replay a tool workflow after failure.
+- Before public deployment: require user authentication and per-user quotas for chat, workspace issuance, and voice; terminate TLS; disable development UIs unless access-controlled; and configure latency/error/cost alerts. Use separate staging/production OpenAI projects and scoped service-account keys with expiration and rotation. Set account spend alerts and an appropriate hard spend limit in the OpenAI dashboard.
+- Keep one API instance until shared session, approval, and rate-limit storage is implemented. Current memory-only state disappears on restart and is not coordinated across replicas. Database/Redis and production evaluation/load tests remain in the roadmap.
+
 ## Project structure
 
 ```text
@@ -230,11 +252,11 @@ src/
 │   ├── livekit/          # Voice agent, worker, and console setup.
 │   ├── openai/           # Model routing, delegation budgets, and provider errors.
 │   ├── schema/           # Zod schemas and categorized types/.
-│   └── playground/       # Chat and voice UI.
+│   └── playground/       # Original chat/voice UI and the additional ChatKit view.
 ├── dto/                  # API input and output contracts.
-├── lib/                  # External integrations, including clef/ classifier module and service.
+├── lib/                  # Provider integrations, Clef routing, and ChatKit protocol adapter.
 ├── middleware/           # Filters, interceptors, errors, and shared utilities.
-├── modules/              # Features in v1/; v2/ reserved for new contracts.
+├── modules/              # Chat, ChatKit, workspaces, and voice in v1/; clean v2/ boundary.
 ├── cli.ts                # Text CLI entry point.
 ├── main.ts               # HTTP and Socket.IO entry point.
 └── voice.ts              # LiveKit worker entry point.
@@ -278,6 +300,8 @@ Ordered from foundations to advanced capabilities. ✅ Verified complete · ⬜ 
 - ✅ Add a CLI that uses the same application services as the REST API.
 - ✅ Stream model output over the CLI and a versioned Socket.IO namespace.
 - ✅ Provide an embedded same-origin playground for testing Socket.IO streams.
+- ✅ Add ChatKit alongside the playground with shared agent execution, streamed replies, thread history, citations, usage, and inline approvals.
+- ⬜ Extend ChatKit with uploads and voice after validating their protocol support.
 - ✅ Add LiveKit Cloud voice with environment-switched LiveKit Inference and direct OpenAI adapters.
 - ✅ Issue short-lived, room-scoped, microphone-only voice tokens without exposing secrets.
 - ✅ Run a named TypeScript voice worker with shared chat/voice instructions.
@@ -405,6 +429,9 @@ Ordered from foundations to advanced capabilities. ✅ Verified complete · ⬜ 
 
 ### 16. Evaluations, observability, security, and production operations
 
+- ✅ Exclude sensitive prompt, response, and tool data from main-agent and specialist SDK traces.
+- ✅ Bound main-agent output per model call and distinguish exhausted quota from temporary rate limits.
+- ⬜ Configure separate staging/production OpenAI projects, scoped expiring keys, rotation, spend alerts, and hard spend limits.
 - ✅ Disable Cloud audio and transcript retention in the LiveKit worker configuration.
 - ✅ Verify Agent Observability is enabled and validate Cloud traces, session logs, and metrics with a real voice session (2026-10-25).
 - ⬜ Deploy the LiveKit worker to a continuously hosted environment when local development is no longer sufficient.

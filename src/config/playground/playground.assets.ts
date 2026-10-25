@@ -46,6 +46,7 @@ export const PLAYGROUND_PAGE = `<!doctype html>
           <span>Agentic</span>
         </a>
         <div class="topbar-actions">
+          <a class="quiet-button" href="/playground/chatkit">ChatKit</a>
           <span id="connection" class="sr-only" role="status">Connecting</span>
           <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Use dark theme">
             <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.53 1.72a.75.75 0 0 1 .16.82A8.97 8.97 0 0 0 9 6a9 9 0 0 0 9 9 8.97 8.97 0 0 0 3.46-.69.75.75 0 0 1 .98.98 10.5 10.5 0 0 1-9.69 6.46c-5.8 0-10.5-4.7-10.5-10.5 0-4.37 2.67-8.11 6.46-9.7a.75.75 0 0 1 .82.17Z"/></svg>

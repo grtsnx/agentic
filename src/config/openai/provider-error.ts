@@ -45,6 +45,23 @@ export function mapProviderError(cause: unknown): ApplicationException {
       false,
     );
   }
+  // Quota exhaustion also uses 429, but backoff cannot restore a billing budget.
+  if (
+    chain.some((error) =>
+      [error.code, error.type].some(
+        (value) =>
+          value === 'insufficient_quota' ||
+          value === 'billing_hard_limit_reached',
+      ),
+    )
+  ) {
+    return new ApplicationException(
+      'PROVIDER_QUOTA_EXCEEDED',
+      'The AI service has reached its usage allowance. Please contact the application administrator.',
+      HttpStatus.SERVICE_UNAVAILABLE,
+      false,
+    );
+  }
   if (status === 429 || code.includes('rate_limit')) {
     return new ApplicationException(
       'PROVIDER_RATE_LIMITED',

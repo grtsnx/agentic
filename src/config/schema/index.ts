@@ -1,4 +1,5 @@
 export { environmentSchema } from './environment.schema.js';
+export { chatkitRequestSchema } from './chatkit/chatkit.schema.js';
 export {
   openaiSourceSchema,
   openaiOutputSchema,

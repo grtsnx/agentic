@@ -38,6 +38,7 @@ export interface OpenaiStreamOptions {
 export interface OpenaiReplyOptions extends OpenaiStreamOptions {}
 
 export type ErrorRecord = {
+  type?: unknown;
   cause?: unknown;
   code?: unknown;
   message?: unknown;

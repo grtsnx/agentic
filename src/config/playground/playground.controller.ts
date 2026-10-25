@@ -16,12 +16,48 @@ import {
 } from './playground.assets.js';
 import { ORB_ENGINE_SCRIPT, ORB_ENGINE_CORE } from './orb-engine.asset.js';
 import { LIVEKIT_BROWSER_APP } from './voice-playground.asset.js';
+import {
+  CHATKIT_PAGE,
+  CHATKIT_STYLES,
+  chatkitScript,
+} from './chatkit.asset.js';
 
 @ApiExcludeController()
 @SkipThrottle()
 @Controller('playground')
 export class PlaygroundController {
   constructor(private readonly config: ConfigService) {}
+
+  @Get('chatkit')
+  @Header('Cache-Control', 'no-store')
+  @Header(
+    'Content-Security-Policy',
+    // The official component injects its shadow-root styles. Only this page permits inline CSS.
+    "default-src 'self'; script-src 'self' https://cdn.platform.openai.com; frame-src https://cdn.platform.openai.com; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'",
+  )
+  chatkit(): StreamableFile {
+    return this.file(CHATKIT_PAGE, 'text/html; charset=utf-8');
+  }
+
+  @Get('chatkit.js')
+  @Header('Cache-Control', 'no-store')
+  chatkitApp(): StreamableFile {
+    const domainKey =
+      this.config.get<string>('CHATKIT_DOMAIN_KEY') ||
+      (this.config.get<string>('NODE_ENV') === 'production'
+        ? ''
+        : 'domain_pk_localhost_dev');
+    return this.file(
+      chatkitScript(domainKey),
+      'text/javascript; charset=utf-8',
+    );
+  }
+
+  @Get('chatkit.css')
+  @Header('Cache-Control', 'no-store')
+  chatkitStyles(): StreamableFile {
+    return this.file(CHATKIT_STYLES, 'text/css; charset=utf-8');
+  }
 
   @Get()
   @Header('Cache-Control', 'no-store')

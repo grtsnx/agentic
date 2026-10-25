@@ -1,4 +1,6 @@
 export { LibModule } from './lib.module.js';
+export { ChatkitAdapterModule } from './chatkit/chatkit.module.js';
+export { ChatkitAdapterService } from './chatkit/chatkit.service.js';
 export { ContextDevModule } from './context-dev/context-dev.module.js';
 export { ContextDevService } from './context-dev/context-dev.service.js';
 export { FirecrawlModule } from './firecrawl/firecrawl.module.js';
