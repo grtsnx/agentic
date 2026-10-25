@@ -1,8 +1,11 @@
-import { FILE_ACCEPT, FILE_MIME_TYPES } from '../agent/tools/file-policy.js';
-export const WORKSPACE_VIEW = `
-<button id="workspace-open" class="quiet-button" type="button" aria-haspopup="dialog">Files &amp; actions</button>`;
+import {
+  FILE_ACCEPT,
+  FILE_MIME_TYPES,
+  FILE_MAX_BYTES,
+  WORKSPACE_MAX_BYTES,
+} from '../agent/tools/file-policy.js';
 export const WORKSPACE_ATTACHMENTS = `
-<input id="workspace-file" type="file" accept="${FILE_ACCEPT}" hidden />
+<input id="workspace-file" type="file" multiple accept="${FILE_ACCEPT}" hidden />
 <div id="composer-files" class="composer-files" role="list" aria-label="Attached files" hidden></div>
 <p id="composer-upload-notice" class="composer-upload-notice" role="status" hidden></p>`;
 export const WORKSPACE_ATTACH_BUTTON = `
@@ -10,16 +13,6 @@ export const WORKSPACE_ATTACH_BUTTON = `
   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
 </button>`;
 export const WORKSPACE_SHEET = `
-<dialog id="workspace-sheet" class="workspace-sheet" aria-labelledby="workspace-title">
-  <header><h2 id="workspace-title">Files &amp; actions</h2><button id="workspace-close" type="button" aria-label="Close files and actions">✕</button></header>
-  <p>Files are private to this chat and expire after 30 minutes.</p>
-  <button id="workspace-choose" class="workspace-upload" type="button">Attach a file</button>
-  <small>JPG, PNG, PDF, DOCX, TXT, Markdown, CSV, JSON. Up to 1 MiB each.</small>
-  <p id="workspace-notice" role="status"></p>
-  <section aria-label="Attached files" id="workspace-files"></section>
-  <h3>Review actions</h3><p>Review the exact action before allowing it.</p>
-  <section id="workspace-approvals" aria-live="polite"></section>
-</dialog>
 <dialog id="attachment-preview" class="attachment-preview" aria-labelledby="attachment-preview-title">
   <header><div><h2 id="attachment-preview-title">File preview</h2><small id="attachment-preview-info"></small></div><button id="attachment-preview-close" type="button" aria-label="Close preview">✕</button></header>
   <div id="attachment-preview-body" class="attachment-preview-body" role="status"></div>
@@ -65,20 +58,21 @@ export const WORKSPACE_STYLES = `
 .composer-upload-notice {margin:0 0 10px;font-size:.72rem;color:var(--muted);overflow-wrap:anywhere;}
 .composer-upload-notice[data-error] {color:var(--danger);}
 @media(max-width:480px){.composer-file{flex-basis:140px;padding:12px;}}
-.workspace-sheet { position:fixed; inset:0 0 0 auto; margin:0; width:min(480px,100vw); height:100dvh; max-height:100dvh; box-sizing:border-box; border:0; padding:24px; background:#fff; color:#20232b; overflow:auto; }
-.workspace-sheet::backdrop {background:#14182466;}
-.workspace-sheet header {display:flex;align-items:center;justify-content:space-between;gap:12px;}
-.workspace-sheet h2 {font-size:20px;} .workspace-sheet p,.workspace-sheet small {color:#697080;line-height:1.5;}
-.workspace-sheet button {border:1px solid #dce0e8;border-radius:8px;padding:8px 12px;background:transparent;color:inherit;cursor:pointer;}
-.workspace-sheet button:disabled {opacity:.5;cursor:wait;}
-.workspace-upload {display:grid;gap:10px;margin-bottom:8px;} .workspace-upload input {max-width:100%;}
-.workspace-action {border:1px solid #dce0e8;border-radius:12px;padding:14px;margin:12px 0;overflow-wrap:anywhere;}
-.workspace-action pre {white-space:pre-wrap;max-height:240px;overflow:auto;font-size:12px;}
-.workspace-action footer {display:flex;flex-wrap:wrap;gap:8px;}
-html[data-theme='dark'] .workspace-sheet {background:#101010;color:#eee;}
-html[data-theme='dark'] .workspace-sheet p,html[data-theme='dark'] .workspace-sheet small {color:#aaa;}
-html[data-theme='dark'] .workspace-action,html[data-theme='dark'] .workspace-sheet button {border-color:#333;}
-@media(max-width:480px){#workspace-open{font-size:12px;padding:8px;} .workspace-sheet{padding:18px;}}
+.approval-card {width:calc(100% - 32px);box-sizing:border-box;max-width:720px;margin:12px auto 20px;padding:20px;border:1px solid var(--border);border-radius:18px;background:var(--surface-subtle);color:var(--text);overflow-wrap:anywhere;}
+.approval-card header {display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;}
+.approval-card header svg {width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;}
+.approval-card p {font-size:13px;line-height:1.6;margin:10px 0;}
+.approval-card small {display:block;color:var(--muted);font-size:12px;line-height:1.6;}
+.approval-card pre {max-height:240px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);font:12px/1.6 monospace;}
+.approval-card footer {display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:16px;}
+.approval-card button {min-height:40px;padding:9px 16px;border:1px solid var(--border);border-radius:10px;background:transparent;color:var(--text);font-weight:600;cursor:pointer;}
+.approval-card button[data-approve] {background:var(--text);color:var(--surface);border-color:var(--text);}
+.approval-card button:disabled {opacity:.5;cursor:default;}
+.approval-card button:focus-visible {outline:2px solid var(--text);outline-offset:3px;}
+.approval-card[data-settled] {opacity:.85;}
+.approval-card .approval-status {color:var(--muted);font-size:12px;}
+@media(max-width:480px){.approval-card{padding:16px;border-radius:14px;}}
+
 `;
 export const WORKSPACE_APP = `
 function createWorkspacePanel() {
@@ -87,7 +81,7 @@ function createWorkspacePanel() {
   let generation=0;
   let uploading=false;
   let attachedFiles=[];
-  let pendingFile;
+  let pendingFiles=[];
   const fileUrls=new Map();
   const fileLoads=new Map();
   const preview=document.querySelector('#attachment-preview');
@@ -103,10 +97,8 @@ function createWorkspacePanel() {
   const fileInput=document.querySelector('#workspace-file');
   const uploadNotice=document.querySelector('#composer-upload-notice');
   const fileCards=document.querySelector('#composer-files');
-  const sheet=document.querySelector('#workspace-sheet');
-  const opener=document.querySelector('#workspace-open');
-  const notice=document.querySelector('#workspace-notice');
-  if(!sheet || !opener) return {isUploading:()=>false,credentials:()=>({}),refresh:async()=>{},reset:async()=>{}};
+  const approvalCards=new Map();
+  const approvalTimers=new Set();
   async function request(path,options={}) {
     const headers={...(credentials?{Authorization:'Bearer '+credentials.token}:{}),...options.headers};
     const response=await fetch('/v1/workspaces'+path,{...options,headers,signal:AbortSignal.timeout(65000)});
@@ -126,7 +118,6 @@ function createWorkspacePanel() {
     return creating;
   }
   function text(tag,content) {const element=document.createElement(tag);element.textContent=content;return element;}
-  function safe(task) {return async()=>{try{notice.textContent='';await task();}catch(error){notice.textContent=error.message;}};}
   function uploadStatus(message,error=false) {
     if(!uploadNotice)return;
     uploadNotice.textContent=message;uploadNotice.hidden=!message;
@@ -220,7 +211,7 @@ function createWorkspacePanel() {
   function renderFiles() {
     if(!fileCards)return;
     fileCards.replaceChildren();
-    const entries=[...attachedFiles,...(pendingFile?[{filename:pendingFile.name,bytes:pendingFile.size,pending:true}]:[])];
+    const entries=[...attachedFiles,...pendingFiles.map(file=>({filename:file.name,bytes:file.size,pending:true}))];
     fileCards.hidden=!entries.length;
     for(const file of entries) {
       const card=text('div','');card.className='composer-file';card.setAttribute('role','listitem');card.title=file.filename;
@@ -246,60 +237,89 @@ function createWorkspacePanel() {
     const data=await request('/'+credentials.id);
     if(current!==generation) return;
     attachedFiles=data.files;renderFiles();
-    const files=document.querySelector('#workspace-files');files.replaceChildren();
-    for(const file of data.files) {
-      const row=text('p',file.filename+' · '+Math.ceil(file.bytes/1024)+' KB');
-      files.append(row);
-    }
-    const actions=document.querySelector('#workspace-approvals');actions.replaceChildren();
-    const pending=data.approvals.filter(action=>action.status==='pending');
-    opener.textContent=pending.length?'Review actions ('+pending.length+')':'Files & actions';
-    for(const action of pending) {
-      const card=document.createElement('article');card.className='workspace-action';
-      card.append(text('strong',action.target),text('p',action.risk),text('small','Scope: this chat · '+action.tier+' · Expires '+new Date(action.expiresAt).toLocaleTimeString()),text('pre',JSON.stringify(action.action,null,2)));
-      const buttons=document.createElement('footer');
-      for(const decision of ['approve','deny','cancel']) {
-        const button=text('button',decision==='approve'?'Approve once':decision==='deny'?'Deny':'Cancel');button.type='button';
-        button.addEventListener('click',safe(async()=>{
-          for(const sibling of buttons.children) sibling.disabled=true;
-          try {
-            const result=await request('/'+credentials.id+'/approvals/'+action.id,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({decision})});
-            notice.textContent=result.status==='executed'?'Action finished. You can ask about the result.':'Action '+result.status+'.';
-            if(result.result) notice.append(text('pre',JSON.stringify(result.result,null,2)));
-          } finally {await refresh();}
-        }));buttons.append(button);
-      }
-      card.append(buttons);actions.append(card);
-    }
-    if(!pending.length) actions.append(text('p','No actions waiting for approval.'));
+    for(const action of data.approvals) renderApproval(action);
   }
-  opener.addEventListener('click',safe(async()=>{sheet.showModal();await ensure();await refresh();}));
-  document.querySelector('#workspace-close').addEventListener('click',()=>sheet.close());
-  sheet.addEventListener('close',()=>opener.focus());
+  function renderApproval(action) {
+    const existing=approvalCards.get(action.id);
+    if(existing){
+      if(action.status!=='pending'&&!existing.busy&&!existing.settled)existing.finish(action.status==='consumed'?'Action already submitted.':action.status==='expired'?'Request expired. Ask for a new proposal.':action.status==='denied'?'Denied. Nothing was executed.':'Cancelled.');
+      return;
+    }
+    if(action.status!=='pending')return;
+    const current=generation;
+    const card=text('article','');card.className='approval-card';card.setAttribute('aria-label','Action approval');
+    const heading=text('header','');
+    heading.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6Z"/><path d="M12 8v5m0 3v1"/></svg>';
+    heading.append(text('span',action.action.tool==='execute_code'?'Allow code execution?':'Allow file removal?'));
+    const target=action.action.tool==='delete_file'?(attachedFiles.find(file=>file.id===action.action.fileId)?.filename??action.target):action.target;
+    card.append(heading,text('p',target),text('small','This chat only · One action · Expires '+new Date(action.expiresAt).toLocaleTimeString()),text('p',action.risk));
+    card.append(text('pre',action.action.tool==='execute_code'?action.action.code:'Remove '+target));
+    const footer=text('footer','');const status=text('p','Waiting for your approval.');status.className='approval-status';status.setAttribute('role','status');
+    const state={busy:false,settled:false,finish(message){state.settled=true;card.setAttribute('data-settled','');for(const button of footer.children)button.disabled=true;status.textContent=message;clearTimeout(timer);approvalTimers.delete(timer);}};
+    const timer=setTimeout(()=>state.finish('Request expired. Ask for a new proposal.'),Math.max(0,action.expiresAt-Date.now()));approvalTimers.add(timer);
+    for(const decision of ['approve','deny']) {
+      const button=text('button',decision==='approve'?'Approve once':'Deny');button.type='button';if(decision==='approve')button.setAttribute('data-approve','');
+      button.addEventListener('click',async()=>{
+        if(state.busy||state.settled||current!==generation)return;
+        if(active){status.textContent='Wait for the current response to finish, or stop it first.';return;}
+        state.busy=true;for(const sibling of footer.children)sibling.disabled=true;status.textContent=decision==='approve'?'Running approved action…':'Denying…';
+        clearTimeout(timer);approvalTimers.delete(timer);
+        try {
+          const result=await request('/'+credentials.id+'/approvals/'+action.id,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({decision})});
+          if(current!==generation)return;
+          state.finish(result.status==='executed'?'Action completed.':result.status==='denied'?'Denied. Nothing was executed.':'Action '+result.status+'.');
+          if(result.result!==undefined)card.append(text('pre',JSON.stringify(result.result,null,2)));
+          await refresh().catch(()=>uploadStatus('Action finished, but attachments could not be refreshed.',true));
+        } catch(error){
+          // A lost response does not prove the action failed. Never offer an automatic retry.
+          if(current===generation)state.finish('Could not confirm the outcome: '+error.message+' Check before requesting this action again.');
+        } finally {state.busy=false;}
+      });footer.append(button);
+    }
+    card.append(footer,status);approvalCards.set(action.id,state);
+    document.querySelector('#empty-state').hidden=true;
+    const messages=document.querySelector('#messages');messages.append(card);messages.scrollTop=messages.scrollHeight;
+  }
   attach?.addEventListener('click',()=>fileInput.click());
-  document.querySelector('#workspace-choose').addEventListener('click',()=>fileInput.click());
   fileInput.addEventListener('change',async()=>{
-    const file=fileInput.files?.[0];if(!file||uploading)return;
+    const files=Array.from(fileInput.files??[]);if(!files.length||uploading)return;
     const current=generation;
     try {
-      const ext=file.name.split('.').pop().toLowerCase();const mimes=${JSON.stringify(FILE_MIME_TYPES)};const mime=Object.hasOwn(mimes,ext)?mimes[ext]:undefined;
-      if(!mime)throw new Error('Choose a JPG, PNG, PDF, DOCX, TXT, Markdown, CSV, or JSON file.');
-      if(file.size>1048576)throw new Error('Choose a file no larger than 1 MiB.');
-      uploading=true;attach.disabled=true;pendingFile=file;renderFiles();uploadStatus('Uploading '+file.name+'…');
-      await ensure();if(current!==generation)return;
-      const form=new FormData();form.append('file',new Blob([file],{type:mime}),file.name);
-      await request('/'+credentials.id+'/files',{method:'POST',body:form});
-      if(current!==generation)return;
-      pendingFile=undefined;await refresh();
-      if(current===generation){uploadStatus('');notice.textContent='File attached. Ask about it in chat.';}
+      const mimes=${JSON.stringify(FILE_MIME_TYPES)};
+      for(const file of files) {
+        const ext=file.name.split('.').pop().toLowerCase();
+        if(!Object.hasOwn(mimes,ext))throw new Error(file.name+': choose a JPG, PNG, PDF, DOCX, TXT, Markdown, CSV, or JSON file.');
+        if(!file.size||file.size>${FILE_MAX_BYTES})throw new Error(file.name+': choose a non-empty file no larger than 1 MiB.');
+      }
+      uploading=true;attach.disabled=true;
+      await ensure();await refresh();if(current!==generation)return;
+      if(attachedFiles.length+files.length>5)throw new Error('You can attach up to five files per chat.');
+      if([...attachedFiles,...files].reduce((sum,file)=>sum+(file.bytes??file.size),0)>${WORKSPACE_MAX_BYTES})throw new Error('Attachments must total no more than 2 MiB per chat.');
+      pendingFiles=[...files];renderFiles();
+      const failures=[];
+      // Upload sequentially to respect parser capacity. Keep successful files when another fails.
+      for(const [index,file] of files.entries()) {
+        if(current!==generation)return;
+        uploadStatus('Uploading '+(index+1)+' of '+files.length+': '+file.name+'…');
+        const mime=mimes[file.name.split('.').pop().toLowerCase()];
+        const form=new FormData();form.append('file',new Blob([file],{type:mime}),file.name);
+        try {await request('/'+credentials.id+'/files',{method:'POST',body:form});}
+        catch(error){failures.push(file.name+': '+error.message);}
+        if(current!==generation)return;
+        pendingFiles.shift();await refresh();
+      }
+      if(current===generation){
+        const message=failures.length?failures.join(' '):files.length+' file'+(files.length===1?'':'s')+' attached. Ask about '+(files.length===1?'it':'them')+' in chat.';
+        uploadStatus(failures.length?message:'',!!failures.length);
+      }
     } catch(error) {
-      if(current===generation){uploadStatus(error.message,true);notice.textContent=error.message;}
+      if(current===generation){uploadStatus(error.message,true);}
     } finally {
-      if(current===generation){uploading=false;attach.disabled=false;pendingFile=undefined;fileInput.value='';renderFiles();}
+      if(current===generation){uploading=false;attach.disabled=false;pendingFiles=[];fileInput.value='';renderFiles();}
     }
   });
-  return {isUploading:()=>uploading,credentials:()=>credentials?{workspaceId:credentials.id,workspaceToken:credentials.token}:{},refresh:()=>refresh().catch(error=>{notice.textContent=error.message;}),
-    reset:async()=>{generation++;preview.close();clearPreview();for(const url of fileUrls.values())URL.revokeObjectURL(url);fileUrls.clear();fileLoads.clear();uploading=false;pendingFile=undefined;attachedFiles=[];attach.disabled=false;fileInput.value='';renderFiles();uploadStatus('');const previous=credentials;credentials=undefined;opener.textContent='Files & actions';sheet.close();
+  return {isUploading:()=>uploading,credentials:()=>credentials?{workspaceId:credentials.id,workspaceToken:credentials.token}:{},prepare:ensure,refresh:()=>refresh().catch(error=>{uploadStatus(error.message,true);}),
+    reset:async()=>{generation++;preview.close();clearPreview();for(const url of fileUrls.values())URL.revokeObjectURL(url);fileUrls.clear();fileLoads.clear();uploading=false;pendingFiles=[];attachedFiles=[];attach.disabled=false;fileInput.value='';renderFiles();uploadStatus('');const previous=credentials;credentials=undefined;for(const timer of approvalTimers)clearTimeout(timer);approvalTimers.clear();approvalCards.clear();
       if(previous) await fetch('/v1/workspaces/'+previous.id,{method:'DELETE',headers:{Authorization:'Bearer '+previous.token},signal:AbortSignal.timeout(10000)}).catch(()=>{});
     }};
 }

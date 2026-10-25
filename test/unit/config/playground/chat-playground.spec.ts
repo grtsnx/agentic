@@ -78,6 +78,12 @@ function setup(deferFrames = false) {
       addEventListener() {},
     },
     URL,
+    AbortSignal,
+    fetch: vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => ({ data: { id: 'workspace', token: 'token' } }),
+    }),
     navigator: { clipboard: { writeText } },
     setTimeout: vi.fn(),
     performance,

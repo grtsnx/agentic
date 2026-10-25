@@ -1,5 +1,4 @@
 import {
-  WORKSPACE_VIEW,
   WORKSPACE_ATTACHMENTS,
   WORKSPACE_ATTACH_BUTTON,
   WORKSPACE_SHEET,
@@ -47,7 +46,6 @@ export const PLAYGROUND_PAGE = `<!doctype html>
           <span>Agentic</span>
         </a>
         <div class="topbar-actions">
-          ${WORKSPACE_VIEW}
           <span id="connection" class="sr-only" role="status">Connecting</span>
           <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Use dark theme">
             <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.53 1.72a.75.75 0 0 1 .16.82A8.97 8.97 0 0 0 9 6a9 9 0 0 0 9 9 8.97 8.97 0 0 0 3.46-.69.75.75 0 0 1 .98.98 10.5 10.5 0 0 1-9.69 6.46c-5.8 0-10.5-4.7-10.5-10.5 0-4.37 2.67-8.11 6.46-9.7a.75.75 0 0 1 .82.17Z"/></svg>
@@ -59,7 +57,7 @@ export const PLAYGROUND_PAGE = `<!doctype html>
 
       <main id="conversation" class="conversation">
         <section id="empty-state" class="empty-state">
-          <span class="welcome-aura" aria-hidden="true"><i></i><i></i><i></i><span>${AGENTIC_SYMBOL}</span></span>
+          <span class="welcome-aura" aria-hidden="true"><span>${AGENTIC_SYMBOL}</span></span>
           <h1>What's on your mind?</h1>
           <p>Work through an idea, find an answer, or talk it out.</p>
           <div class="prompt-starters" aria-label="Ideas to get started">
@@ -340,7 +338,7 @@ export const PLAYGROUND_APP = `(() => {
     scrollToLatest();
   }
 
-  function send() {
+  async function send() {
     const message = elements.message.value.trim();
     if (!message || active || !socket.connected || workspacePanel.isUploading()) return;
     createMessage('user', message);
@@ -350,7 +348,13 @@ export const PLAYGROUND_APP = `(() => {
     elements.message.value = '';
     elements.message.style.height = 'auto';
     setActive(true);
-    socket.emit('chat.send', { message, ...workspacePanel.credentials() });
+    const pending=assistantMessage;
+    try {
+      await workspacePanel.prepare();
+      if(assistantMessage!==pending)return;
+      if(!socket.connected)throw new Error('Connection lost. Please try again.');
+      socket.emit('chat.send', { message, ...workspacePanel.credentials() });
+    } catch(error){if(assistantMessage===pending)interruptResponse(error.message);}
   }
 
   function resetConversation() {
@@ -531,7 +535,7 @@ button { color: inherit; }
 html[data-connection='online'] .brand-mark { background: var(--success); }
 html[data-connection='reconnecting'] .brand-mark { background: #d97706; }
 .agentic-symbol { display: block; width: 26px; height: 26px; }
-.welcome-aura .agentic-symbol { width: 38px; height: 38px; filter: drop-shadow(0 2px 8px #5f74b744); }
+.welcome-aura .agentic-symbol { width: 34px; height: 34px; }
 .avatar .agentic-symbol { width: 24px; height: 24px; }
 .topbar-actions { display: flex; align-items: center; gap: 14px; }
 .voice-status { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: .7rem; }
@@ -560,12 +564,10 @@ ${VOICE_PLAYGROUND_STYLES}
 button:focus-visible, a:focus-visible { outline: 3px solid #9aaee9; outline-offset: 4px; }
 .quiet-button svg, .send-button svg, .starter-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .send-button svg { width: 21px; height: 21px; }
-.welcome-aura { position: relative; display: grid; place-items: center; width: 76px; height: 76px; margin-bottom: 24px; isolation: isolate; }
-.welcome-aura::before { position: absolute; inset: -30px; z-index: -1; border-radius: 50%; background: radial-gradient(circle, #dde9fa90 0%, #f2edfc40 42%, transparent 70%); content: ''; }
-.welcome-aura i { position: absolute; inset: 5px; border: 1px solid #9ac9df60; border-radius: 44% 56% 60% 40%; background: linear-gradient(135deg, #ddf7f98a, #b6c9eb85 40%, #cfc0f78a); transform: rotate(-15deg); }
-.welcome-aura i:nth-child(2) { inset: 9px; border-color: #c6b3e06b; transform: rotate(45deg); }
-.welcome-aura i:nth-child(3) { inset: 13px; border-color: #ffffffa6; transform: rotate(90deg); background: linear-gradient(130deg, #ffffff70, #9eabe86b); }
-.welcome-aura > span { z-index: 1; color: #fff; text-shadow: 0 2px 12px #5f74b75c; font-size: 1.6rem; }
+.welcome-aura { position: relative; display: grid; flex: 0 0 76px; place-items: center; width: 76px; height: 76px; aspect-ratio: 1; margin-bottom: 24px; }
+.welcome-aura::before { position: absolute; inset: -34px; border-radius: 50%; background: radial-gradient(circle, #d5e3fb 0%, #e4def800 70%); content: ''; animation: welcome-halo 4.8s ease-in-out infinite; }
+.welcome-aura::after { position: absolute; inset: -7px; border: 1px solid #d7deec; border-radius: 50%; content: ''; }
+.welcome-aura > span { display: grid; place-items: center; width: 100%; height: 100%; border-radius: 50%; color: #fff; background: radial-gradient(circle at 32% 28%, #556278, #303746 64%); box-shadow: inset 0 1px 0 #ffffff2e, 0 12px 26px #3037461f; }
 .prompt-starters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; width: min(640px, 100%); margin-top: 36px; }
 .prompt-starter { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 18px; border: 1px solid #e9ecf3; border-radius: 16px; color: #4c566c; background: #ffffffb8; text-align: left; cursor: pointer; transition: border-color .2s, box-shadow .2s, transform .2s; }
 .prompt-starter:hover { border-color: #c7d0e8; box-shadow: 0 7px 20px #455a910a; transform: translateY(-2px); }
@@ -612,7 +614,7 @@ html[data-theme='dark'] .theme-icon-moon { display: none; }
   .scroll-fade { --scroll-fade-t: var(--_scroll-fade-size-t); --scroll-fade-b: var(--_scroll-fade-size-b); }
 }
 .conversation { display: flex; min-height: 0; flex-direction: column; overflow: hidden; }
-.empty-state { display: flex; flex: 1; min-height: 0; height: 100%; flex-direction: column; align-items: center; justify-content: center; padding: 24px 24px 8px; overflow: hidden; text-align: center; }
+.empty-state { display: flex; flex: 1; min-height: 0; height: 100%; flex-direction: column; align-items: center; justify-content: center; padding: 24px 24px 8px; overflow: visible; text-align: center; }
 .empty-state[hidden] { display: none; }
 .empty-state h1 { margin: 0 0 15px; font-size: clamp(2rem, 4vw, 3rem); font-weight: 480; line-height: 1.12; letter-spacing: -.055em; }
 .empty-state p { margin: 0; color: #7a8292; font-size: .88rem; line-height: 1.7; }
@@ -680,6 +682,7 @@ textarea::placeholder { color: #8a93a5; }
 @keyframes voice-think { 50% { height: 10px; transform: translateY(-2px); } }
 @keyframes voice-wave { 50% { height: 13px; } }
 @keyframes voice-session-enter { from { opacity: 0; transform: scale(.985); } }
+@keyframes welcome-halo { 50% { opacity: .45; transform: scale(.94); } }
 @media (max-width: 640px) { .app-shell { grid-template-rows: 62px minmax(0, 1fr) auto; } .empty-state { padding: 30px 20px; } .welcome-aura { width: 62px; height: 62px; margin-bottom: 18px; } .prompt-starters { gap: 8px; margin-top: 26px; } .prompt-starter { padding: 12px; border-radius: 13px; } .prompt-starter strong { font-size: .66rem; } .prompt-starter > span:not(.starter-icon):not(.starter-arrow), .starter-arrow { display: none; } .empty-state p { font-size: .8rem; max-width: 270px; } .composer-wrap { width: calc(100% - 28px); } .composer-wrap { padding-bottom: 12px; } .composer { padding: 14px 13px 10px; border-radius: 20px; } .topbar { padding: 0 18px; } .voice-status { font-size: 0; } .messages { padding-top: 28px; } .composer-hint { display: none; } }
 
 @media (max-width: 640px) { textarea { font-size: 16px; } .send-button, .stop-button, .voice-button { width: 44px; height: 44px; } .quiet-button { min-height: 44px; } .composer-wrap { padding-bottom: max(12px, env(safe-area-inset-bottom)); } }
@@ -698,6 +701,9 @@ html[data-theme='dark'] {
 html[data-theme='dark'] body,
 html[data-theme='dark'] .app-shell { background: #000000; }
 html[data-theme='dark'] .topbar { background: #000000; }
+html[data-theme='dark'] .welcome-aura::before { background: radial-gradient(circle, #ffffff18 0%, #ffffff00 70%); }
+html[data-theme='dark'] .welcome-aura::after { border-color: #2a2a2a; }
+html[data-theme='dark'] .welcome-aura > span { background: radial-gradient(circle at 32% 28%, #2c2c2c, #141414 68%); box-shadow: inset 0 1px 0 #ffffff14, 0 0 0 1px #262626, 0 16px 32px #0000008c; }
 html[data-theme='dark'] textarea::placeholder,
 html[data-theme='dark'] .empty-state p,
 html[data-theme='dark'] .disclaimer,
