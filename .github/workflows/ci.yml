@@ -59,6 +59,7 @@ jobs:
           image: agentic:ci
           fail-build: true
           severity-cutoff: high
+          only-fixed: true
 
   dependency-review:
     name: Dependency review

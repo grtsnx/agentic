@@ -20,6 +20,12 @@ ENV NODE_ENV=production \
     PORT=3000
 WORKDIR /app
 
+# Apply available OS fixes and remove npm from the runtime attack surface.
+# The application starts with node and never installs packages at runtime.
+RUN apk upgrade --no-cache \
+  && rm -rf /usr/local/lib/node_modules/npm \
+  && rm -f /usr/local/bin/npm /usr/local/bin/npx
+
 COPY --from=production-dependencies --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --chown=node:node package.json ./package.json
