@@ -1,3 +1,4 @@
+import { modelRoutingSchema } from '../clef/clef.schema.js';
 import { z } from 'zod';
 
 const callSchema = z
@@ -9,6 +10,7 @@ const callSchema = z
 
 export const openaiRuntimeSchema = z
   .object({
+    routing: modelRoutingSchema.optional(),
     durationMs: z.number().int().nonnegative(),
     tokens: z
       .object({

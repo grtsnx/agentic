@@ -42,3 +42,5 @@ export {
   FILE_MIME_TYPES,
   FILE_ACCEPT,
 } from './agent/tools/file-policy.js';
+
+export { CLEF_QUESTION } from './openai/clef-routing.js';

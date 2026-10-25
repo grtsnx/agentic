@@ -18,3 +18,5 @@ export {
 } from './web-tools/web-tool.schema.js';
 export type * from './types/index.js';
 export * from './workspaces/workspace.schema.js';
+
+export { clefResponseSchema, modelRoutingSchema } from './clef/clef.schema.js';

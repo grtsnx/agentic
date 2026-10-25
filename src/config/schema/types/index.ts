@@ -36,3 +36,5 @@ export type {
   ApiVersion,
 } from './http/http.types.js';
 export type * from './workspaces/workspace.types.js';
+
+export type { ModelRoutingDecision } from './clef/clef.types.js';

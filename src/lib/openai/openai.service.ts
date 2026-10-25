@@ -1,4 +1,6 @@
+import { ClefService } from '../clef/clef.service.js';
 import type {
+  ModelRoutingDecision,
   TokenDetails,
   RuntimeSource,
   OpenaiStreamOptions,
@@ -44,6 +46,7 @@ export class OpenaiService {
   constructor(
     @Optional() private readonly config?: ConfigService,
     @Optional() private readonly webTools?: WebToolsService,
+    @Optional() private readonly clef?: ClefService,
   ) {}
 
   createSession(): MemorySession {
@@ -55,9 +58,10 @@ export class OpenaiService {
     options: OpenaiReplyOptions = {},
   ): Promise<OpenaiResponse> {
     const startedAt = performance.now();
-    const model = await this.selectModel(message, options);
-    const searchEnabled = this.setting('WEB_SEARCH_ENABLED', true);
     const signal = this.runSignal(options.signal);
+    const routing = await this.selectModel(message, { ...options, signal });
+    const model = routing.model;
+    const searchEnabled = this.setting('WEB_SEARCH_ENABLED', true);
     const sources: WebSource[] = options.sources ?? [];
     const agent = new Agent({
       name: AGENT_NAME,
@@ -95,6 +99,7 @@ export class OpenaiService {
           result,
           performance.now() - startedAt,
           model,
+          routing,
         ),
       });
     } catch (error) {
@@ -116,9 +121,10 @@ export class OpenaiService {
     yield thinking;
     lastStatus = this.statusKey(thinking);
 
-    const model = await this.selectModel(message, options);
-    const searchEnabled = this.setting('WEB_SEARCH_ENABLED', true);
     const signal = this.runSignal(options.signal);
+    const routing = await this.selectModel(message, { ...options, signal });
+    const model = routing.model;
+    const searchEnabled = this.setting('WEB_SEARCH_ENABLED', true);
     const sources: WebSource[] = options.sources ?? [];
     const agent = new Agent({
       name: AGENT_NAME,
@@ -186,6 +192,7 @@ export class OpenaiService {
             stream,
             performance.now() - startedAt,
             model,
+            routing,
           ),
         }),
       };
@@ -197,7 +204,7 @@ export class OpenaiService {
   private async selectModel(
     message: string,
     options: OpenaiStreamOptions,
-  ): Promise<OpenaiModel> {
+  ): Promise<ModelRoutingDecision> {
     try {
       const history = (await options.session?.getItems(24)) ?? [];
       const recentUserMessages = history.flatMap((item) => {
@@ -218,10 +225,20 @@ export class OpenaiService {
           return [];
         return [content.slice(0, 4000)];
       });
-      return routeOpenaiModel(message, {
+      const context = {
         recentUserMessages,
         hasAttachments: options.hasAttachments,
-      });
+      };
+      options.signal?.throwIfAborted();
+      if (this.clef)
+        return await this.clef.route(message, context, options.signal);
+      return {
+        model: routeOpenaiModel(message, context),
+        source: 'local',
+        reason: 'disabled',
+        durationMs: 0,
+        estimatedCostUsd: null,
+      };
     } catch (error) {
       throw mapProviderError(error);
     }
@@ -434,6 +451,7 @@ export class OpenaiService {
     result: RuntimeSource,
     durationMs: number,
     fallbackModel: OpenaiModel,
+    routing?: ModelRoutingDecision,
   ): OpenaiRuntime {
     const usage = result.state.usage;
     const tools = this.countCalls(
@@ -452,6 +470,7 @@ export class OpenaiService {
     );
 
     return {
+      ...(routing && routing.reason !== 'disabled' ? { routing } : {}),
       durationMs: Math.max(0, Math.round(durationMs)),
       tokens: {
         input: usage.inputTokens,

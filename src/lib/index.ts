@@ -23,3 +23,6 @@ export {
   getPdfPreviewScript,
 } from './documents/documents.service.js';
 export { DocumentsModule } from './documents/documents.module.js';
+
+export { ClefModule } from './clef/clef.module.js';
+export { ClefService } from './clef/clef.service.js';

@@ -1,3 +1,4 @@
+import { ClefModule } from './clef/clef.module.js';
 import { DocumentsModule } from './documents/documents.module.js';
 import { SandboxModule } from './sandbox/sandbox.module.js';
 import { Module } from '@nestjs/common';
@@ -9,6 +10,7 @@ import { ValyuModule } from './valyu/valyu.module.js';
 
 @Module({
   imports: [
+    ClefModule,
     DocumentsModule,
     SandboxModule,
     LiveKitModule,
@@ -18,6 +20,7 @@ import { ValyuModule } from './valyu/valyu.module.js';
     ValyuModule,
   ],
   exports: [
+    ClefModule,
     DocumentsModule,
     SandboxModule,
     LiveKitModule,

@@ -107,6 +107,23 @@ export const environmentSchema = z
       .regex(/^$|^\+[1-9]\d{6,14}$/, 'Use an international E.164 phone number')
       .optional(),
     OPENAI_API_KEY: z.string().trim().optional(),
+    CLEF_ROUTING_ENABLED: booleanValue('CLEF_ROUTING_ENABLED').default(false),
+    CLOUDFLARE_ACCOUNT_ID: z
+      .string()
+      .trim()
+      .regex(
+        /^$|^[a-f\d]{32}$/i,
+        'CLOUDFLARE_ACCOUNT_ID must be a 32-character account ID',
+      )
+      .optional(),
+    CLOUDFLARE_API_TOKEN: z.string().trim().optional(),
+    CLEF_ROUTING_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .min(100)
+      .max(5000)
+      .default(1500),
+    CLEF_ROUTING_CONFIDENCE: z.coerce.number().min(0.6).max(0.99).default(0.75),
     MODEL_TIMEOUT_MS: z.coerce
       .number()
       .int()
@@ -165,6 +182,19 @@ export const environmentSchema = z
           message: `${provider}_API_KEY is required when ${provider}_ENABLED is true`,
           path: [`${provider}_API_KEY`],
         });
+      }
+    }
+    if (environment.CLEF_ROUTING_ENABLED) {
+      for (const key of [
+        'CLOUDFLARE_ACCOUNT_ID',
+        'CLOUDFLARE_API_TOKEN',
+      ] as const) {
+        if (!environment[key])
+          context.addIssue({
+            code: 'custom',
+            message: key + ' is required when CLEF_ROUTING_ENABLED is true',
+            path: [key],
+          });
       }
     }
     if (environment.OBSERVE_ENABLED) {

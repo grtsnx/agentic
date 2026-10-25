@@ -1,3 +1,4 @@
+import { ClefModule } from '../clef/clef.module.js';
 import { Global, Module } from '@nestjs/common';
 import { DelegationService } from './delegation.service.js';
 import { OpenaiService } from './openai.service.js';
@@ -5,7 +6,7 @@ import { WebToolsModule } from '@/config';
 
 @Global()
 @Module({
-  imports: [WebToolsModule],
+  imports: [WebToolsModule, ClefModule],
   providers: [OpenaiService, DelegationService],
   exports: [OpenaiService, DelegationService],
 })
