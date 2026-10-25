@@ -77,23 +77,85 @@ describe('ChatKit protocol and capability isolation', () => {
       .filter((line) => line.startsWith('data: '))
       .map((line) => JSON.parse(line.slice(6)));
 
-  it('serves the official component with a page-scoped CSP and no API secret', async () => {
+  it('serves the custom UI without a remote widget or API secret', async () => {
     const response = await request(app.getHttpServer())
-      .get('/playground/chatkit')
+      .get('/playground')
       .expect(200);
-    expect(response.text).toContain('<openai-chatkit');
-    expect(response.headers['content-security-policy']).toContain(
+    expect(response.text).toContain('id="message"');
+    expect(response.text).not.toContain('<openai-chatkit');
+    expect(response.text).not.toContain('href="/playground/chatkit"');
+    await request(app.getHttpServer())
+      .get('/playground/chatkit')
+      .expect(308)
+      .expect('Location', '/playground');
+    expect(response.headers['content-security-policy']).not.toContain(
       'https://cdn.platform.openai.com',
     );
     expect(response.headers['content-security-policy']).toContain(
-      "script-src 'self' https://cdn.platform.openai.com;",
+      "script-src 'self'",
     );
     const script = await request(app.getHttpServer())
-      .get('/playground/chatkit.js')
+      .get('/playground/app.js')
       .expect(200);
-    expect(script.text).toContain('domain_pk_localhost_dev');
+    expect(script.text).toContain('threads.create');
+    expect(script.text).not.toContain('cdn.platform.openai.com');
     expect(script.text).not.toContain('OPENAI_API_KEY');
   });
+  it('uploads, scopes, previews, and removes attachments without sharing them across threads', async () => {
+    const auth = await owner();
+    const other = await owner();
+    const upload = await request(app.getHttpServer())
+      .post('/v1/chatkit/' + auth.id + '/files')
+      .set('Authorization', 'Bearer ' + auth.token)
+      .attach('file', Buffer.from('Private facts for this chat.'), {
+        filename: 'notes.txt',
+        contentType: 'text/plain',
+      })
+      .expect(200);
+    expect(upload.body).toMatchObject({ type: 'file', name: 'notes.txt' });
+    const fileId = upload.body.id;
+    const result = await post(auth, {
+      type: 'threads.create',
+      params: { input: { ...input, attachments: [fileId] } },
+    }).expect(200);
+    const output = events(result.text);
+    expect(
+      output.find((event) => event.item?.type === 'user_message').item
+        .attachments[0].id,
+    ).toBe(fileId);
+    expect(result.text).toContain('Preview notes.txt');
+    await request(app.getHttpServer())
+      .get('/v1/chatkit/' + auth.id + '/files/' + fileId)
+      .set('Authorization', 'Bearer ' + auth.token)
+      .expect(200)
+      .expect('Private facts for this chat.');
+    await request(app.getHttpServer())
+      .get('/v1/chatkit/' + other.id + '/files/' + fileId)
+      .set('Authorization', 'Bearer ' + other.token)
+      .expect(404);
+    await post(auth, {
+      type: 'threads.create',
+      params: { input: { ...input, attachments: [fileId] } },
+    }).expect(404);
+    await post(auth, {
+      type: 'attachments.delete',
+      params: { attachment_id: fileId },
+    }).expect(200);
+    // A draft-delete replay must not erase a file already sent to a conversation.
+    await request(app.getHttpServer())
+      .get('/v1/chatkit/' + auth.id + '/files/' + fileId)
+      .set('Authorization', 'Bearer ' + auth.token)
+      .expect(200);
+    await post(auth, {
+      type: 'threads.delete',
+      params: { thread_id: output[0].thread.id },
+    }).expect(200);
+    await request(app.getHttpServer())
+      .get('/v1/chatkit/' + auth.id + '/files/' + fileId)
+      .set('Authorization', 'Bearer ' + auth.token)
+      .expect(404);
+  });
+
   it('streams the ChatKit protocol, citations and usage without a REST envelope, and continues history', async () => {
     const auth = await owner();
     const result = await post(auth, {
@@ -113,6 +175,11 @@ describe('ChatKit protocol and capability isolation', () => {
       'https://example.com',
     );
     expect(result.text).toContain('12 in / 3 out / 15 total');
+    expect(answer.item.agentic.runtime.tokens).toMatchObject({
+      input: 12,
+      output: 3,
+      total: 15,
+    });
     const history = await post(auth, {
       type: 'threads.get_by_id',
       params: { thread_id: id },

@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { runInNewContext } from 'node:vm';
+import { CHATKIT_APP } from '@/config/playground/chatkit.asset.js';
 import { PLAYGROUND_APP } from '@/config/playground/playground.assets.js';
 
 class Element extends EventEmitter {
@@ -66,8 +67,8 @@ function setup(deferFrames = false) {
   };
   const socket = Object.assign(new EventEmitter(), { connected: true });
   const writeText = vi.fn().mockResolvedValue(undefined);
-  runInNewContext(PLAYGROUND_APP, {
-    io: () => socket,
+  runInNewContext(PLAYGROUND_APP.replace(CHATKIT_APP, ''), {
+    createChatkitTransport: () => socket,
     document: {
       querySelector: query,
       querySelectorAll: () => [],
@@ -134,7 +135,7 @@ describe('chat interruption handling', () => {
     },
   );
 
-  it('shows reconnecting while Socket.IO retries an active response', () => {
+  it('shows reconnecting when the chat transport disconnects', () => {
     const ui = setup();
     ui.socket.emit('disconnect');
     const status = ui.body.children.find(

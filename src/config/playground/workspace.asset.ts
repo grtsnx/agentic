@@ -107,7 +107,7 @@ function createWorkspacePanel() {
     const headers={...(credentials?{Authorization:'Bearer '+credentials.token}:{}),...options.headers};
     const response=await fetch('/v1/workspaces'+path,{...options,headers,signal:AbortSignal.timeout(65000)});
     const payload=response.status===204?{}:await response.json();
-    if(!response.ok) throw new Error(typeof payload.message==='string'?payload.message:'The workspace request failed.');
+    if(!response.ok){const error=new Error(typeof payload.message==='string'?payload.message:'The workspace request failed.');error.status=response.status;throw error;}
     return payload.data??payload;
   }
   async function ensure() {
@@ -128,7 +128,7 @@ function createWorkspacePanel() {
     uploadNotice.toggleAttribute('data-error',error);
   }
   async function fileBlob(file) {
-    const response=await fetch('/v1/workspaces/'+credentials.id+'/files/'+file.id+'/content',{headers:{Authorization:'Bearer '+credentials.token},signal:AbortSignal.timeout(15000)});
+    const response=await fetch('/v1/chatkit/'+credentials.id+'/files/'+file.id,{headers:{Authorization:'Bearer '+credentials.token},signal:AbortSignal.timeout(15000)});
     if(!response.ok)throw new Error('Unable to load this file. It may have expired.');
     return response.blob();
   }
@@ -192,7 +192,7 @@ function createWorkspacePanel() {
         previewDocument=doc;previewPage=1;document.querySelector('#attachment-preview-pager').hidden=false;
         await renderPdfPage();
       } else {
-        const result=await request('/'+credentials.id+'/files/'+file.id+'/preview');
+        const result={text:await (await fileBlob(file)).text()};
         if(current!==previewVersion)return;
         previewBody.replaceChildren(text('pre',result.text||'This document has no extractable text.'));
       }
@@ -239,20 +239,21 @@ function createWorkspacePanel() {
   }
   function moveToMessage(body,content) {
     const files=attachedFiles.filter(file=>!sentFileIds.has(file.id));
-    if(!files.length)return;
+    if(!files.length)return [];
     const row=text('div','');row.className='message-attachments';row.setAttribute('role','list');row.setAttribute('aria-label','Sent attachments');
     for(const file of files)row.append(createFileCard(file,false));
     body.insertBefore(row,content);
     // Sent files remain available to this chat, but are no longer composer drafts.
     for(const file of files)sentFileIds.add(file.id);
     renderFiles();uploadStatus('');
+    return files.map(file=>file.id);
   }
   async function refresh() {
     if(!credentials) return;
     const current=generation;
     const data=await request('/'+credentials.id);
     if(current!==generation) return;
-    attachedFiles=data.files;renderFiles();
+    attachedFiles=[...chatTransport.files,...data.files];renderFiles();
     for(const action of data.approvals) renderApproval(action);
   }
   function renderApproval(action) {
@@ -334,9 +335,17 @@ function createWorkspacePanel() {
       if(current===generation){uploading=false;attach.disabled=false;pendingFiles=[];fileInput.value='';renderFiles();}
     }
   });
-  return {moveToMessage,isUploading:()=>uploading,credentials:()=>credentials?{workspaceId:credentials.id,workspaceToken:credentials.token}:{},prepare:ensure,refresh:()=>refresh().catch(error=>{uploadStatus(error.message,true);}),
-    reset:async()=>{generation++;preview.close();clearPreview();for(const url of fileUrls.values())URL.revokeObjectURL(url);fileUrls.clear();fileLoads.clear();uploading=false;pendingFiles=[];attachedFiles=[];sentFileIds.clear();attach.disabled=false;fileInput.value='';renderFiles();uploadStatus('');const previous=credentials;credentials=undefined;for(const timer of approvalTimers)clearTimeout(timer);approvalTimers.clear();approvalCards.clear();
-      if(previous) await fetch('/v1/workspaces/'+previous.id,{method:'DELETE',headers:{Authorization:'Bearer '+previous.token},signal:AbortSignal.timeout(10000)}).catch(()=>{});
+  return {moveToMessage,
+    renderSent(body,content,ids){const files=attachedFiles.filter(file=>ids.includes(file.id));if(!files.length)return;const row=text('div','');row.className='message-attachments';row.setAttribute('role','list');row.setAttribute('aria-label','Sent attachments');for(const file of files)row.append(createFileCard(file,false));body.insertBefore(row,content);},
+    useFiles(files){attachedFiles=files;sentFileIds.clear();for(const file of files)sentFileIds.add(file.id);renderFiles();},
+    clearDrafts:async()=>{if(!credentials)return;for(const file of attachedFiles.filter(file=>!sentFileIds.has(file.id)))await request('/'+credentials.id+'/files/'+file.id,{method:'DELETE'});},
+    isUploading:()=>uploading,credentials:()=>credentials?{workspaceId:credentials.id,workspaceToken:credentials.token}:{},prepare:ensure,refresh:()=>refresh().catch(error=>{uploadStatus(error.message,true);}),
+    reset:async(preserveOwner=false)=>{
+      // New chat also recovers an expired owner capability. Never discard a live
+      // owner on a network error, since that would strand its history.
+      if(preserveOwner&&credentials){try{await request('/'+credentials.id);}catch(error){if([401,404].includes(error.status)){credentials=undefined;preserveOwner=false;}else throw error;}}
+      await workspacePanel.clearDrafts();generation++;preview.close();clearPreview();for(const url of fileUrls.values())URL.revokeObjectURL(url);fileUrls.clear();fileLoads.clear();uploading=false;pendingFiles=[];attachedFiles=[];sentFileIds.clear();attach.disabled=false;fileInput.value='';renderFiles();uploadStatus('');const previous=credentials;if(!preserveOwner)credentials=undefined;for(const timer of approvalTimers)clearTimeout(timer);approvalTimers.clear();approvalCards.clear();
+      if(previous&&!preserveOwner) await fetch('/v1/workspaces/'+previous.id,{method:'DELETE',headers:{Authorization:'Bearer '+previous.token},signal:AbortSignal.timeout(10000)}).catch(()=>{});
     }};
 }
 const workspacePanel=createWorkspacePanel();

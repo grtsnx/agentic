@@ -8,7 +8,6 @@ const baseUrl = `http://localhost:${environment.PORT}`;
 const logger = new ConsoleLogger('Bootstrap');
 if (environment.REALTIME_PLAYGROUND_ENABLED) {
   logger.log(`Playground: ${baseUrl}/playground`);
-  logger.log(`ChatKit: ${baseUrl}/playground/chatkit`);
 }
 logger.log('CLI: bun run chat');
 

@@ -79,6 +79,7 @@ function setup() {
     AbortSignal,
     URL,
     active: false,
+    chatTransport: { files: [] },
     setTimeout: vi.fn(),
     clearTimeout: vi.fn(),
   };

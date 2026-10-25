@@ -268,7 +268,7 @@ describe('AppController (e2e)', () => {
     );
   });
 
-  it('serves a same-origin Socket.IO playground and local assets', async () => {
+  it('serves the unified ChatKit playground and LiveKit assets', async () => {
     const page = await request(app.getHttpServer())
       .get('/playground')
       .expect('Content-Type', /text\/html/)
@@ -303,12 +303,16 @@ describe('AppController (e2e)', () => {
     expect(orbCore.text).not.toMatch(/from ["']react["']/);
 
     expect(page.text).toContain('<title>Agentic</title>');
-    expect(page.text).toContain('/socket.io/socket.io.js');
+    expect(page.text).toContain('id="message"');
+    expect(page.text).not.toContain('<openai-chatkit');
+    expect(page.text).not.toContain('/socket.io/socket.io.js');
+    expect(script.text).toContain('threads.add_user_message');
+
     expect(page.text).toContain('/playground/app.js');
     expect(page.text).toContain('/playground/livekit-client.js');
     expect(page.text).toContain('/playground/livekit-app.js');
     expect(page.text).toContain('id="voice-connect"');
-    expect(page.text).toContain('class="voice-visualizer"');
+
     expect(page.text).toContain('id="voice-session"');
     expect(page.text).toContain('id="voice-bars"');
     expect(page.text).toContain('id="voice-transcript"');
@@ -338,17 +342,15 @@ describe('AppController (e2e)', () => {
     expect(livekit.text).toContain('LivekitClient');
     expect(page.text).not.toContain('https://hoppscotch.io');
     expect(page.text).not.toContain('/v1/chat');
-    expect(page.text).toContain("What's on your mind?");
+
     expect(page.text).not.toContain('Activity log');
     expect(page.text).not.toContain('id="events"');
     expect(() => new Function(script.text)).not.toThrow();
     expect(() => new Function(livekitApp.text)).not.toThrow();
-    expect(script.text).toContain("io('/v1/chat'");
-    expect(script.text).toContain("socket.on('chat.status'");
-    expect(script.text).toContain('formatDuration');
+
     expect(styles.text).toContain('color-scheme: light');
     expect(styles.text).toContain('.activity-canvas');
-    expect(script.text).toContain("import('/playground/orb-engine.js')");
+
     expect(styles.text).toContain(".voice-status[data-state='thinking']");
     expect(styles.text).toContain('.voice-session:not([hidden])');
     expect(styles.text).toContain('.voice-transcript-panel');

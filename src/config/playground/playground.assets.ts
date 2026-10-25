@@ -1,4 +1,9 @@
 import {
+  CHATKIT_APP,
+  CHATKIT_HISTORY_VIEW,
+  CHATKIT_STYLES,
+} from './chatkit.asset.js';
+import {
   WORKSPACE_ATTACHMENTS,
   WORKSPACE_ATTACH_BUTTON,
   WORKSPACE_SHEET,
@@ -28,13 +33,6 @@ export const PLAYGROUND_PAGE = `<!doctype html>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
     <title>Agentic</title>
-    <script>
-      try {
-        if (localStorage.getItem('agentic-playground-theme') === 'dark') {
-          document.documentElement.dataset.theme = 'dark';
-        }
-      } catch {}
-    </script>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,${encodeURIComponent(AGENTIC_FAVICON)}" />
     <link rel="stylesheet" href="/playground/styles.css" />
   </head>
@@ -46,13 +44,12 @@ export const PLAYGROUND_PAGE = `<!doctype html>
           <span>Agentic</span>
         </a>
         <div class="topbar-actions">
-          <a class="quiet-button" href="/playground/chatkit">ChatKit</a>
+          <button id="history" class="theme-toggle" type="button" aria-label="Conversation history"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2.6 7M3 4v7h7M12 7v5l3 2"/></svg></button>
           <span id="connection" class="sr-only" role="status">Connecting</span>
           <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Use dark theme">
             <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.53 1.72a.75.75 0 0 1 .16.82A8.97 8.97 0 0 0 9 6a9 9 0 0 0 9 9 8.97 8.97 0 0 0 3.46-.69.75.75 0 0 1 .98.98 10.5 10.5 0 0 1-9.69 6.46c-5.8 0-10.5-4.7-10.5-10.5 0-4.37 2.67-8.11 6.46-9.7a.75.75 0 0 1 .82.17Z"/></svg>
             <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
           </button>
-          <button id="new-chat" class="quiet-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New chat</button>
         </div>
       </header>
 
@@ -104,15 +101,15 @@ export const PLAYGROUND_PAGE = `<!doctype html>
             </div>
           </div>
         </div>
-        <p class="disclaimer">Agentic can make mistakes. Check important information.</p>
+        <p class="disclaimer">Agentic can make mistakes.</p>
       </footer>
     </div>
 
     ${ANSWER_ACTIONS_VIEW}
+    ${CHATKIT_HISTORY_VIEW}
     ${VOICE_PLAYGROUND_VIEW}
 
     <div id="voice-audio" aria-hidden="true"></div>
-    <script src="/socket.io/socket.io.js"></script>
     <script src="/playground/livekit-client.js"></script>
     <script src="/playground/app.js"></script>
     <script src="/playground/livekit-app.js"></script>
@@ -120,7 +117,8 @@ export const PLAYGROUND_PAGE = `<!doctype html>
 </html>`;
 
 export const PLAYGROUND_APP = `(() => {
-  const socket = io('/v1/chat', { transports: ['websocket'] });
+  ${CHATKIT_APP}
+  const chatTransport = createChatkitTransport();
   const elements = {
     connection: document.querySelector('#connection'),
     themeToggle: document.querySelector('#theme-toggle'),
@@ -152,6 +150,7 @@ export const PLAYGROUND_APP = `(() => {
       );
     }
   }
+  try {applyTheme(localStorage.getItem('agentic-playground-theme'));} catch {}
   if (themeRoot?.dataset && elements.themeToggle) {
     elements.themeToggle.addEventListener('click', () => {
       const next = themeRoot.dataset.theme === 'dark' ? 'light' : 'dark';
@@ -214,7 +213,7 @@ export const PLAYGROUND_APP = `(() => {
 
   function setActive(value) {
     active = value;
-    elements.send.disabled = value || !socket.connected;
+    elements.send.disabled = value || !chatTransport.connected;
     elements.stop.hidden = !value;
     elements.send.hidden = value;
     elements.newChat.disabled = value;
@@ -341,9 +340,9 @@ export const PLAYGROUND_APP = `(() => {
 
   async function send() {
     const message = elements.message.value.trim();
-    if (!message || active || !socket.connected || workspacePanel.isUploading()) return;
+    if (!message || active || chatTransport.busy || !chatTransport.connected || workspacePanel.isUploading()) return;
     const userMessage=createMessage('user', message);
-    workspacePanel.moveToMessage(userMessage.body,userMessage.content);
+    const attachments = workspacePanel.moveToMessage(userMessage.body,userMessage.content);
     assistantMessage = undefined;
     createAssistant();
     startElapsed();
@@ -354,13 +353,16 @@ export const PLAYGROUND_APP = `(() => {
     try {
       await workspacePanel.prepare();
       if(assistantMessage!==pending)return;
-      if(!socket.connected)throw new Error('Connection lost. Please try again.');
-      socket.emit('chat.send', { message, ...workspacePanel.credentials() });
+      if(!chatTransport.connected)throw new Error('Connection lost. Please try again.');
+      chatTransport.emit('chat.send', { message, attachments, ...workspacePanel.credentials() });
     } catch(error){if(assistantMessage===pending)interruptResponse(error.message);}
   }
 
-  function resetConversation() {
-    void workspacePanel.reset();
+  async function resetConversation() {
+    if(active || chatTransport.busy)return;
+    chatkitWidgets.clear();
+    try {await workspacePanel.reset(true);} catch(error) {setConnection('offline',error.message);return;}
+    chatTransport.newThread();
     clearReconnectTimer();
     assistantMessage?.orb.dispose();
     closeSources();
@@ -368,19 +370,20 @@ export const PLAYGROUND_APP = `(() => {
     elements.messages.replaceChildren();
     elements.empty.hidden = false;
     elements.message.value = '';
+    document.querySelector('#chat-history').close();
     elements.message.focus?.({ preventScroll: true });
     assistantMessage = undefined;
     startedAt = undefined;
-    socket.disconnect();
-    socket.connect();
+    chatTransport.disconnect();
+    chatTransport.connect();
   }
 
-  socket.on('connect', () => {
+  chatTransport.on('connect', () => {
     const wasRecovering = active;
     clearReconnectTimer();
     setConnection('online', 'Online');
     if (wasRecovering) {
-      // Socket.IO cannot resume a server stream after a transport loss. Be
+      // A disconnected HTTP stream cannot resume automatically. Be
       // explicit instead of leaving the user looking at a stale spinner.
       interruptResponse('Connection restored. The previous response was interrupted. Please send it again.');
       return;
@@ -388,7 +391,7 @@ export const PLAYGROUND_APP = `(() => {
     setActive(false);
   });
 
-  socket.on('disconnect', () => {
+  chatTransport.on('disconnect', () => {
     if (!active) {
       stopElapsed();
       setConnection('offline', 'Offline');
@@ -398,13 +401,13 @@ export const PLAYGROUND_APP = `(() => {
     showReconnecting();
     clearReconnectTimer();
     reconnectTimer = setTimeout(() => {
-      if (active && !socket.connected) {
+      if (active && !chatTransport.connected) {
         interruptResponse('The connection could not be restored. Please try again.');
       }
     }, 12000);
   });
 
-  socket.on('connect_error', () => {
+  chatTransport.on('connect_error', () => {
     if (active) {
       showReconnecting();
       return;
@@ -416,20 +419,20 @@ export const PLAYGROUND_APP = `(() => {
 
   globalThis.addEventListener?.('offline', showReconnecting);
   globalThis.addEventListener?.('online', () => {
-    if (active && !socket.connected) showReconnecting();
+    if (active && !chatTransport.connected) showReconnecting();
   });
 
-  socket.on('chat.started', () => {
+  chatTransport.on('chat.started', () => {
     setActive(true);
     if (startedAt === undefined) startElapsed();
     updateStatus({ phase: 'thinking', message: 'Thinking' });
   });
 
-  socket.on('chat.status', (data) => {
+  chatTransport.on('chat.status', (data) => {
     updateStatus(data);
   });
 
-  socket.on('chat.delta', (data) => {
+  chatTransport.on('chat.delta', (data) => {
     const message = ensureAssistant();
     message.status.hidden = true;
     message.orb.setVisible(false);
@@ -444,7 +447,7 @@ export const PLAYGROUND_APP = `(() => {
     });
   });
 
-  socket.on('chat.completed', (data) => {
+  chatTransport.on('chat.completed', (data) => {
     void workspacePanel.refresh();
     const message = ensureAssistant();
     stopElapsed();
@@ -461,11 +464,11 @@ export const PLAYGROUND_APP = `(() => {
     scrollToLatest();
   });
 
-  socket.on('chat.cancelling', () => {
+  chatTransport.on('chat.cancelling', () => {
     updateStatus({ phase: 'thinking', message: 'Stopping' });
   });
 
-  socket.on('chat.cancelled', () => {
+  chatTransport.on('chat.cancelled', () => {
     void workspacePanel.refresh();
     const message = ensureAssistant();
     stopElapsed();
@@ -479,13 +482,34 @@ export const PLAYGROUND_APP = `(() => {
     startedAt = undefined;
   });
 
-  socket.on('chat.error', (data) => {
+  chatTransport.on('chat.error', (data) => {
     void workspacePanel.refresh();
     interruptResponse(data.message ?? 'The response could not be completed. Please try again.');
   });
 
+  chatTransport.on('chat.widget', (item) => renderChatkitWidget(item));
+  chatTransport.on('chat.history', (items) => {
+    assistantMessage?.orb.dispose();
+    stopElapsed();
+    closeSources();
+    chatkitWidgets.clear();
+    elements.message.value = '';
+    elements.messages.replaceChildren();
+    elements.empty.hidden = !items.length;
+    assistantMessage = undefined;
+    for (const item of items) {
+      if (item.type === 'user_message') {
+        const message = createMessage('user', item.content.map(part => part.text).join('\\n'));
+        workspacePanel.renderSent(message.body, message.content, item.attachments.map(file => file.id));
+      } else if (item.type === 'assistant_message') {
+        const message = createAssistant();
+        message.rawText = item.content.map(part => part.text).join('\\n');
+        chatTransport.deliver('chat.completed', {response: item.agentic ?? {message:message.rawText, sources:[]}});
+      } else renderChatkitWidget(item);
+    }
+  });
   elements.send.addEventListener('click', send);
-  elements.stop.addEventListener('click', () => socket.emit('chat.cancel', {}));
+  elements.stop.addEventListener('click', () => chatTransport.emit('chat.cancel', {}));
   elements.newChat.addEventListener('click', resetConversation);
   for (const starter of document.querySelectorAll('.prompt-starter')) {
     starter.addEventListener('click', () => {
@@ -509,6 +533,7 @@ export const PLAYGROUND_APP = `(() => {
 })();`;
 
 export const PLAYGROUND_STYLES = `
+${CHATKIT_STYLES}
 ${WORKSPACE_STYLES}
 ${ANSWER_ACTIONS_STYLES}:root {
   color-scheme: light;

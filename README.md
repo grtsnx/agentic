@@ -17,13 +17,12 @@ Add `OPENAI_API_KEY` to `.env`, then start the API:
 bun run start:dev
 ```
 
-| Interface  | URL or command                           |
-| ---------- | ---------------------------------------- |
-| Playground | http://localhost:3001/playground         |
-| ChatKit    | http://localhost:3001/playground/chatkit |
-| Swagger    | http://localhost:3001/api                |
-| Scalar     | http://localhost:3001/docs               |
-| Text CLI   | `bun run chat`                           |
+| Interface  | URL or command                   |
+| ---------- | -------------------------------- |
+| Playground | http://localhost:3001/playground |
+| Swagger    | http://localhost:3001/api        |
+| Scalar     | http://localhost:3001/docs       |
+| Text CLI   | `bun run chat`                   |
 
 Chat uses a local heuristic router: simple requests go to `gpt-5-nano`; engineering tasks, attachment questions, and complex follow-ups go to `gpt-6-luna`. Follow-ups use bounded recent user context, and ordinary new topics can return to Nano. Optional Clef-flash classification can override this local fallback. Responses include input/output tokens, model usage, and estimated model cost.
 
@@ -39,15 +38,15 @@ See [.env.example](.env.example) for settings and defaults. Configuration is val
 
 ## ChatKit
 
-Open `/playground/chatkit`, or choose **ChatKit** in the playground header. This additional view uses the official OpenAI web component and a NestJS adapter for the [custom-server ChatKit protocol](https://developers.openai.com/api/docs/guides/custom-chatkit). The existing workspace service runs the agent, shared instructions, tools, model routing, and approval policy. No Agent Builder workflow or Python server is needed.
+The main `/playground` keeps Agentic’s custom layout, composer, source drawer, attachments, and LiveKit voice view. Its browser client uses our [ChatKit protocol backend](https://developers.openai.com/api/docs/guides/custom-chatkit) for streamed replies, conversation history, and approval actions. It does not embed the default ChatKit web component. `/playground/chatkit` redirects to the same playground.
 
-The view supports streamed replies, real processing updates, source annotations, token/cost metadata, thread history, rename/delete, cancellation, and inline approval cards. **Voice & files** returns to the original playground for LiveKit and uploads. ChatKit uploads, voice, feedback, and retry are not enabled in this first integration; unsupported protocol requests are rejected explicitly.
+- Attach multiple files with the plus button. Sent files appear above your message and remain previewable.
+- Open the history icon to continue or delete a conversation. History is available within the current page session; server memory expires after 30 minutes or a restart. No database or Redis is required.
+- Approvals remain explicit and bound to one action. Network failures never automatically retry them.
+- The microphone opens the existing LiveKit voice view. Voice transcripts appear in the visible conversation, but are not saved into ChatKit text history.
+- `CHATKIT_DOMAIN_KEY` is only relevant to clients embedding the official hosted component. This custom playground does not need it or load its CDN script. REST, Socket.IO, and CLI remain available.
 
-Localhost works with the development domain-key placeholder. For a deployed site, register its origin in the [OpenAI domain allowlist](https://platform.openai.com/settings/organization/security/domain-allowlist), set the public `CHATKIT_DOMAIN_KEY` in `.env`, and restart. `REALTIME_PLAYGROUND_ENABLED` gates both the view and protocol endpoint. The component is loaded from OpenAI's CDN and requires internet access; application API keys stay on the server.
-
-Browser access uses an expiring workspace capability stored in that tab's session storage. Every thread has its own model session and is scoped to that capability. Histories are memory-only, expire within 30 minutes, and disappear on restart. The existing workspace capacity and turn/context limits still apply. For production, replace anonymous capability issuance with your application's user authentication before exposing this playground publicly.
-
-Verify the adapter without provider costs: `bun run test:e2e -- test/e2e/chatkit/chatkit.e2e-spec.ts`. For a live check, start the app, open the ChatKit URL, send a short greeting, then send a follow-up and confirm the response, usage card, and history. This uses your configured model provider and incurs normal usage charges.
+Run `bun run test:e2e -- test/e2e/chatkit/chatkit.e2e-spec.ts` for isolated protocol tests. For a live check, run the app, open `/playground`, attach a small text file, ask about its contents, then open history and continue the conversation. Normal provider usage charges apply.
 
 ## Optional Clef routing
 
@@ -115,7 +114,7 @@ Keep the API running and start the worker in a second terminal:
 bun run voice:dev
 ```
 
-Open the playground, click the microphone, and allow microphone access. Both processes must run for voice replies. If playback is blocked, select **Tap to hear Agentic**. After changing voice settings, restart the worker and start a new conversation.
+Open the playground, select **Voice** in the composer, and allow microphone access. Both processes must run for voice replies. If playback is blocked, select **Tap to hear Agentic**. After changing voice settings, restart the worker and start a new conversation.
 
 `VOICE_PROVIDER=livekit` bills inference through LiveKit Cloud. Use `VOICE_PROVIDER=openai` with `OPENAI_API_KEY` for direct OpenAI inference through the same LiveKit transport.
 
@@ -164,9 +163,9 @@ The playground displays streamed answers, citations, sources, and usage. For ext
 
 ## Files, actions, and specialists
 
-Click the **+ attach icon** inside the playground message box to upload JPG, PNG, PDF, DOCX, or UTF-8 TXT, Markdown, CSV, and JSON files. Select multiple files in the picker to attach them together. Click an attachment card to preview it, or its **×** to remove it. PDFs show one rendered page at a time; DOCX previews show extracted text. Attachments appear above the input until you send, then move above your message with clickable previews; ask about them in chat. Approval requests appear directly in the conversation with the exact action, risk, scope, and **Approve once** or **Deny** controls. Limits are five files, 1 MiB per file, and 2 MiB per workspace. Retrieval returns scoped chunks with filenames and chunk numbers; uploaded text is treated as untrusted evidence. PDF and DOCX text is extracted locally; images can be inspected by the model. Scanned PDFs do not have OCR yet. Parsing is limited to 50 PDF pages, 200,000 extracted document characters, and 10 seconds. Encrypted or malformed documents are rejected. Removing an attachment stops future file access but does not erase quotes already present in chat history. Embedding-based retrieval is not supported yet.
+Click the **+ attach icon** inside the playground message box to upload JPG, PNG, PDF, DOCX, or UTF-8 TXT, Markdown, CSV, and JSON files. Select multiple files in the picker to attach them together. Use **×** to remove a draft attachment. After sending, attachments move above your message; choose the corresponding **Preview** button to inspect a file. PDFs use the browser PDF viewer; DOCX previews show extracted text. Ask about the attached files in chat. Approval requests appear directly in the conversation with the exact action, risk, scope, and **Approve once** or **Deny** controls. Limits are five files, 1 MiB per file, and 2 MiB per workspace. Retrieval returns scoped chunks with filenames and chunk numbers; uploaded text is treated as untrusted evidence. PDF and DOCX text is extracted locally; images can be inspected by the model. Scanned PDFs do not have OCR yet. Parsing is limited to 50 PDF pages, 200,000 extracted document characters, and 10 seconds. Encrypted or malformed documents are rejected. Removing an attachment stops future file access but does not erase quotes already present in chat history. Embedding-based retrieval is not supported yet.
 
-Workspaces expire after 30 minutes, allow one active operation and 50 chat turns, and use an independent bearer capability. The playground keeps that token in memory. REST clients create a workspace with `POST /v1/workspaces` and send its token as `Authorization: Bearer TOKEN` on subsequent workspace routes. Socket.IO clients send `workspaceId` and `workspaceToken` with `chat.send`. See Swagger for upload, retrieval, messages, delegation, approvals, cancellation, and audit endpoints.
+Workspaces expire after 30 minutes, allow one active operation and 50 chat turns, and use an independent bearer capability. The playground keeps its expiring owner token in tab session storage and creates a separate workspace for each thread. REST clients create a workspace with `POST /v1/workspaces` and send its token as `Authorization: Bearer TOKEN` on subsequent workspace routes. Socket.IO clients send `workspaceId` and `workspaceToken` with `chat.send`. See Swagger for upload, retrieval, messages, delegation, approvals, cancellation, and audit endpoints.
 
 In the text CLI, use `/workspace` or `/attach PATH`, `/actions`, and `/approve ID`, `/deny ID`, or `/cancel ID`. The playground and CLI show the exact proposed code or file deletion, target, risk, and expiration before approval. A decision applies once to that immutable action and expires after five minutes. Models cannot approve their own actions. Safe reads run automatically; uploaded-file reads require the workspace capability. Message and payment tiers are classified but have no execution adapters yet.
 
@@ -252,7 +251,7 @@ src/
 │   ├── livekit/          # Voice agent, worker, and console setup.
 │   ├── openai/           # Model routing, delegation budgets, and provider errors.
 │   ├── schema/           # Zod schemas and categorized types/.
-│   └── playground/       # Original chat/voice UI and the additional ChatKit view.
+│   └── playground/       # Custom chat UI, ChatKit transport, previews, and LiveKit voice.
 ├── dto/                  # API input and output contracts.
 ├── lib/                  # Provider integrations, Clef routing, and ChatKit protocol adapter.
 ├── middleware/           # Filters, interceptors, errors, and shared utilities.
@@ -299,9 +298,9 @@ Ordered from foundations to advanced capabilities. ✅ Verified complete · ⬜ 
 
 - ✅ Add a CLI that uses the same application services as the REST API.
 - ✅ Stream model output over the CLI and a versioned Socket.IO namespace.
-- ✅ Provide an embedded same-origin playground for testing Socket.IO streams.
-- ✅ Add ChatKit alongside the playground with shared agent execution, streamed replies, thread history, citations, usage, and inline approvals.
-- ⬜ Extend ChatKit with uploads and voice after validating their protocol support.
+- ✅ Provide an embedded same-origin playground; keep Socket.IO available to API clients.
+- ✅ Use ChatKit in the main Agentic UI with shared execution, thread history, citations, usage, and inline approvals.
+- ✅ Support scoped multi-file uploads and previews with the existing LiveKit composer entry point.
 - ✅ Add LiveKit Cloud voice with environment-switched LiveKit Inference and direct OpenAI adapters.
 - ✅ Issue short-lived, room-scoped, microphone-only voice tokens without exposing secrets.
 - ✅ Run a named TypeScript voice worker with shared chat/voice instructions.

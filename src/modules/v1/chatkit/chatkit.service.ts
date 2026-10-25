@@ -3,12 +3,16 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  PayloadTooLargeException,
   type OnModuleDestroy,
 } from '@nestjs/common';
 import { ChatkitAdapterService } from '@/lib';
 import { describeException } from '@/middleware';
 import {
   chatkitRequestSchema,
+  WORKSPACE_MAX_BYTES,
+  type UploadedDocument,
+  type WorkspaceFile,
   type ChatkitEvent,
   type ChatkitInput,
   type ChatkitItem,
@@ -36,6 +40,56 @@ export class ChatkitService implements OnModuleDestroy {
     );
   }
 
+  async upload(owner: WorkspaceScope, file: UploadedDocument) {
+    const uploaded = await this.workspaces.files.upload(owner, file);
+    return this.adapter.attachment(
+      this.workspaces.files.get(owner, uploaded.id),
+    );
+  }
+
+  file(owner: WorkspaceScope, id: string): WorkspaceFile {
+    this.expire();
+    const staged = owner.files.get(id);
+    if (staged) return staged;
+    for (const thread of this.threads.values()) {
+      if (thread.ownerId === owner.id && thread.scope.files.has(id))
+        return thread.scope.files.get(id)!;
+    }
+    throw new NotFoundException('File not found or expired.');
+  }
+
+  private attach(
+    thread: ChatkitThread,
+    input: ChatkitInput,
+    owner: WorkspaceScope,
+  ) {
+    const files = [...new Set(input.attachments)].map((id) => {
+      const file = owner.files.get(id) ?? thread.scope.files.get(id);
+      if (!file)
+        throw new NotFoundException(
+          'Attachment not found in this conversation.',
+        );
+      return file;
+    });
+    const merged = new Map(thread.scope.files);
+    for (const file of files) merged.set(file.id, file);
+    if (
+      merged.size > 5 ||
+      [...merged.values()].reduce((sum, file) => sum + file.bytes, 0) >
+        WORKSPACE_MAX_BYTES
+    )
+      throw new PayloadTooLargeException(
+        'Limit: five files and 2 MiB per conversation.',
+      );
+    // Validate the whole set before synchronously moving staging files into this
+    // thread. Other threads cannot retrieve them through the model's tools.
+    for (const file of files) {
+      thread.scope.files.set(file.id, file);
+      owner.files.delete(file.id);
+    }
+    return files;
+  }
+
   process(body: unknown, owner: WorkspaceScope, signal: AbortSignal) {
     const parsed = chatkitRequestSchema.safeParse(body);
     if (!parsed.success)
@@ -43,6 +97,12 @@ export class ChatkitService implements OnModuleDestroy {
     const request = parsed.data;
     this.expire();
     owner.abort.signal.throwIfAborted();
+    if (request.type === 'attachments.delete') {
+      // Removing a draft attachment must not delete files already sent to a thread.
+      if (owner.files.has(request.params.attachment_id))
+        this.workspaces.files.delete(owner, request.params.attachment_id);
+      return { json: {} };
+    }
     if (request.type === 'threads.list') {
       const records = [...this.threads.values()].filter(
         (thread) => thread.ownerId === owner.id,
@@ -69,14 +129,21 @@ export class ChatkitService implements OnModuleDestroy {
         ownerSignal: owner.abort.signal,
         scope,
         createdAt: new Date().toISOString(),
-        title: request.params.input.content
-          .map((part) => part.text)
-          .join(' ')
-          .slice(0, 80),
+        title:
+          request.params.input.content
+            .map((part) => part.text)
+            .join(' ')
+            .slice(0, 80) || 'Attachments',
         items: [],
         approvals: new Map(),
         busy: false,
       };
+      try {
+        this.attach(thread, request.params.input, owner);
+      } catch (error) {
+        this.workspaces.store.remove(scope);
+        throw error;
+      }
       this.threads.set(scope.id, thread);
       return {
         stream: this.respond(thread, request.params.input, owner, signal, true),
@@ -103,6 +170,7 @@ export class ChatkitService implements OnModuleDestroy {
         return { json: {} };
       case 'threads.add_user_message':
         this.requireIdle(thread);
+        this.attach(thread, request.params.input, owner);
         return {
           stream: this.respond(thread, request.params.input, owner, signal),
         };
@@ -146,16 +214,27 @@ export class ChatkitService implements OnModuleDestroy {
         ...this.adapter.base(thread.scope.id),
         type: 'user_message',
         content: input.content,
-        attachments: [],
+        attachments: input.attachments.map((id) =>
+          this.adapter.attachment(thread.scope.files.get(id)!),
+        ),
         inference_options: {},
         quoted_text: input.quoted_text,
       };
       thread.items.push(user);
       yield { type: 'thread.item.done', item: user };
+      if (input.attachments.length) {
+        const files = this.adapter.files(
+          thread.scope.id,
+          input.attachments.map((id) => thread.scope.files.get(id)!),
+        );
+        thread.items.push(files);
+        yield { type: 'thread.item.done', item: files };
+      }
       yield { type: 'stream_options', stream_options: { allow_cancel: true } };
       yield { type: 'thread.item.added', item: assistant };
       const message =
-        input.content.map((part) => part.text).join('\n') +
+        (input.content.map((part) => part.text).join('\n') ||
+          'Help me understand the attached files.') +
         (input.quoted_text ? `\nQuoted context:\n${input.quoted_text}` : '');
       for await (const event of this.workspaces.stream(
         thread.scope,
@@ -182,6 +261,7 @@ export class ChatkitService implements OnModuleDestroy {
       if (!finalResponse) throw new Error('Stream ended without completion');
       signal.throwIfAborted();
       assistant.content[0] = this.adapter.content(finalResponse);
+      assistant.agentic = finalResponse;
       const usage = this.adapter.usage(thread.scope.id, finalResponse);
       // Drain the workspace stream before committing the completed turn. Persist the
       // final UI items together so a disconnect cannot leave half a completed reply.

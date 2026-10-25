@@ -13,10 +13,9 @@ const input = z
       .array(
         z.object({ type: z.literal('input_text'), text: z.string().max(8000) }),
       )
-      .min(1)
       .max(20),
-    // Uploads remain in the original playground until a ChatKit file-store adapter is added.
-    attachments: z.array(z.string()).max(0).default([]),
+    // Only server-issued file IDs are accepted, never client-provided URLs or metadata.
+    attachments: z.array(z.string().uuid()).max(5).default([]),
     quoted_text: z.string().max(8000).nullish(),
     inference_options: z
       .object({ model: z.null().optional(), tool_choice: z.null().optional() })
@@ -24,7 +23,10 @@ const input = z
   })
   .superRefine((value, context) => {
     const text = value.content.map((part) => part.text).join('\n');
-    if (!text.trim() || text.length + (value.quoted_text?.length ?? 0) > 8000)
+    if (
+      (!text.trim() && !value.attachments.length) ||
+      text.length + (value.quoted_text?.length ?? 0) > 8000
+    )
       context.addIssue({
         code: 'custom',
         message: 'Enter a message of at most 8000 characters.',
@@ -43,6 +45,10 @@ export const chatkitRequestSchema = z.discriminatedUnion('type', [
     params: z.object({ thread_id: threadId }),
   }),
   z.object({ type: z.literal('threads.list'), params: pagination }),
+  z.object({
+    type: z.literal('attachments.delete'),
+    params: z.object({ attachment_id: z.string().uuid() }),
+  }),
   z.object({
     type: z.literal('items.list'),
     params: pagination.extend({ thread_id: threadId }),

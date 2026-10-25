@@ -1,6 +1,8 @@
 import type { z } from 'zod';
-import type { Widgets } from '@openai/chatkit';
+import type { Attachment, Widgets } from '@openai/chatkit';
 import type { chatkitRequestSchema } from '../../chatkit/chatkit.schema.js';
+import type { OpenaiStreamResponse } from '../openai/openai.types.js';
+import type { WorkspaceFile } from '../workspaces/workspace.types.js';
 import type { WorkspaceScope } from '../workspaces/workspace.types.js';
 
 export type ChatkitRequest = z.infer<typeof chatkitRequestSchema>;
@@ -26,11 +28,15 @@ export type ChatkitItem = {
   | {
       type: 'user_message';
       content: ChatkitInput['content'];
-      attachments: [];
+      attachments: Attachment[];
       inference_options: {};
       quoted_text?: string | null;
     }
-  | { type: 'assistant_message'; content: ChatkitContent[] }
+  | {
+      type: 'assistant_message';
+      content: ChatkitContent[];
+      agentic?: OpenaiStreamResponse;
+    }
   | { type: 'widget'; widget: Widgets.Card; copy_text?: string }
 );
 export type ChatkitThread = {
@@ -78,4 +84,8 @@ export type ChatkitThreadView = {
   created_at: string;
   status: { type: 'active' };
   items: ChatkitPage<ChatkitItem>;
+  files: Pick<
+    WorkspaceFile,
+    'id' | 'filename' | 'mime' | 'bytes' | 'kind' | 'pages'
+  >[];
 };
