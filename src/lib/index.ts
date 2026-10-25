@@ -10,4 +10,11 @@ export {
   openaiRuntimeSchema,
   type OpenaiRuntime,
 } from './openai/schema/openai-runtime.schema.js';
+export {
+  openaiStreamEventSchema,
+  openaiStreamResponseSchema,
+  type OpenaiStreamEvent,
+  type OpenaiStreamResponse,
+} from './openai/schema/openai-stream.schema.js';
 export { OpenaiService } from './openai/openai.service.js';
+export type { OpenaiStreamOptions } from './openai/openai.service.js';

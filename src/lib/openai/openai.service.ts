@@ -1,10 +1,15 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
-import { Agent, run } from '@openai/agents';
+import { Agent, MemorySession, run } from '@openai/agents';
 import {
   openaiOutputSchema,
   openaiResponseSchema,
   type OpenaiResponse,
 } from './schema/openai-output.schema.js';
+import {
+  openaiStreamResponseSchema,
+  type OpenaiStreamEvent,
+} from './schema/openai-stream.schema.js';
+import type { OpenaiRuntime } from './schema/openai-runtime.schema.js';
 
 const MODEL_NAME = 'gpt-6-astra';
 const TOKENS_PER_MILLION = 1_000_000;
@@ -17,6 +22,26 @@ interface TokenDetails {
   [key: string]: number | TokenDetails;
 }
 
+interface RuntimeSource {
+  state: {
+    usage: {
+      requests: number;
+      inputTokens: number;
+      outputTokens: number;
+      totalTokens: number;
+      inputTokensDetails: TokenDetails[];
+      outputTokensDetails: TokenDetails[];
+    };
+  };
+  newItems: Array<{ type: string; toolName?: string }>;
+  rawResponses: Array<{ providerData?: Record<string, unknown> }>;
+}
+
+export interface OpenaiStreamOptions {
+  session?: MemorySession;
+  signal?: AbortSignal;
+}
+
 @Injectable()
 export class OpenaiService {
   private readonly agent = new Agent({
@@ -25,6 +50,16 @@ export class OpenaiService {
     model: MODEL_NAME,
     outputType: openaiOutputSchema,
   });
+
+  private readonly streamingAgent = new Agent({
+    name: 'History tutor',
+    instructions: 'You answer history questions clearly and concisely.',
+    model: MODEL_NAME,
+  });
+
+  createSession(): MemorySession {
+    return new MemorySession();
+  }
 
   async generateReply(message: string): Promise<OpenaiResponse> {
     const result = await run(this.agent, message);
@@ -36,6 +71,49 @@ export class OpenaiService {
 
     // Validate model-controlled data before attaching server-controlled runtime metadata.
     const output = openaiOutputSchema.parse(result.finalOutput);
+
+    return openaiResponseSchema.parse({
+      ...output,
+      runtime: this.buildRuntime(result),
+    });
+  }
+
+  async *streamReply(
+    message: string,
+    options: OpenaiStreamOptions = {},
+  ): AsyncGenerator<OpenaiStreamEvent> {
+    const stream = await run(this.streamingAgent, message, {
+      stream: true,
+      session: options.session,
+      signal: options.signal,
+    });
+
+    for await (const event of stream) {
+      if (
+        event.type === 'raw_model_stream_event' &&
+        event.data.type === 'output_text_delta'
+      ) {
+        yield { type: 'delta', delta: event.data.delta };
+      }
+    }
+
+    await stream.completed;
+    if (!stream.finalOutput) {
+      throw new ServiceUnavailableException(
+        'The AI provider returned no streamed output',
+      );
+    }
+
+    yield {
+      type: 'completed',
+      response: openaiStreamResponseSchema.parse({
+        message: stream.finalOutput,
+        runtime: this.buildRuntime(stream),
+      }),
+    };
+  }
+
+  private buildRuntime(result: RuntimeSource): OpenaiRuntime {
     const usage = result.state.usage;
     const tools = this.countCalls(
       result.newItems
@@ -52,36 +130,33 @@ export class OpenaiService {
       }),
     );
 
-    return openaiResponseSchema.parse({
-      ...output,
-      runtime: {
-        tokens: {
-          input: usage.inputTokens,
-          output: usage.outputTokens,
-          total: usage.totalTokens,
-          cachedInput: this.sumTokenDetail(
-            usage.inputTokensDetails,
-            'cached_tokens',
-          ),
-          reasoningOutput: this.sumTokenDetail(
-            usage.outputTokensDetails,
-            'reasoning_tokens',
-          ),
-        },
-        cost: {
-          estimatedUsd: this.estimateModelCost(usage),
-          currency: 'USD',
-          exact: false,
-          // Tool pricing varies by tool, so the model estimate covers the full run only without tools.
-          includesToolCosts: tools.length === 0,
-        },
-        models:
-          models.length > 0
-            ? models
-            : [{ name: MODEL_NAME, calls: usage.requests }],
-        tools,
+    return {
+      tokens: {
+        input: usage.inputTokens,
+        output: usage.outputTokens,
+        total: usage.totalTokens,
+        cachedInput: this.sumTokenDetail(
+          usage.inputTokensDetails,
+          'cached_tokens',
+        ),
+        reasoningOutput: this.sumTokenDetail(
+          usage.outputTokensDetails,
+          'reasoning_tokens',
+        ),
       },
-    });
+      cost: {
+        estimatedUsd: this.estimateModelCost(usage),
+        currency: 'USD',
+        exact: false,
+        // Tool pricing varies by tool, so the model estimate covers the full run only without tools.
+        includesToolCosts: tools.length === 0,
+      },
+      models:
+        models.length > 0
+          ? models
+          : [{ name: MODEL_NAME, calls: usage.requests }],
+      tools,
+    };
   }
 
   private countCalls(names: string[]): Array<{ name: string; calls: number }> {

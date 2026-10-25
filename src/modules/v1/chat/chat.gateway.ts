@@ -1,0 +1,131 @@
+import { randomUUID } from 'node:crypto';
+import { UseFilters } from '@nestjs/common';
+import {
+  ConnectedSocket,
+  MessageBody,
+  SubscribeMessage,
+  WebSocketGateway,
+  type OnGatewayConnection,
+  type OnGatewayDisconnect,
+  type WsResponse,
+} from '@nestjs/websockets';
+import { catchError, concat, finalize, from, map, of, type Observable } from 'rxjs';
+import type { Socket } from 'socket.io';
+import { ChatV1RequestDto } from '@/dto';
+import { OpenaiService } from '@/lib';
+import { WebsocketExceptionFilter } from '@/middleware';
+
+interface ConnectionState {
+  abortController?: AbortController;
+  session: ReturnType<OpenaiService['createSession']>;
+}
+
+type ChatSocketResponse = WsResponse<Record<string, unknown>>;
+
+@UseFilters(WebsocketExceptionFilter)
+@WebSocketGateway({ path: '/v1/chat/ws', maxPayload: 8 * 1024 })
+export class ChatV1Gateway
+  implements OnGatewayConnection<Socket>, OnGatewayDisconnect<Socket>
+{
+  private readonly connections = new WeakMap<Socket, ConnectionState>();
+
+  constructor(private readonly openaiService: OpenaiService) {}
+
+  handleConnection(client: Socket): void {
+    this.connections.set(client, { session: this.openaiService.createSession() });
+  }
+
+  handleDisconnect(client: Socket): void {
+    this.connections.get(client)?.abortController?.abort();
+    this.connections.delete(client);
+  }
+
+  @SubscribeMessage('chat.send')
+  sendMessage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() request: ChatV1RequestDto,
+  ): Observable<ChatSocketResponse> {
+    const state = this.getConnectionState(client);
+    if (state.abortController) {
+      return of({
+        event: 'chat.error',
+        data: {
+          code: 'CHAT_BUSY',
+          message: 'Wait for the active response or cancel it first.',
+        },
+      });
+    }
+
+    const requestId = randomUUID();
+    const abortController = new AbortController();
+    state.abortController = abortController;
+
+    const response$ = from(
+      this.openaiService.streamReply(request.message.trim(), {
+        session: state.session,
+        signal: abortController.signal,
+      }),
+    ).pipe(
+      map((event): ChatSocketResponse =>
+        event.type === 'delta'
+          ? {
+              event: 'chat.delta',
+              data: { requestId, delta: event.delta },
+            }
+          : {
+              event: 'chat.completed',
+              data: { requestId, response: event.response },
+            },
+      ),
+      catchError(() =>
+        of({
+          event: abortController.signal.aborted
+            ? 'chat.cancelled'
+            : 'chat.error',
+          data: {
+            requestId,
+            ...(abortController.signal.aborted
+              ? {}
+              : {
+                  code: 'STREAM_FAILED',
+                  message: 'The chat stream could not be completed.',
+                }),
+          },
+        }),
+      ),
+      finalize(() => {
+        if (state.abortController === abortController) {
+          state.abortController = undefined;
+        }
+      }),
+    );
+
+    return concat(
+      of({ event: 'chat.started', data: { requestId } }),
+      response$,
+    );
+  }
+
+  @SubscribeMessage('chat.cancel')
+  cancel(@ConnectedSocket() client: Socket): ChatSocketResponse {
+    const state = this.getConnectionState(client);
+    if (!state.abortController) {
+      return {
+        event: 'chat.error',
+        data: { code: 'NO_ACTIVE_CHAT', message: 'There is no active chat.' },
+      };
+    }
+
+    state.abortController.abort();
+    return { event: 'chat.cancelling', data: {} };
+  }
+
+  private getConnectionState(client: Socket): ConnectionState {
+    const current = this.connections.get(client);
+    if (current) return current;
+
+    const state = { session: this.openaiService.createSession() };
+    this.connections.set(client, state);
+    return state;
+  }
+}
