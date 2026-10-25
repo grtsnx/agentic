@@ -20,13 +20,21 @@
     "types": ["vitest/globals", "node"],
     "paths": {
       "@/app": ["./src/app/app.module.ts"],
+      "@/app/*": ["./src/app/*"],
       "@/config": ["./src/config/index.ts"],
+      "@/config/*": ["./src/config/*"],
       "@/config/schema": ["./src/config/schema/index.ts"],
+      "@/config/schema/*": ["./src/config/schema/*"],
       "@/config/web-tools": ["./src/config/web-tools/index.ts"],
+      "@/config/web-tools/*": ["./src/config/web-tools/*"],
       "@/dto": ["./src/dto/index.ts"],
+      "@/dto/*": ["./src/dto/*"],
       "@/lib": ["./src/lib/index.ts"],
+      "@/lib/*": ["./src/lib/*"],
       "@/middleware": ["./src/middleware/index.ts"],
+      "@/middleware/*": ["./src/middleware/*"],
       "@/modules": ["./src/modules/index.ts"],
+      "@/modules/*": ["./src/modules/*"],
       "@/*": ["./src/*"]
     }
   }

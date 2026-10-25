@@ -10,6 +10,13 @@ export const PLAYGROUND_PAGE = `<!doctype html>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
     <title>Agentic</title>
+    <script>
+      try {
+        if (localStorage.getItem('agentic-playground-theme') === 'dark') {
+          document.documentElement.dataset.theme = 'dark';
+        }
+      } catch {}
+    </script>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,${encodeURIComponent(AGENTIC_FAVICON)}" />
     <link rel="stylesheet" href="/playground/styles.css" />
   </head>
@@ -21,10 +28,11 @@ export const PLAYGROUND_PAGE = `<!doctype html>
           <span>Agentic</span><span class="brand-divider" aria-hidden="true">/</span><span class="workspace-label">Your workspace</span>
         </a>
         <div class="topbar-actions">
-          <span id="connection" class="connection" role="status">
-            <span class="connection-dot" aria-hidden="true"></span>
-            Connecting
-          </span>
+          <span id="connection" class="sr-only" role="status">Connecting</span>
+          <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Use dark theme">
+            <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.5A8.5 8.5 0 1 1 9.5 3 7 7 0 0 0 21 14.5Z"/></svg>
+            <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          </button>
           <button id="new-chat" class="quiet-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New chat</button>
         </div>
       </header>
@@ -32,7 +40,6 @@ export const PLAYGROUND_PAGE = `<!doctype html>
       <main id="conversation" class="conversation">
         <section id="empty-state" class="empty-state">
           <span class="welcome-aura" aria-hidden="true"><i></i><i></i><i></i><span>${AGENTIC_SYMBOL}</span></span>
-          <span class="welcome-eyebrow">A little space for big ideas</span>
           <h1>What's on your mind?</h1>
           <p>Work through an idea, find an answer, or talk it out.</p>
           <div class="prompt-starters" aria-label="Ideas to get started">
@@ -59,7 +66,6 @@ export const PLAYGROUND_PAGE = `<!doctype html>
           <textarea id="message" rows="1" maxlength="8000" placeholder="Ask anything, or think out loud…"></textarea>
           <div class="composer-actions">
             <div class="composer-status">
-              <span class="composer-model" title="The model is selected automatically for your request"><span aria-hidden="true">✦</span> Auto</span>
               <span class="composer-hint">Enter to send · Shift + Enter for a new line</span>
               <span id="voice-status" class="voice-status" role="status" hidden>
                 <span class="voice-visualizer" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
@@ -94,6 +100,7 @@ export const PLAYGROUND_APP = `(() => {
   const socket = io('/v1/chat', { transports: ['websocket'] });
   const elements = {
     connection: document.querySelector('#connection'),
+    themeToggle: document.querySelector('#theme-toggle'),
     conversation: document.querySelector('#conversation'),
     empty: document.querySelector('#empty-state'),
     message: document.querySelector('#message'),
@@ -108,6 +115,40 @@ export const PLAYGROUND_APP = `(() => {
   let elapsedTimer;
   let responseStarted = false;
   let startedAt;
+
+  const themeRoot = document.documentElement;
+  function applyTheme(theme) {
+    if (!themeRoot?.dataset) return;
+    if (theme === 'dark') themeRoot.dataset.theme = 'dark';
+    else delete themeRoot.dataset.theme;
+    if (elements.themeToggle) {
+      elements.themeToggle.setAttribute(
+        'aria-label',
+        theme === 'dark' ? 'Use light theme' : 'Use dark theme',
+      );
+    }
+  }
+  if (themeRoot?.dataset && elements.themeToggle) {
+    elements.themeToggle.addEventListener('click', () => {
+      const next = themeRoot.dataset.theme === 'dark' ? 'light' : 'dark';
+      applyTheme(next);
+      try {
+        localStorage.setItem('agentic-playground-theme', next);
+      } catch {}
+    });
+  }
+
+  function setConnection(state, label) {
+    if (themeRoot?.dataset) themeRoot.dataset.connection = state;
+    if (elements.connection) elements.connection.textContent = label;
+  }
+
+  function syncScrollFade() {
+    elements.conversation.classList?.toggle?.(
+      'scroll-fade',
+      Boolean(elements.empty.hidden),
+    );
+  }
 
   function scrollToLatest() {
     requestAnimationFrame(() => {
@@ -149,6 +190,7 @@ export const PLAYGROUND_APP = `(() => {
 
   function createMessage(role, text = '') {
     elements.empty.hidden = true;
+    syncScrollFade();
     const article = document.createElement('article');
     article.className = 'message ' + role;
     const avatar = document.createElement('div');
@@ -277,6 +319,7 @@ export const PLAYGROUND_APP = `(() => {
     stopElapsed();
     elements.messages.replaceChildren();
     elements.empty.hidden = false;
+    syncScrollFade();
     elements.message.value = '';
     assistantMessage = undefined;
     responseStarted = false;
@@ -286,23 +329,20 @@ export const PLAYGROUND_APP = `(() => {
   }
 
   socket.on('connect', () => {
-    elements.connection.lastChild.textContent = ' Online';
-    elements.connection.dataset.state = 'online';
+    setConnection('online', 'Online');
     setActive(false);
   });
 
   socket.on('disconnect', () => {
     if (active) interruptResponse('Connection interrupted. This answer is incomplete; send your request again once connected.');
     stopElapsed();
-    elements.connection.lastChild.textContent = ' Offline';
-    elements.connection.dataset.state = 'offline';
+    setConnection('offline', 'Offline');
     setActive(false);
   });
 
   socket.on('connect_error', () => {
     stopElapsed();
-    elements.connection.lastChild.textContent = ' Connection failed';
-    elements.connection.dataset.state = 'offline';
+    setConnection('offline', 'Connection failed');
     setActive(false);
   });
 
@@ -380,6 +420,7 @@ export const PLAYGROUND_APP = `(() => {
 
 export const PLAYGROUND_STYLES = `:root {
   color-scheme: light;
+  --spacing: 0.25rem;
   --background: #ffffff;
   --surface: #ffffff;
   --surface-subtle: #f7f7f8;
@@ -398,9 +439,10 @@ body { margin: 0; overflow: hidden; background: var(--background); color: var(--
 button, textarea { font: inherit; }
 button { color: inherit; }
 .app-shell { display: grid; grid-template-rows: 76px minmax(0, 1fr) auto; height: 100%; height: 100dvh; background: radial-gradient(ellipse 45% 50% at 50% 45%, #f5f7fc85, transparent 100%), #fff; }
-.topbar { display: flex; align-items: center; justify-content: space-between; padding: 0 34px; border-bottom: 1px solid #f0f0f1; background: #ffffffd9; }
+.topbar { display: flex; align-items: center; justify-content: space-between; padding: 0 34px; background: #ffffffd9; }
 .brand { display: inline-flex; align-items: center; gap: 12px; color: var(--text); text-decoration: none; font-size: .94rem; font-weight: 650; letter-spacing: -.035em; }
-.brand-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 11px; color: #fff; background: var(--accent); }
+.brand-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 11px; color: #fff; background: var(--accent); transition: background .2s ease; }
+html[data-connection='online'] .brand-mark { background: var(--success); }
 .agentic-symbol { display: block; width: 26px; height: 26px; }
 .welcome-aura .agentic-symbol { width: 38px; height: 38px; filter: drop-shadow(0 2px 8px #5f74b744); }
 .avatar .agentic-symbol { width: 24px; height: 24px; }
@@ -439,7 +481,6 @@ button:focus-visible, a:focus-visible { outline: 3px solid #9aaee9; outline-offs
 .welcome-aura i:nth-child(2) { inset: 9px; border-color: #c6b3e06b; transform: rotate(45deg); }
 .welcome-aura i:nth-child(3) { inset: 13px; border-color: #ffffffa6; transform: rotate(90deg); background: linear-gradient(130deg, #ffffff70, #9eabe86b); }
 .welcome-aura > span { z-index: 1; color: #fff; text-shadow: 0 2px 12px #5f74b75c; font-size: 1.6rem; }
-.welcome-eyebrow { margin-bottom: 16px; color: #7d88a3; font-size: .63rem; font-weight: 500; letter-spacing: .055em; }
 .prompt-starters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; width: min(640px, 100%); margin-top: 36px; }
 .prompt-starter { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 18px; border: 1px solid #e9ecf3; border-radius: 16px; color: #4c566c; background: #ffffffb8; text-align: left; cursor: pointer; transition: border-color .2s, box-shadow .2s, transform .2s; }
 .prompt-starter:hover { border-color: #c7d0e8; box-shadow: 0 7px 20px #455a910a; transform: translateY(-2px); }
@@ -450,16 +491,38 @@ button:focus-visible, a:focus-visible { outline: 3px solid #9aaee9; outline-offs
 .prompt-starter > span:not(.starter-icon):not(.starter-arrow) { color: #7c8698; font-size: .64rem; line-height: 1.4; }
 .starter-arrow { position: absolute; top: 20px; right: 17px; color: #b0bacb; font-size: .82rem; }
 .composer:focus-within { border-color: #becbe6; box-shadow: 0 0 0 3px #eff3fc80, 0 16px 45px -22px #46577938; }
-.composer-model { display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px; border: 1px solid #eceff5; border-radius: 7px; color: #77839b; font-size: .63rem; }
-.composer-model > span { color: #93a1bf; }
-
-.connection { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: .68rem; }
-.connection-dot { width: 7px; height: 7px; border-radius: 999px; background: #a1a1aa; }
-.connection[data-state='online'] .connection-dot { background: var(--success); box-shadow: 0 0 0 3px #dcfce7; }
-.connection[data-state='offline'] .connection-dot { background: var(--danger); }
+.theme-toggle { display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 1px solid var(--border); border-radius: 10px; color: var(--muted); background: var(--surface); cursor: pointer; }
+.theme-toggle:hover { color: var(--text); background: var(--surface-subtle); }
+.theme-toggle svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+html:not([data-theme='dark']) .theme-icon-sun,
+html[data-theme='dark'] .theme-icon-moon { display: none; }
 .quiet-button { display: inline-flex; align-items: center; gap: 7px; padding: 9px 13px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); cursor: pointer; font-size: .73rem; font-weight: 500; }
 .quiet-button:hover { background: var(--surface-subtle); }
 .quiet-button:disabled { cursor: not-allowed; opacity: .5; }
+@property --scroll-fade-t { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --scroll-fade-b { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@keyframes scroll-fade-reveal-t { from { --scroll-fade-t: 0px; } to { --scroll-fade-t: var(--_scroll-fade-size-t); } }
+@keyframes scroll-fade-reveal-b { from { --scroll-fade-b: var(--_scroll-fade-size-b); } to { --scroll-fade-b: 0px; } }
+.scroll-fade {
+  --_scroll-fade-size-t: min(12%, calc(var(--spacing) * 10));
+  --_scroll-fade-size-b: min(12%, calc(var(--spacing) * 10));
+  --scroll-fade-block: linear-gradient(to bottom, transparent 0, #000 var(--scroll-fade-t, 0px), #000 calc(100% - var(--scroll-fade-b, 0px)), transparent 100%);
+  -webkit-mask-image: var(--scroll-fade-block);
+  mask-image: var(--scroll-fade-block);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+@supports (animation-timeline: scroll()) {
+  .scroll-fade {
+    animation: scroll-fade-reveal-t 1ms ease-in-out, scroll-fade-reveal-b 1ms ease-in-out;
+    animation-timeline: scroll(self y), scroll(self y);
+    animation-range: 0 calc(var(--spacing) * 24), calc(100% - calc(var(--spacing) * 24)) 100%;
+    animation-fill-mode: both;
+  }
+}
+@supports not (animation-timeline: scroll()) {
+  .scroll-fade { --scroll-fade-t: var(--_scroll-fade-size-t); --scroll-fade-b: var(--_scroll-fade-size-b); }
+}
 .conversation { overflow-y: auto; scroll-behavior: smooth; }
 .empty-state { display: flex; min-height: 100%; flex-direction: column; align-items: center; justify-content: center; padding: 34px 24px 42px; text-align: center; }
 .empty-state[hidden] { display: none; }
@@ -516,9 +579,51 @@ textarea::placeholder { color: #8a93a5; }
 @keyframes voice-think { 50% { height: 10px; transform: translateY(-2px); } }
 @keyframes voice-wave { 50% { height: 13px; } }
 @keyframes voice-session-enter { from { opacity: 0; transform: scale(.985); } }
-@media (max-width: 640px) { .app-shell { grid-template-rows: 62px minmax(0, 1fr) auto; } .workspace-label, .brand-divider { display: none; } .empty-state { padding: 30px 20px; } .welcome-aura { width: 62px; height: 62px; margin-bottom: 18px; } .prompt-starters { gap: 8px; margin-top: 26px; } .prompt-starter { padding: 12px; border-radius: 13px; } .prompt-starter strong { font-size: .66rem; } .prompt-starter > span:not(.starter-icon):not(.starter-arrow), .starter-arrow { display: none; } .empty-state p { font-size: .8rem; max-width: 270px; } .composer-wrap, .messages { width: calc(100% - 28px); } .composer-wrap { padding-bottom: 12px; } .composer { padding: 14px 13px 10px; border-radius: 20px; } .topbar { padding: 0 18px; } .connection, .voice-status { font-size: 0; } .connection-dot { margin-right: 2px; } .messages { padding-top: 28px; } .composer-hint { display: none; } }
+@media (max-width: 640px) { .app-shell { grid-template-rows: 62px minmax(0, 1fr) auto; } .workspace-label, .brand-divider { display: none; } .empty-state { padding: 30px 20px; } .welcome-aura { width: 62px; height: 62px; margin-bottom: 18px; } .prompt-starters { gap: 8px; margin-top: 26px; } .prompt-starter { padding: 12px; border-radius: 13px; } .prompt-starter strong { font-size: .66rem; } .prompt-starter > span:not(.starter-icon):not(.starter-arrow), .starter-arrow { display: none; } .empty-state p { font-size: .8rem; max-width: 270px; } .composer-wrap, .messages { width: calc(100% - 28px); } .composer-wrap { padding-bottom: 12px; } .composer { padding: 14px 13px 10px; border-radius: 20px; } .topbar { padding: 0 18px; } .voice-status { font-size: 0; } .messages { padding-top: 28px; } .composer-hint { display: none; } }
 
 @media (max-width: 640px) { textarea { font-size: 16px; } .send-button, .stop-button, .voice-button { width: 44px; height: 44px; } .quiet-button { min-height: 44px; } .composer-wrap { padding-bottom: max(12px, env(safe-area-inset-bottom)); } }
-@media (max-height: 500px) { .empty-state { justify-content: flex-start; padding-top: 24px; padding-bottom: 24px; } .welcome-aura { width: 48px; height: 48px; margin-bottom: 14px; } .welcome-eyebrow { margin-bottom: 10px; } .prompt-starters { margin-top: 20px; } textarea { max-height: 100px; } }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
+@media (max-height: 500px) { .empty-state { justify-content: flex-start; padding-top: 24px; padding-bottom: 24px; } .welcome-aura { width: 48px; height: 48px; margin-bottom: 14px; } .prompt-starters { margin-top: 20px; } textarea { max-height: 100px; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } .scroll-fade { animation-duration: 1ms !important; } }
+html[data-theme='dark'] {
+  color-scheme: dark;
+  --background: #000000;
+  --surface: #171b24;
+  --surface-subtle: #222733;
+  --text: #e8ebf2;
+  --muted: #a7b0c0;
+  --border: #2d3340;
+  --accent: #3c4658;
+}
+html[data-theme='dark'] body,
+html[data-theme='dark'] .app-shell { background: #000000; }
+html[data-theme='dark'] .topbar { background: #000000; }
+html[data-theme='dark'] .workspace-label,
+html[data-theme='dark'] .empty-state p,
+html[data-theme='dark'] .disclaimer,
+html[data-theme='dark'] .composer-hint,
+html[data-theme='dark'] .message-label { color: #9aa3b5; }
+html[data-theme='dark'] .quiet-button,
+html[data-theme='dark'] .theme-toggle,
+html[data-theme='dark'] .avatar { background: #1c212c; }
+html[data-theme='dark'] .prompt-starter { border-color: #2c3342; color: #d5dbe6; background: #1a1e28; }
+html[data-theme='dark'] .prompt-starter strong { color: #eef1f6; }
+html[data-theme='dark'] .starter-icon { border-color: #323848; background: #222838; }
+html[data-theme='dark'] .composer-wrap { background: linear-gradient(to top, #000000 78%, #00000000); }
+html[data-theme='dark'] .composer { border-color: #31384a; background: #171b24; }
+html[data-theme='dark'] .user .message-content { border-color: #343b4d; color: #e4e8f1; background: #242a38; }
+html[data-theme='dark'] .assistant .avatar { border-color: #343b4d; color: #c5d0f5; background: #1c2433; }
+html[data-theme='dark'] .runtime-chips span { border-color: #31384a; color: #b7c0d0; background: #1c212c; }
+html[data-theme='dark'] .voice-session { color: #e8ebf2; background: #000000; }
+html[data-theme='dark'] .voice-session-header,
+html[data-theme='dark'] .voice-transcript-panel > header,
+html[data-theme='dark'] .voice-transcript-panel > footer { border-color: #2a3040; }
+html[data-theme='dark'] .voice-stage,
+html[data-theme='dark'] .voice-transcript-panel { border-color: #2a3040; background: #141820; }
+html[data-theme='dark'] .voice-back,
+html[data-theme='dark'] .voice-control,
+html[data-theme='dark'] .voice-start { color: #e8ebf2; }
+html[data-theme='dark'] .voice-participant,
+html[data-theme='dark'] .voice-transcript-turn.user .words { border-color: #31384a; background: #1c212c; }
+html[data-connection='online'] .brand-mark,
+html[data-connection='online'] .voice-session-brand .brand-mark { background: var(--success); }
 `;

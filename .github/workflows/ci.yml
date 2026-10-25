@@ -14,12 +14,21 @@ concurrency:
 
 jobs:
   quality:
-    name: Quality and security
-    runs-on: ubuntu-latest
+    name: Quality and security (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -47,16 +56,44 @@ jobs:
       - name: Build application
         run: bun run build
 
+      - name: Load the native voice worker without credentials or microphone access
+        run: node dist/voice.js --help
+
       - name: Audit dependencies
+        if: runner.os == 'Linux'
         run: bun audit --audit-level=high
 
+      - name: Validate Compose configuration
+        if: runner.os == 'Linux'
+        env:
+          AGENTIC_ENV_FILE: .env.example
+        run: docker compose --profile voice config --quiet
+
       - name: Build runtime image
-        run: docker build --tag agentic:ci .
+        if: runner.os == 'Linux'
+        run: docker build --tag agentic:local .
+
+      - name: Verify native voice bindings in the runtime image
+        if: runner.os == 'Linux'
+        run: docker run --rm --network none --read-only --tmpfs /tmp agentic:local node dist/voice.js --help
+
+      - name: Verify Compose API health
+        if: runner.os == 'Linux'
+        env:
+          AGENTIC_ENV_FILE: .env.example
+        run: docker compose up -d --no-build --wait --wait-timeout 90 api
+
+      - name: Stop Compose test services
+        if: always() && runner.os == 'Linux'
+        env:
+          AGENTIC_ENV_FILE: .env.example
+        run: docker compose --profile voice down
 
       - name: Scan runtime image
+        if: runner.os == 'Linux'
         uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7
         with:
-          image: agentic:ci
+          image: agentic:local
           fail-build: true
           severity-cutoff: high
           only-fixed: true

@@ -1,28 +1,32 @@
 # syntax=docker/dockerfile:1.7
 
-FROM oven/bun:1.4.3-alpine@sha256:629e17411f1f129dbec3af78d5af9c9f2a937435c80349437206c6b0b7422373 AS dependencies
+# LiveKit RTC ships glibc bindings; Alpine/musl cannot load them.
+FROM oven/bun:1.4.3@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598 AS dependencies
 WORKDIR /app
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile
+RUN --mount=type=cache,id=agentic-bun,target=/root/.bun/install/cache,sharing=locked bun install --frozen-lockfile
 
 FROM dependencies AS build
 COPY nest-cli.json tsconfig.json tsconfig.build.json ./
 COPY src ./src
 RUN bun run build
 
-FROM oven/bun:1.4.3-alpine@sha256:629e17411f1f129dbec3af78d5af9c9f2a937435c80349437206c6b0b7422373 AS production-dependencies
+FROM oven/bun:1.4.3@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598 AS production-dependencies
 WORKDIR /app
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile --production
+RUN --mount=type=cache,id=agentic-bun,target=/root/.bun/install/cache,sharing=locked bun install --frozen-lockfile --production
 
-FROM node:26.12.1-alpine3.23@sha256:bc2b334006f15c7167bbeb2f08f28c2df883f7594a0470e04454ebe7560cfe68 AS runtime
+FROM node:26.12.1-bookworm-slim@sha256:28147155d47dc31abe0a46e0d12b59b2fb3d0a2dcc5dc65fce76a074180b16fe AS runtime
 ENV NODE_ENV=production \
     PORT=3000
 WORKDIR /app
 
 # Apply available OS fixes and remove npm from the runtime attack surface.
 # The application starts with node and never installs packages at runtime.
-RUN apk upgrade --no-cache \
+RUN apt-get update \
+  && apt-get upgrade -y \
+  && apt-get install -y --no-install-recommends ca-certificates libstdc++6 \
+  && rm -rf /var/lib/apt/lists/* \
   && rm -rf /usr/local/lib/node_modules/npm \
   && rm -f /usr/local/bin/npm /usr/local/bin/npx
 

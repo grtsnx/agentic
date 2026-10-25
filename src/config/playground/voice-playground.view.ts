@@ -14,7 +14,7 @@ export const VOICE_PLAYGROUND_VIEW = `
           Back to chat
         </button>
       </header>
-      <div class="voice-session-layout">
+      <div class="voice-session-layout scroll-fade">
         <main class="voice-stage">
           <div class="voice-stage-topline">
             <span id="voice-elapsed" class="voice-elapsed" aria-label="Call duration">00:00</span>
@@ -57,7 +57,7 @@ export const VOICE_PLAYGROUND_VIEW = `
         </main>
         <aside id="voice-transcript-panel" class="voice-transcript-panel" aria-label="Live voice transcript">
           <header><div><span class="voice-eyebrow">Every word, together</span><h2>Conversation</h2></div><span id="voice-live-label" class="live-pill">Ready</span></header>
-          <div id="voice-transcript" class="voice-transcript" role="log" aria-live="polite" aria-relevant="additions text">
+          <div id="voice-transcript" class="voice-transcript scroll-fade" role="log" aria-live="polite" aria-relevant="additions text">
             <div id="voice-transcript-empty" class="voice-transcript-empty">
               <div class="voice-empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-8l-5 3v-3H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/><path d="M7 8h10M7 12h6"/></svg></div>
               <h3>Be in the conversation.</h3><p>Your words appear here as you speak.<br>We'll keep your place.</p>

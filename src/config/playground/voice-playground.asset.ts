@@ -33,7 +33,7 @@ export const LIVEKIT_BROWSER_APP = `(() => {
     'agent-speaking': ['Agentic is speaking', 'A thought for you.', 'You can jump in whenever you like.'],
     thinking: ['Thinking it through', 'Let me think.', 'Making a little space for a good answer.'],
     muted: ['Microphone muted', 'Take a moment.', "Unmute whenever you're ready to continue."],
-    disconnected: ['Conversation ended', 'Good talking with you.', 'Your conversation is still here. Start again whenever you like.'],
+    disconnected: ['', 'Good talking with you.', 'Your conversation is still here. Start again whenever you like.'],
     error: ['Something interrupted us', "Let's try again.", 'Check your connection, then start a new conversation.'],
   };
 
@@ -64,10 +64,11 @@ export const LIVEKIT_BROWSER_APP = `(() => {
   function renderState(state, detail) {
     const [label, title, hint] = copy[state] || copy.idle;
     elements.session.dataset.state = state;
-    elements.status.hidden = false;
+    elements.status.hidden = !label;
     elements.status.dataset.state = state;
     elements['status-label'].textContent = label;
     elements['session-state'].textContent = label;
+    elements['session-state'].hidden = !label;
     elements.title.textContent = title;
     elements['session-hint'].textContent = detail || hint;
     aura.setState(state);

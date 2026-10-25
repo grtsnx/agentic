@@ -135,6 +135,48 @@ The voice screen has a spacious Aura stage and a live transcript alongside it (b
 
 The visual direction uses the soft gradients and restrained controls of [this Dribbble voice assistant reference](https://dribbble.com/shots/26793063-AI-Assistant-Mobile-App-UI-Modern-Voice-Chat-Experience), with [LiveKit Agents UI](https://livekit.com/products/agents-ui) as the interaction reference. The renderer is framework-free and respects reduced motion.
 
+### Voice in the terminal
+
+Install the [LiveKit CLI](https://docs.livekit.io/reference/developer-tools/livekit-cli/) and use the same voice agent locally:
+
+```bash
+bun run voice:devices              # list microphone and speaker devices
+bun run voice:console              # build, load .env, and start voice mode
+bun run voice:console --text       # start without microphone capture
+```
+
+The launcher explicitly loads `.env` before starting the native console. In voice mode, press `m` to mute, `Ctrl+T` to switch between voice and text, `?` for shortcuts, and `q` to quit (`Ctrl+C` in text mode). The native developer console can display tool diagnostics; spoken replies use the shared Agentic instructions. Audio recording is off unless you explicitly use LiveKit's recording option.
+
+Validation on 2026-10-25: macOS microphone/speaker discovery and a synthetic audio turn through the same agent passed; the spoken name check returned “I'm Agentic.” The user also confirmed that human microphone capture and the audible reply worked on this Mac. Windows/Linux hardware checks remain pending because only the Mac is available. Console sessions do not join Cloud rooms and cannot validate Cloud Agent Observability.
+
+#### Windows and Linux setup
+
+Use Node.js 24 or newer, Bun, and the native LiveKit CLI. On Windows x64, install the CLI with `winget install --id LiveKit.LiveKitCLI --exact`, open a new terminal so PATH is refreshed, and enable microphone access for desktop apps in Windows privacy settings. On Linux x64 or ARM64, install the CLI using the [official installation instructions](https://docs.livekit.io/reference/developer-tools/livekit-cli/) and configure a working system audio input/output. Use a glibc distribution such as Ubuntu or Debian; the installed LiveKit RTC package does not supply Alpine/musl or Windows ARM64 bindings.
+
+Run `bun run voice:devices`, then select devices explicitly if needed:
+
+```bash
+bun run voice:console --input-device "Your microphone name" --output-device "Your speaker name"
+```
+
+Device names are passed as literal arguments to the native executable (`lk.exe` on Windows). The launcher preserves CLI failures as non-zero exit codes and reports a missing CLI with exit code 127. Native microphone access is separate from Docker or WSL; a working container alone does not validate desktop audio capture.
+
+CI is configured to build, type-check, run unit/end-to-end tests, and load the native voice worker on Windows, Linux, and macOS without credentials. The new matrix must run on GitHub before Windows and Linux x64 are marked verified. A local Linux ARM64 container check passed: native worker loading, API liveness/readiness, playground delivery, and LiveKit Cloud worker registration. These software checks do not validate microphone capture.
+
+#### Microphone validation on each platform
+
+Run the commands above on macOS, Windows, and Linux with a working microphone and speaker. Allow microphone access for the terminal when prompted. Say “Hello Agentic, repeat microphone check seven” and confirm the console receives that phrase and you hear the matching reply. Verify mute/unmute, switch to text with `Ctrl+T` and back to voice, then quit and confirm microphone capture stops. Record the OS, CLI version, devices, and outcome; device discovery or synthetic audio alone does not prove human microphone capture.
+
+| Platform | Device discovery                                   | Human speech and audible reply | Mute, mode switching, and shutdown |
+| -------- | -------------------------------------------------- | ------------------------------ | ---------------------------------- |
+| macOS    | ✅ MacBook Air microphone and speakers, CLI 2.19.2 | ✅ User confirmed, 2026-10-25  | ⬜ Pending                         |
+| Windows  | ⬜ Requires test machine                           | ⬜ Pending                     | ⬜ Pending                         |
+| Linux    | ⬜ Requires test machine                           | ⬜ Pending                     | ⬜ Pending                         |
+
+### Cloud observability
+
+In the selected Cloud project, open **Settings → Observability** and enable **Agent observability**. Start a new playground voice conversation with the worker running, end the conversation, then open its **Sessions → Agent insights** view and check for traces and logs. Older sessions do not backfill. The worker requests redacted traces and logs with audio and transcript retention disabled. Verified on 2026-10-25: session `RM_7pbfbScXGvNW` produced inference/speaking traces, session logs, and model latency metrics in Cloud Agent Insights; its temporary room and worker were cleaned up afterward. See [Agent insights](https://docs.livekit.io/testing/observability/insights/).
+
 ### Phone calls
 
 A Cloud API key does not include a telephone number. To receive calls, provision a [LiveKit phone number](https://docs.livekit.io/telephony/start/phone-numbers/), associate it with an inbound SIP dispatch rule targeting `LIVEKIT_AGENT_NAME`, and keep the named worker running. Follow LiveKit's [inbound-call testing guide](https://docs.livekit.io/telephony/testing/) to verify routing.
@@ -150,6 +192,18 @@ lk sip dispatch list --project agentic
 
 With no configured number, startup says telephony is unconfigured. The connected project had no number or inbound dispatch rule when checked on 2026-10-25; `LIVEKIT_PHONE_NUMBER` is therefore left empty locally.
 
+Available inventory checked on 2026-10-25 included US local **+1 484 740 8352** (Reading, Pennsylvania) and toll-free **+1 833 442 5405**. Availability can change; neither number is reserved or purchased.
+
+| Option                     | Number rental              | Inbound calling                                                        |
+| -------------------------- | -------------------------- | ---------------------------------------------------------------------- |
+| First US local number      | One included on every plan | Build includes 50 minutes; paid-plan allowances differ, then $0.01/min |
+| Additional US local number | $1/month on paid plans     | Same local-minute pricing                                              |
+| US toll-free number        | $2/month on paid plans     | $0.02/min                                                              |
+
+Prices are USD, checked against [LiveKit pricing](https://livekit.com/pricing) on 2026-10-25. Paid plans start at $50/month. Agent sessions and AI inference have separate charges and allowances. Direct LiveKit numbers are currently US-only; other countries require a supported SIP provider.
+
+Proposed dispatch design for approval: inbound calls to the approved number use a reusable individual dispatch rule, create a separate room per call with a random suffix, and dispatch `agentic-voice`. Bind the rule only to the approved number, keep audio/transcript retention disabled, and verify two simultaneous calls cannot share a room before enabling general access. Individual room names include the caller's phone number even with PII redaction; see [dispatch rules](https://docs.livekit.io/telephony/accepting-calls/dispatch-rule/). Purchase and Cloud dispatch changes remain pending explicit approval.
+
 ### LiveKit product coverage
 
 | Product                                                                     | Current integration                                                                                                                                                                                                                                                                                                             |
@@ -162,20 +216,7 @@ With no configured number, startup says telephony is unconfigured. The connected
 
 The connected Cloud project currently has no deployed Cloud agent and no purchased phone number. The local worker is intentional for development; deploy it only when a continuously hosted voice agent is required.
 
-### LiveKit TODO
-
-- ✅ Keep LiveKit SDK integration under `lib/` and expose voice through the v1 module.
-- ✅ Switch LiveKit Inference and direct OpenAI voice adapters with `VOICE_PROVIDER`.
-- ✅ Issue short-lived, room-scoped, microphone-only tokens without browser secrets.
-- ✅ Run a named TypeScript voice worker with shared chat/voice instructions.
-- ✅ Show participant-aware listening, thinking, speaking, transcript, and connection states.
-- ✅ Drive the Aura and separate participant meters from live audio, with responsive controls and reduced-motion support.
-- ✅ Document Cloud credentials and print the configured telephony number at startup.
-- ✅ Disable Cloud audio and transcript retention in worker configuration.
-- ⬜ Deploy the worker to a continuously hosted environment when local development is no longer sufficient.
-- ⬜ Enable and validate LiveKit Agent Observability in the Cloud project.
-- ⬜ Add telephony only after an explicitly approved phone-number purchase and SIP dispatch design.
-- ⬜ Add voice CLI input only after selecting and testing a cross-platform audio capture path.
+LiveKit implementation and remaining work are tracked in the [agent platform roadmap](#agent-platform-roadmap).
 
 ## Socket.IO chat
 
@@ -247,7 +288,7 @@ src/                      # Application source.
 ├── cli/                  # Standalone Nest application context for terminal commands.
 ├── config/               # Runtime configuration and executable application setup.
 │   ├── agent/            # Shared Agentic identity and channel-specific delivery rules.
-│   ├── livekit/          # LiveKit voice agent and worker configuration.
+│   ├── livekit/          # LiveKit agent, worker, and native console launcher.
 │   ├── schema/           # All Zod schemas, grouped by feature; shared inferred types.
 │   ├── web-tools/        # Tool registration, limits, source policy, and Nest wiring.
 │   └── playground/       # Same-origin chat and voice playground.
@@ -267,6 +308,8 @@ src/                      # Application source.
 ├── cli.ts                # Standalone CLI entry point.
 ├── main.ts               # HTTP and Socket.IO application entry point.
 └── voice.ts              # LiveKit Agents worker entry point.
+compose.yaml              # Local API and optional voice-worker services.
+Dockerfile                # Shared non-root Linux application image.
 test/                     # All automated tests.
 ├── e2e/                  # Assembled HTTP and Socket.IO tests.
 ├── smoke/                # Explicit opt-in tests against real providers.
@@ -284,6 +327,7 @@ This roadmap grows Agentic from a small OpenAI-backed API into a general-purpose
 - ✅ Return one safe response format for successes and failures, with a request ID on every response.
 - ✅ Expose liveness and readiness endpoints without database, Redis, or public-network dependencies.
 - ✅ Keep unit and end-to-end tests under categorized `test/` folders.
+- ✅ Keep LiveKit SDK integration under `lib/` and expose voice through the v1 module.
 - ✅ Run formatting, linting, type checks, tests, audits, application builds, and container scans in CI.
 
 Completion: a clean checkout passes every verification command and starts with invalid configuration rejected.
@@ -301,19 +345,29 @@ Completion: a clean checkout passes every verification command and starts with i
 
 Completion: v1 returns a live model response, rejects invalid input, and exposes useful provider failures without leaking secrets; v2 remains clean until it differs.
 
-### 3. CLI and Socket.IO streaming
+### 3. CLI, Socket.IO streaming, and LiveKit voice
 
 - ✅ Add a CLI that uses the same application services as the REST API.
 - ✅ Stream model output over the CLI and a versioned Socket.IO namespace.
 - ✅ Provide an embedded same-origin playground for testing Socket.IO streams.
 - ✅ Add LiveKit Cloud voice with environment-switched LiveKit Inference and direct OpenAI adapters.
 - ✅ Issue short-lived, room-scoped, microphone-only voice tokens without exposing secrets.
+- ✅ Run a named TypeScript voice worker with shared chat/voice instructions.
+- ✅ Show participant-aware listening, thinking, speaking, transcript, and connection states.
+- ✅ Drive the Aura and separate participant meters from live audio, with responsive controls and reduced-motion support.
+- ✅ Document Cloud credentials and print the configured telephony number at startup.
 - ✅ Cancel active CLI and Socket.IO turns without persisting partial sessions.
 - ✅ Display tokens, estimated cost, model calls, tool calls, and safe provider errors.
 - ✅ Add configurable model timeouts and explicit non-zero CLI exit codes.
+- ✅ Add a native LiveKit voice console command with explicit `.env` loading and verify a synthetic audio conversation.
+- ✅ Validate human microphone capture and audible replies on macOS (user confirmed, 2026-10-25).
+- ✅ Validate the Linux ARM64 Compose image: API health, playground delivery, native voice bindings, and LiveKit Cloud worker registration (2026-10-25).
+- ⬜ Run the Windows/Linux CI matrix to verify builds, tests, and native voice-worker loading.
+- ⬜ Validate human microphone capture on Windows and Linux before marking cross-platform voice CLI input complete; test machines are not yet available.
+- ⬜ Add telephony only after an explicitly approved phone-number purchase and SIP dispatch design.
 - ⬜ Display human approval requests when privileged tools are introduced.
 
-Completion: a user can start and cancel a streaming chat from the CLI or Socket.IO without duplicated agent logic.
+Completion: a user can start and cancel streaming chat and voice sessions across supported interfaces without duplicated agent logic; telephony follows explicit purchase and dispatch approval.
 
 ### 4. Structured outputs and conversation sessions
 
@@ -449,6 +503,10 @@ Completion: isolation tests prove that one tenant cannot read, invoke, approve, 
 
 ### 16. Evaluations, observability, security, and production operations
 
+- ✅ Disable Cloud audio and transcript retention in the LiveKit worker configuration.
+- ✅ Verify Agent Observability is enabled and validate Cloud traces, session logs, and metrics with a real voice session (2026-10-25).
+- ⬜ Deploy the LiveKit worker to a continuously hosted environment when local development is no longer sufficient.
+
 - ⬜ Add end-to-end traces across requests, agents, tools, approvals, sandboxes, and workflows.
 - ⬜ Track latency, availability, tokens, cost, tool success, approval delay, and task outcome.
 - ⬜ Build regression evaluations for answer quality, tool selection, delegation, safety, and prompt injection.
@@ -481,14 +539,31 @@ bun run build
 
 ## Container deployment
 
-Build and run the same OCI image on Docker, Kubernetes, Nomad, ECS, Cloud Run, Fly.io, Railway, Render, or any compatible platform:
+Use both files: `Dockerfile` builds the portable application image; `compose.yaml` runs the API and optional voice worker together. Neither service adds a database or Redis.
+
+Create `.env` from `.env.example` if needed and add your provider credentials. Keep existing `.env` values when upgrading. Then run:
+
+```bash
+docker compose up --build -d --wait                     # API only
+docker compose --profile voice up --build -d --wait     # API and LiveKit voice worker
+docker compose ps
+docker compose logs -f api voice
+docker compose --profile voice down
+```
+
+The playground is at `http://localhost:3001/playground`. The API binds to localhost on port 3001; the worker connects outbound to your configured LiveKit server and publishes no host port. To enable the voice profile, set `VOICE_ENABLED=true` and valid `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET` in `.env`. Stop any standalone worker first if you want only the Compose worker accepting jobs.
+
+Compose injects `.env` at runtime; credentials are excluded from the image. Both services run as the image's non-root user with a read-only filesystem, temporary `/tmp`, dropped capabilities, bounded logs, health checks, and graceful shutdown time. They share one image and can restart independently. The voice profile uses LiveKit Cloud by default through your existing configuration; it does not start a self-hosted media server or access your computer's microphone. Use the browser playground or native `bun run voice:console` for microphone input.
+
+Optional Compose settings: `AGENTIC_ENV_FILE` selects another environment file, and `AGENTIC_HTTP_PORT` changes the host port (default 3001). If changing the host port, update `CORS_ORIGINS` to match. In-memory sessions still disappear when the API restarts.
+
+To build the image for a different deployment platform:
 
 ```bash
 docker build --tag agentic:local .
-docker run --rm --read-only --tmpfs /tmp --publish 3001:3000 agentic:local
 ```
 
-The image uses pinned Bun and Node digests, contains production dependencies only, and runs as the unprivileged `node` user.
+The Debian-based image uses pinned Bun and Node digests, contains production dependencies only, and runs as the unprivileged `node` user. Debian supplies the glibc runtime required by the LiveKit RTC native bindings; Alpine/musl is not supported by the installed SDK.
 
 ## CI/CD
 
