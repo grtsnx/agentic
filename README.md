@@ -44,7 +44,7 @@ See [.env.example](.env.example) for settings and defaults. Configuration is val
 CLOUDFLARE_ACCOUNT_ID=
 CLOUDFLARE_API_TOKEN=
 CLEF_ROUTING_ENABLED=false
-CLEF_ROUTING_TIMEOUT_MS=1500
+CLEF_ROUTING_TIMEOUT_MS=3000
 CLEF_ROUTING_CONFIDENCE=0.75
 ```
 

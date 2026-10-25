@@ -5,7 +5,14 @@ import { OPENAI_MODELS } from '../../openai/openai-model-router.js';
 export const clefResponseSchema = z.object({
   success: z.literal(true),
   result: z.object({
-    answers: z.object({ needs_complex: z.number().min(0).max(1) }),
+    answers: z.object({
+      // Clef returns typed answers. A `noul` answer is an object containing
+      // the probability, rather than the probability at the answer root.
+      needs_complex: z.object({
+        type: z.literal('noul'),
+        noul: z.number().min(0).max(1),
+      }),
+    }),
   }),
 });
 export const modelRoutingSchema = z

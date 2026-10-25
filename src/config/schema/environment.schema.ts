@@ -122,7 +122,7 @@ export const environmentSchema = z
       .int()
       .min(100)
       .max(5000)
-      .default(1500),
+      .default(3000),
     CLEF_ROUTING_CONFIDENCE: z.coerce.number().min(0.6).max(0.99).default(0.75),
     MODEL_TIMEOUT_MS: z.coerce
       .number()

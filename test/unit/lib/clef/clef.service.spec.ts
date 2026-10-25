@@ -12,7 +12,9 @@ const answer = (probability: unknown) =>
   new Response(
     JSON.stringify({
       success: true,
-      result: { answers: { needs_complex: probability } },
+      result: {
+        answers: { needs_complex: { type: 'noul', noul: probability } },
+      },
     }),
     { status: 200 },
   );

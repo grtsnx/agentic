@@ -44,7 +44,7 @@ export class ClefService {
     const timeout = new AbortController();
     const timer = setTimeout(
       () => timeout.abort(),
-      this.config.get<number>('CLEF_ROUTING_TIMEOUT_MS', 1500),
+      this.config.get<number>('CLEF_ROUTING_TIMEOUT_MS', 3000),
     );
     const combined = AbortSignal.any([
       timeout.signal,
@@ -89,7 +89,7 @@ export class ClefService {
       }
       const parsed = clefResponseSchema.safeParse(payload);
       if (!parsed.success) return fallback('invalid_response');
-      const probability = parsed.data.result.answers.needs_complex;
+      const probability = parsed.data.result.answers.needs_complex.noul;
       const confidence = this.config.get<number>(
         'CLEF_ROUTING_CONFIDENCE',
         0.75,
