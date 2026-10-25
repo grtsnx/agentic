@@ -33,21 +33,26 @@ describe('ChatController (e2e)', () => {
     await app.init();
   });
 
-  it.each(['/v1/chat', '/v2/chat'])(
-    'serves the isolated %s chat endpoint',
-    async (path) => {
-      const response = await request(app.getHttpServer())
-        .post(path)
-        .send({ message: '  Explain the Roman Republic  ' })
-        .expect(200);
+  it('serves the v1 chat endpoint', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/v1/chat')
+      .send({ message: '  Explain the Roman Republic  ' })
+      .expect(200);
 
-      expect(generateReply).toHaveBeenCalledWith('Explain the Roman Republic');
-      expect(response.body).toMatchObject({
-        statusCode: 200,
-        data: structuredOutput,
-      });
-    },
-  );
+    expect(generateReply).toHaveBeenCalledWith('Explain the Roman Republic');
+    expect(response.body).toMatchObject({
+      statusCode: 200,
+      data: structuredOutput,
+    });
+  });
+
+  it('keeps the v2 chat boundary empty until a new contract exists', async () => {
+    await request(app.getHttpServer())
+      .post('/v2/chat')
+      .send({ message: 'Hello' })
+      .expect(404);
+    expect(generateReply).not.toHaveBeenCalled();
+  });
 
   it.each([
     [{}, 400],
@@ -63,15 +68,7 @@ describe('ChatController (e2e)', () => {
     expect(generateReply).not.toHaveBeenCalled();
   });
 
-  it('validates v2 independently', async () => {
-    await request(app.getHttpServer())
-      .post('/v2/chat')
-      .send({ message: '   ' })
-      .expect(400);
-    expect(generateReply).not.toHaveBeenCalled();
-  });
-
-  it('documents both chat versions without exposing secrets', async () => {
+  it('documents only the implemented chat version without exposing secrets', async () => {
     const v1 = await request(app.getHttpServer())
       .get('/api/v1-json')
       .expect(200);
@@ -81,7 +78,7 @@ describe('ChatController (e2e)', () => {
 
     expect(v1.body.paths).toHaveProperty('/v1/chat');
     expect(v1.body.paths).not.toHaveProperty('/v2/chat');
-    expect(v2.body.paths).toHaveProperty('/v2/chat');
+    expect(v2.body.paths).not.toHaveProperty('/v2/chat');
     expect(v2.body.paths).not.toHaveProperty('/v1/chat');
     expect(JSON.stringify([v1.body, v2.body])).not.toContain('OPENAI_API_KEY');
   });

@@ -23,7 +23,11 @@ interface ConnectionState {
 type ChatSocketResponse = WsResponse<Record<string, unknown>>;
 
 @UseFilters(WebsocketExceptionFilter)
-@WebSocketGateway({ path: '/v1/chat/ws', maxPayload: 8 * 1024 })
+@WebSocketGateway({
+  namespace: '/v1/chat',
+  transports: ['websocket'],
+  maxHttpBufferSize: 8 * 1024,
+})
 export class ChatV1Gateway
   implements OnGatewayConnection<Socket>, OnGatewayDisconnect<Socket>
 {

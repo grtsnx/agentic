@@ -15,6 +15,8 @@
   },
   "scripts": {
     "build": "nest build && tsc-alias -p tsconfig.build.json",
+    "chat": "nest start --entryFile cli --env-file .env",
+    "chat:prod": "node --env-file=.env dist/cli.js",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"*.{ts,json,md}\" \".github/**/*.{yml,yaml}\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"*.{ts,json,md}\" \".github/**/*.{yml,yaml}\"",
     "start": "nest start --env-file .env",

@@ -1,7 +1,7 @@
 import { Readable, Writable } from 'node:stream';
-import { ChatCliService } from '@/cli/chat-cli.service.js';
+import { CliService } from '@/cli/cli.service.js';
 
-describe('ChatCliService', () => {
+describe('CliService', () => {
   it('streams a reply and prints runtime usage', async () => {
     const openaiService = {
       createSession: vi.fn(() => ({ id: 'session' })),
@@ -30,7 +30,7 @@ describe('ChatCliService', () => {
     });
     const input = Readable.from(['Hello\n/exit\n']);
 
-    await new ChatCliService(openaiService as never).run(input, writable);
+    await new CliService(openaiService as never).run(input, writable);
 
     expect(output).toContain('Hello');
     expect(output).toContain('Tokens: 10 in / 2 out / 12 total');
