@@ -94,7 +94,7 @@ export const environmentSchema = z
     ).optional(),
     VOICE_ENABLED: booleanValue('VOICE_ENABLED').optional(),
     VOICE_PROVIDER: z.enum(voiceProviders).default('livekit'),
-    VOICE_MODEL: z.string().trim().min(1).default('gpt-realtime-2.1'),
+    VOICE_MODEL: z.string().trim().min(1).default('gpt-realtime-2.1-mini'),
     VOICE_NAME: z.string().trim().min(1).default('marin'),
     LIVEKIT_URL: z.string().trim().optional(),
     LIVEKIT_API_KEY: z.string().trim().optional(),

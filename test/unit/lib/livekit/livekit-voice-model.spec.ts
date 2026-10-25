@@ -12,7 +12,7 @@ describe('createLiveKitVoiceModel', () => {
   it('uses LiveKit Inference by default', () => {
     const model = createLiveKitVoiceModel(validateEnvironment(base));
 
-    expect(model.model).toBe('openai/gpt-realtime-2.1');
+    expect(model.model).toBe('openai/gpt-realtime-2.1-mini');
     expect(model.provider).toBe('livekit');
     expect(model).toMatchObject({
       _options: { inputAudioNoiseReduction: { type: 'far_field' } },
@@ -28,7 +28,7 @@ describe('createLiveKitVoiceModel', () => {
       }),
     );
 
-    expect(model.model).toBe('gpt-realtime-2.1');
+    expect(model.model).toBe('gpt-realtime-2.1-mini');
     expect(model.provider).toBe('api.openai.com');
     expect(model).toMatchObject({
       _options: { inputAudioNoiseReduction: { type: 'far_field' } },

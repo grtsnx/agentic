@@ -112,7 +112,7 @@ PORT=3001
 CORS_ORIGINS=http://localhost:3001
 VOICE_ENABLED=true
 VOICE_PROVIDER=livekit
-VOICE_MODEL=gpt-realtime-2.1
+VOICE_MODEL=gpt-realtime-2.1-mini
 VOICE_NAME=marin
 LIVEKIT_URL=wss://your-project.livekit.cloud
 LIVEKIT_API_KEY=your-livekit-key
@@ -127,11 +127,19 @@ bun run start:dev
 bun run voice:dev
 ```
 
-Open `http://localhost:3001/playground`, click the microphone in the message input, then **Start conversation**. Allow microphone access when prompted. The server issues a unique ten-minute token that can join only its generated room, publish only microphone audio and data, subscribe to the agent, and dispatch only `LIVEKIT_AGENT_NAME`. API secrets are never sent to the browser.
+Open `http://localhost:3001/playground` and click the microphone in the message input to connect. Allow microphone access when prompted. Use **Start conversation** to retry after ending a call. Keep both terminals running: the API supplies credentials, but the voice worker produces replies. If no agent becomes ready within 30 seconds of joining the room, the playground ends the attempt and offers a retry. Network failures, microphone permission errors, and agent unavailability have separate messages. The server issues a unique ten-minute token that can join only its generated room, publish only microphone audio and data, subscribe to the agent, and dispatch only `LIVEKIT_AGENT_NAME`. API secrets are never sent to the browser.
+
+With both services running, opt into a real voice response check (uses provider credits):
+
+```bash
+RUN_VOICE_SMOKE=true node --env-file=.env test/smoke/voice.smoke.mjs
+```
+
+The check verifies room connection, agent dispatch, a requested response transcript, and non-silent audio frames. It does not capture your microphone or test physical speaker playback. Displayed voice transcripts omit filler sounds such as “um,” “uhm,” and “hmm”; meaningful words and the original audio remain unchanged.
 
 To use your OpenAI account directly while retaining LiveKit's WebRTC transport, set `VOICE_PROVIDER=openai` and provide `OPENAI_API_KEY`. With `VOICE_PROVIDER=livekit`, realtime inference is billed through LiveKit Cloud instead.
 
-The voice screen has a spacious Aura stage and a live transcript alongside it (below it on narrow screens). Independent meters follow your microphone and the identified agent's audio. The Aura responds to actual volume and frequency changes, with separate listening, thinking, speaking, muted, and reconnecting states. You can interrupt, mute, hide the transcript, or return to chat. Final transcript segments stay in the current chat; a page reload clears them. If browser audio is blocked, select **Tap to hear Agentic**.
+The voice screen uses five rounded bars based on [LiveKit's Bar visualizer](https://docs.livekit.io/reference/components/agents-ui/component/agent-audio-visualizer-bar/), with a live transcript alongside it (below it on narrow screens). The framework-free renderer in `src/config/playground/voice-bar.asset.ts` follows actual participant volume and frequency changes, with separate listening, thinking, speaking, muted, and reconnecting states. Independent meters follow your microphone and the identified agent's audio. You can interrupt, mute, hide the transcript, or return to chat. Final transcript segments stay in the current chat; a page reload clears them. If browser audio is blocked, select **Tap to hear Agentic**.
 
 The visual direction uses the soft gradients and restrained controls of [this Dribbble voice assistant reference](https://dribbble.com/shots/26793063-AI-Assistant-Mobile-App-UI-Modern-Voice-Chat-Experience), with [LiveKit Agents UI](https://livekit.com/products/agents-ui) as the interaction reference. The renderer is framework-free and respects reduced motion.
 
@@ -250,36 +258,36 @@ The embedded playground is same-origin, so it works without adding a public webs
 
 The application validates configuration before it starts. Invalid ports, booleans, and CORS origins stop startup.
 
-| Variable                                                    | Default               | Purpose                                                                             |
-| ----------------------------------------------------------- | --------------------- | ----------------------------------------------------------------------------------- |
-| `NODE_ENV`                                                  | `development`         | Selects development, test, or production behavior.                                  |
-| `PORT`                                                      | `3001`                | Sets the HTTP port.                                                                 |
-| `PLATFORM_NAME`                                             | `Agentic`             | Names the API and OpenAPI document.                                                 |
-| `CORS_ORIGINS`                                              | empty                 | Lists exact, comma-separated browser origins. Empty disables CORS.                  |
-| `SWAGGER_ENABLED`                                           | on outside production | Enables Swagger, Scalar, and OpenAPI JSON. Set it explicitly in production.         |
-| `REALTIME_PLAYGROUND_ENABLED`                               | on outside production | Enables the embedded same-origin Socket.IO chat tester.                             |
-| `OBSERVE_ENABLED`                                           | `false`               | Enables NestJS Observe when valid credentials are present.                          |
-| `VOICE_ENABLED`                                             | `false`               | Enables LiveKit Cloud voice credentials and the voice worker.                       |
-| `VOICE_PROVIDER`                                            | `livekit`             | Chooses LiveKit Inference or the direct `openai` adapter.                           |
-| `VOICE_MODEL`                                               | `gpt-realtime-2.1`    | Selects the realtime speech-to-speech model.                                        |
-| `VOICE_NAME`                                                | `marin`               | Selects the realtime model voice.                                                   |
-| `LIVEKIT_URL`                                               | empty                 | LiveKit Cloud WebSocket URL; required when voice is enabled.                        |
-| `LIVEKIT_API_KEY`                                           | empty                 | Server-side LiveKit key; required when voice is enabled.                            |
-| `LIVEKIT_API_SECRET`                                        | empty                 | Server-side LiveKit secret; required when voice is enabled.                         |
-| `LIVEKIT_AGENT_NAME`                                        | `agentic-voice`       | Explicit dispatch name shared by tokens and the worker.                             |
-| `LIVEKIT_PHONE_NUMBER`                                      | empty                 | Optional provisioned E.164 number displayed at startup; does not provision routing. |
-| `MODEL_TIMEOUT_MS`                                          | `60000`               | Maximum duration of a text model run, including hosted search.                      |
-| `WEB_SEARCH_ENABLED`                                        | `true`                | Makes hosted web search available for model-selected use.                           |
-| `WEB_SEARCH_ALLOWED_DOMAINS`                                | empty                 | Optional comma-separated allowlist of up to 100 domain names.                       |
-| `CONTEXT_DEV_ENABLED`, `FIRECRAWL_ENABLED`, `VALYU_ENABLED` | `false`               | Independently enable optional external tools.                                       |
-| `CONTEXT_DEV_API_KEY`, `FIRECRAWL_API_KEY`, `VALYU_API_KEY` | empty                 | Required only for the corresponding enabled provider.                               |
-| `EXTERNAL_TOOLS_TIMEOUT_MS`                                 | `15000`               | Maximum wait per external tool call (1–60 seconds).                                 |
-| `EXTERNAL_TOOLS_MAX_CALLS`                                  | `5`                   | Shared call budget per chat run or voice conversation (1–20).                       |
-| `EXTERNAL_TOOLS_MAX_RESULTS`                                | `5`                   | Maximum sources returned by one tool call (1–10).                                   |
-| `EXTERNAL_TOOLS_MAX_CHARS`                                  | `12000`               | Total content characters returned by one tool call (1,000–30,000).                  |
-| `SESSION_TTL_MS`                                            | `1800000`             | Sliding lifetime of an in-memory REST chat session.                                 |
-| `SESSION_MAX_TURNS`                                         | `50`                  | Maximum completed turns in one in-memory session.                                   |
-| `SESSION_MAX_TOKENS`                                        | `32000`               | Estimated context budget that triggers bounded summarization.                       |
+| Variable                                                    | Default                 | Purpose                                                                             |
+| ----------------------------------------------------------- | ----------------------- | ----------------------------------------------------------------------------------- |
+| `NODE_ENV`                                                  | `development`           | Selects development, test, or production behavior.                                  |
+| `PORT`                                                      | `3001`                  | Sets the HTTP port.                                                                 |
+| `PLATFORM_NAME`                                             | `Agentic`               | Names the API and OpenAPI document.                                                 |
+| `CORS_ORIGINS`                                              | empty                   | Lists exact, comma-separated browser origins. Empty disables CORS.                  |
+| `SWAGGER_ENABLED`                                           | on outside production   | Enables Swagger, Scalar, and OpenAPI JSON. Set it explicitly in production.         |
+| `REALTIME_PLAYGROUND_ENABLED`                               | on outside production   | Enables the embedded same-origin Socket.IO chat tester.                             |
+| `OBSERVE_ENABLED`                                           | `false`                 | Enables NestJS Observe when valid credentials are present.                          |
+| `VOICE_ENABLED`                                             | `false`                 | Enables LiveKit Cloud voice credentials and the voice worker.                       |
+| `VOICE_PROVIDER`                                            | `livekit`               | Chooses LiveKit Inference or the direct `openai` adapter.                           |
+| `VOICE_MODEL`                                               | `gpt-realtime-2.1-mini` | Selects the realtime speech-to-speech model.                                        |
+| `VOICE_NAME`                                                | `marin`                 | Selects the realtime model voice.                                                   |
+| `LIVEKIT_URL`                                               | empty                   | LiveKit Cloud WebSocket URL; required when voice is enabled.                        |
+| `LIVEKIT_API_KEY`                                           | empty                   | Server-side LiveKit key; required when voice is enabled.                            |
+| `LIVEKIT_API_SECRET`                                        | empty                   | Server-side LiveKit secret; required when voice is enabled.                         |
+| `LIVEKIT_AGENT_NAME`                                        | `agentic-voice`         | Explicit dispatch name shared by tokens and the worker.                             |
+| `LIVEKIT_PHONE_NUMBER`                                      | empty                   | Optional provisioned E.164 number displayed at startup; does not provision routing. |
+| `MODEL_TIMEOUT_MS`                                          | `60000`                 | Maximum duration of a text model run, including hosted search.                      |
+| `WEB_SEARCH_ENABLED`                                        | `true`                  | Makes hosted web search available for model-selected use.                           |
+| `WEB_SEARCH_ALLOWED_DOMAINS`                                | empty                   | Optional comma-separated allowlist of up to 100 domain names.                       |
+| `CONTEXT_DEV_ENABLED`, `FIRECRAWL_ENABLED`, `VALYU_ENABLED` | `false`                 | Independently enable optional external tools.                                       |
+| `CONTEXT_DEV_API_KEY`, `FIRECRAWL_API_KEY`, `VALYU_API_KEY` | empty                   | Required only for the corresponding enabled provider.                               |
+| `EXTERNAL_TOOLS_TIMEOUT_MS`                                 | `15000`                 | Maximum wait per external tool call (1–60 seconds).                                 |
+| `EXTERNAL_TOOLS_MAX_CALLS`                                  | `5`                     | Shared call budget per chat run or voice conversation (1–20).                       |
+| `EXTERNAL_TOOLS_MAX_RESULTS`                                | `5`                     | Maximum sources returned by one tool call (1–10).                                   |
+| `EXTERNAL_TOOLS_MAX_CHARS`                                  | `12000`                 | Total content characters returned by one tool call (1,000–30,000).                  |
+| `SESSION_TTL_MS`                                            | `1800000`               | Sliding lifetime of an in-memory REST chat session.                                 |
+| `SESSION_MAX_TURNS`                                         | `50`                    | Maximum completed turns in one in-memory session.                                   |
+| `SESSION_MAX_TOKENS`                                        | `32000`                 | Estimated context budget that triggers bounded summarization.                       |
 
 Never use `*` in `CORS_ORIGINS`. The server accepts only complete HTTP or HTTPS origins without paths.
 
@@ -302,7 +310,7 @@ src/                      # Application source.
 │   ├── openai/           # Model routing and stable provider error mapping.
 │   ├── schema/           # Runtime Zod schemas; categorized application types in types/.
 │   ├── web-tools/        # Tool registration, limits, source policy, and Nest wiring.
-│   └── playground/       # Same-origin chat and voice playground.
+│   └── playground/       # Chat and voice UI, audio-reactive bars, and transcripts.
 ├── dto/                  # Versioned API input and output contracts.
 ├── lib/                  # Shared provider and infrastructure adapters.
 │   ├── livekit/          # Reusable LiveKit SDK adapter and Nest provider.
@@ -368,7 +376,7 @@ Completion: v1 returns a live model response, rejects invalid input, and exposes
 - ✅ Issue short-lived, room-scoped, microphone-only voice tokens without exposing secrets.
 - ✅ Run a named TypeScript voice worker with shared chat/voice instructions.
 - ✅ Show participant-aware listening, thinking, speaking, transcript, and connection states.
-- ✅ Drive the Aura and separate participant meters from live audio, with responsive controls and reduced-motion support.
+- ✅ Drive the bar visualizer and separate participant meters from live audio, with responsive controls and reduced-motion support.
 - ✅ Document Cloud credentials and print the configured telephony number at startup.
 - ✅ Cancel active CLI and Socket.IO turns without persisting partial sessions.
 - ✅ Display tokens, estimated cost, model calls, tool calls, and safe provider errors.

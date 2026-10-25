@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events';
 import { runInNewContext } from 'node:vm';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LIVEKIT_BROWSER_APP } from '@/config/playground/voice-playground.asset.js';
-import { VOICE_AURA_FACTORY } from '@/config/playground/voice-aura.asset.js';
+import { VOICE_BAR_FACTORY } from '@/config/playground/voice-bar.asset.js';
 
 class Element extends EventEmitter {
   hidden = false;
@@ -46,7 +46,7 @@ function setup() {
   element('session').hidden = true;
   const frames = new Map<number, () => void>();
   let nextFrame = 0;
-  const aura = Object.fromEntries(
+  const visualizer = Object.fromEntries(
     [
       'setState',
       'setParticipants',
@@ -95,11 +95,11 @@ function setup() {
   const dispatch = vi.fn();
   runInNewContext(
     LIVEKIT_BROWSER_APP.replace(
-      VOICE_AURA_FACTORY,
-      'function createAudioReactiveAura() { return fakeAura; }',
+      VOICE_BAR_FACTORY,
+      'function createAudioReactiveBars() { return fakeVisualizer; }',
     ),
     {
-      fakeAura: aura,
+      fakeVisualizer: visualizer,
       document: {
         querySelector: query,
         createElement: () => new Element(),
@@ -118,6 +118,8 @@ function setup() {
         },
       },
       fetch,
+      Error,
+      TypeError,
       AbortController,
       performance,
       setTimeout,
@@ -156,7 +158,7 @@ function setup() {
   return {
     element,
     query,
-    aura,
+    visualizer,
     agent,
     local,
     room,
@@ -297,7 +299,7 @@ describe('voice playground lifecycle', () => {
     ui.room.emit('ParticipantAttributesChanged', {}, ui.agent);
     expect(ui.element('session').dataset.state).toBe('disconnected');
     expect(ui.element('mute').disabled).toBe(true);
-    expect(ui.aura.reset).toHaveBeenCalled();
+    expect(ui.visualizer.reset).toHaveBeenCalled();
     expect(ui.room.eventNames()).toHaveLength(0);
   });
 
@@ -310,9 +312,131 @@ describe('voice playground lifecycle', () => {
     ui.room.emit('Reconnected');
     expect(ui.element('toast').hidden).toBe(true);
   });
+
+  it('ends the wait and releases the microphone when no agent joins', async () => {
+    const ui = setup();
+    ui.room.remoteParticipants.clear();
+    await ui.start();
+    expect(ui.element('live-label').textContent).toBe('Waiting for Agentic');
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(ui.room.disconnect).toHaveBeenCalledOnce();
+    expect(ui.element('session').dataset.state).toBe('error');
+    expect(ui.element('toast').textContent).toContain('unavailable');
+    expect(ui.element('toast').textContent).not.toContain('Network');
+    expect(ui.element('start').hidden).toBe(false);
+  });
+
+  it('clears the agent deadline when the participant becomes ready', async () => {
+    const ui = setup();
+    ui.agent.attributes['lk.agent.state'] = 'initializing';
+    await ui.start();
+    await vi.advanceTimersByTimeAsync(10_000);
+    ui.agent.attributes['lk.agent.state'] = 'listening';
+    ui.room.emit('ParticipantAttributesChanged', {}, ui.agent);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(ui.room.disconnect).not.toHaveBeenCalled();
+    expect(ui.element('live-label').textContent).toBe('Live');
+  });
+
+  it('offers a retry when the agent reports failure', async () => {
+    const ui = setup();
+    await ui.start();
+    ui.agent.attributes['lk.agent.state'] = 'failed';
+    ui.room.emit('ParticipantAttributesChanged', {}, ui.agent);
+    await ui.settle();
+    expect(ui.room.disconnect).toHaveBeenCalledOnce();
+    expect(ui.element('session').dataset.state).toBe('error');
+    expect(ui.element('toast').textContent).toContain('Agentic disconnected');
+  });
+
+  it('does not show a stale deadline or network toast after the user ends a call', async () => {
+    const ui = setup();
+    ui.room.remoteParticipants.clear();
+    await ui.start();
+    await ui.click('end');
+    await vi.advanceTimersByTimeAsync(35_000);
+    expect(ui.room.disconnect).toHaveBeenCalledOnce();
+    expect(ui.element('session').dataset.state).toBe('disconnected');
+    expect(ui.element('toast').hidden).toBe(true);
+  });
+
+  it.each([
+    [
+      'permission',
+      'NotAllowedError',
+      'Permission denied',
+      'Allow microphone access',
+    ],
+    ['network', 'TypeError', 'Failed to fetch', 'Network issue'],
+  ])(
+    'classifies %s failures without exposing raw errors',
+    async (_, name, message, expected) => {
+      const ui = setup();
+      ui.fetch.mockRejectedValueOnce(
+        Object.assign(new Error(message), { name }),
+      );
+      await ui.click('connect');
+      expect(ui.element('toast').textContent).toContain(expected);
+      expect(ui.element('session').dataset.state).toBe('error');
+    },
+  );
+
+  it('does not mislabel an unavailable API as a network failure', async () => {
+    const ui = setup();
+    ui.fetch.mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ serverUrl: '', participantToken: '' }),
+    });
+    await ui.click('connect');
+    expect(ui.element('toast').textContent).toContain('unavailable');
+    expect(ui.element('toast').textContent).not.toContain('Network');
+  });
+
+  it('cleans fillers in interim, final, and chat transcripts without changing meaningful words', async () => {
+    const ui = setup();
+    await ui.start();
+    ui.room.emit(
+      'TranscriptionReceived',
+      [
+        {
+          id: 'turn',
+          text: 'Uhm, I like aluminum, um, and drums.',
+          final: false,
+        },
+      ],
+      ui.local,
+    );
+    ui.flush();
+    expect(ui.element('transcript').children[0]?.children[1]?.textContent).toBe(
+      'I like aluminum, and drums.',
+    );
+    ui.room.emit(
+      'TranscriptionReceived',
+      [
+        {
+          id: 'turn',
+          text: 'Uhm, I like aluminum, um, and drums.',
+          final: true,
+        },
+      ],
+      ui.local,
+    );
+    ui.flush();
+    expect(ui.dispatch.mock.calls[0]?.[0].detail.detail.text).toBe(
+      'I like aluminum, and drums.',
+    );
+    ui.room.emit(
+      'TranscriptionReceived',
+      [{ id: 'filler', text: 'Hmm, uhm...', final: true }],
+      ui.agent,
+    );
+    ui.flush();
+    expect(ui.element('transcript').children).toHaveLength(1);
+    expect(ui.dispatch).toHaveBeenCalledTimes(1);
+  });
 });
 
-describe('audio-reactive Aura', () => {
+describe('audio-reactive bars', () => {
   it('reads PCM from the selected participant and cleans up replaced audio tracks', () => {
     let frame!: (time: number) => void;
     const meters = vi.fn();
@@ -330,7 +454,7 @@ describe('audio-reactive Aura', () => {
     type Media = { id: string; amplitude: number };
     let current: { media?: Media };
     const factory = runInNewContext(
-      VOICE_AURA_FACTORY + '; createAudioReactiveAura',
+      VOICE_BAR_FACTORY + '; createAudioReactiveBars',
       {
         window: {
           matchMedia: () => ({ matches: false }),
@@ -374,7 +498,7 @@ describe('audio-reactive Aura', () => {
         cancelAnimationFrame: vi.fn(),
       },
     );
-    const aura = factory(
+    const visualizer = factory(
       {
         dataset: {},
         getContext: () => context,
@@ -387,24 +511,28 @@ describe('audio-reactive Aura', () => {
       mediaStreamTrack: { id: 'mic', amplitude: 0 },
       isMuted: false,
     };
-    aura.setParticipants(user, undefined);
-    aura.addTrack({ mediaStreamTrack: { id: 'other', amplitude: 1 } }, 'user', {
-      isMicrophoneEnabled: true,
-    });
-    aura.addTrack(microphone, 'user', user);
-    aura.start();
+    visualizer.setParticipants(user, undefined);
+    visualizer.addTrack(
+      { mediaStreamTrack: { id: 'other', amplitude: 1 } },
+      'user',
+      {
+        isMicrophoneEnabled: true,
+      },
+    );
+    visualizer.addTrack(microphone, 'user', user);
+    visualizer.start();
     frame(40);
     expect(meters.mock.lastCall![0].user).toBe(0);
     microphone.mediaStreamTrack.amplitude = 0.1;
     frame(80);
     expect(meters.mock.lastCall![0].user).toBeGreaterThan(0.6);
-    aura.removeTrack(microphone);
+    visualizer.removeTrack(microphone);
     for (let time = 120; time <= 800; time += 40) frame(time);
     expect(meters.mock.lastCall![0].user).toBeLessThan(0.01);
-    aura.addTrack(microphone, 'user', user);
+    visualizer.addTrack(microphone, 'user', user);
     frame(840);
     expect(meters.mock.lastCall![0].user).toBeGreaterThan(0.6);
-    aura.reset();
+    visualizer.reset();
     expect(close).toHaveBeenCalledOnce();
     expect(cleanup).toHaveBeenCalledTimes(6);
   });
@@ -419,7 +547,7 @@ describe('audio-reactive Aura', () => {
       {
         get: (_, name) => {
           if (String(name).includes('Gradient')) return () => gradient;
-          if (name === 'lineTo')
+          if (name === 'roundRect')
             return (...point: number[]) => paths.push(point);
           return () => {};
         },
@@ -427,7 +555,7 @@ describe('audio-reactive Aura', () => {
       },
     );
     const factory = runInNewContext(
-      VOICE_AURA_FACTORY + '; createAudioReactiveAura',
+      VOICE_BAR_FACTORY + '; createAudioReactiveBars',
       {
         window: { matchMedia: () => ({ matches: false }), devicePixelRatio: 1 },
         document: { hidden: false },
@@ -441,7 +569,7 @@ describe('audio-reactive Aura', () => {
         },
       },
     );
-    const aura = factory(
+    const visualizer = factory(
       {
         dataset: {},
         getContext: () => context,
@@ -451,25 +579,29 @@ describe('audio-reactive Aura', () => {
     );
     const user = { audioLevel: 0, isMicrophoneEnabled: true };
     const agent = { audioLevel: 0 };
-    aura.setParticipants(user, agent);
-    aura.start();
+    visualizer.setParticipants(user, agent);
+    visualizer.start();
     frame(40);
-    const silentPath = paths.slice(0, 160);
+    const silentPath = paths.slice();
     paths.length = 0;
     user.audioLevel = 0.3;
-    aura.setState('user-speaking');
+    visualizer.setState('user-speaking');
     frame(80);
     expect(onLevels.mock.lastCall![0].user).toBeGreaterThan(0.6);
     expect(onLevels.mock.lastCall![0].agent).toBe(0);
-    expect(paths.slice(0, 160)).not.toEqual(silentPath);
+    expect(paths).toHaveLength(5);
+    expect(paths).not.toEqual(silentPath);
+    expect(Math.max(...paths.map((bar) => bar[3]!))).toBeGreaterThan(
+      silentPath[0]![3]!,
+    );
     user.isMicrophoneEnabled = false;
     for (let time = 120; time <= 800; time += 40) frame(time);
     expect(onLevels.mock.lastCall![0].user).toBeLessThan(0.01);
     agent.audioLevel = 0.25;
-    aura.setState('agent-speaking');
+    visualizer.setState('agent-speaking');
     frame(840);
     expect(onLevels.mock.lastCall![0].agent).toBeGreaterThan(0.5);
-    aura.reset();
+    visualizer.reset();
     expect(onLevels.mock.lastCall![0]).toEqual({ user: 0, agent: 0 });
   });
 });

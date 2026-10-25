@@ -159,11 +159,11 @@ export function configureSwagger(
     if (version === '1') {
       builder.addTag(
         'Chat',
-        'Version 1 agent chat endpoints for validated, structured responses.',
+        'Agent chat endpoints for validated, structured responses.',
       );
       builder.addTag(
         'Voice',
-        'Version 1 short-lived credentials for LiveKit voice sessions.',
+        'Short-lived credentials for LiveKit voice sessions.',
       );
     }
 

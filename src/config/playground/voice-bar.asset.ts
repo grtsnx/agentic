@@ -1,6 +1,6 @@
 // Kept separate from room lifecycle so the renderer can be tested with audio fixtures.
-export const VOICE_AURA_FACTORY = `
-  function createAudioReactiveAura(canvas, onLevels) {
+export const VOICE_BAR_FACTORY = `
+  function createAudioReactiveBars(canvas, onLevels) {
     const context = canvas.getContext('2d');
     const sources = new Map();
     const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -87,23 +87,6 @@ export const VOICE_AURA_FACTORY = `
       return { level: Math.min(1, peak), bands };
     }
 
-    function trace(radius, amplitude, offset, bands, squash = 1) {
-      context.beginPath();
-      for (let i = 0; i <= 160; i += 1) {
-        const angle = i / 160 * Math.PI * 2;
-        const wave = Math.sin(angle * 3 + phase + offset) * 0.48 +
-          Math.cos(angle * 5 - phase * 0.75 + offset) * 0.32 +
-          Math.sin(angle * 7 + phase * 1.4) * 0.2;
-        const spectrum = bands[Math.floor(i / 160 * 12) % 12] || 0;
-        const r = radius + amplitude * wave + spectrum * amplitude * 0.5;
-        const x = width / 2 + Math.cos(angle) * r;
-        const y = height / 2 + Math.sin(angle) * r * squash;
-        if (!i) context.moveTo(x, y);
-        else context.lineTo(x, y);
-      }
-      context.closePath();
-    }
-
     function draw(now) {
       animationFrame = requestAnimationFrame(draw);
       if (!context || !width || !height || document.hidden) return;
@@ -120,53 +103,44 @@ export const VOICE_AURA_FACTORY = `
         onLevels({ ...levels }, { user: user.bands, agent: agent.bands });
         lastMeterAt = now;
       }
-      const isUser = state === 'user-speaking';
-      const volume = isUser ? levels.user : Math.max(levels.agent, levels.user * 0.35);
+      // Follow live levels immediately, even before a speaker-change event arrives.
+      const isUser = state === 'user-speaking' || levels.user > levels.agent;
+      const volume = isUser ? levels.user : levels.agent;
       const bands = isUser ? user.bands : agent.bands;
       const thinking = state === 'thinking';
       const reduced = motionPreference.matches;
-      const targetHue = isUser ? 166 : thinking ? 254 : state === 'error' ? 12 : state === 'muted' ? 217 : 211;
+      const connecting = ['connecting', 'initializing'].includes(state);
+      const quiet = ['muted', 'disconnected', 'error'].includes(state);
+      const targetHue = state === 'error' ? 12 : isUser ? 166 : thinking ? 254 : 211;
       hue += (targetHue - hue) * (1 - Math.exp(-dt / 0.18));
-      phase += dt * (reduced ? 0 : 0.65 + volume * 8 + (thinking ? 1.6 : 0));
-      const radius = Math.min(width, height) * (0.247 + volume * (reduced ? 0.018 : 0.095));
-      const amplitude = radius * (reduced ? 0.028 : 0.075 + volume * 0.36 + (thinking ? 0.05 : 0));
+      phase += reduced ? 0 : dt * (thinking ? 4 : 2.5);
       context.clearRect(0, 0, width, height);
-      const cx = width / 2;
-      const cy = height / 2;
       context.save();
-
-      const halo = context.createRadialGradient(cx, cy, radius * 0.5, cx, cy, radius * 1.8);
-      halo.addColorStop(0, 'hsla(' + hue + ', 80%, 75%, .11)');
-      halo.addColorStop(0.65, 'hsla(' + hue + ', 80%, 81%, .08)');
-      halo.addColorStop(1, 'hsla(' + hue + ', 85%, 85%, 0)');
-      context.fillStyle = halo;
-      context.fillRect(0, 0, width, height);
-
-      // Translucent, offset membranes give the Aura depth; audio deforms every layer.
-      for (let layer = 0; layer < 7; layer += 1) {
-        const color = hue + layer * 7 - 18;
-        const gradient = context.createLinearGradient(cx - radius, cy - radius, cx + radius, cy + radius);
-        gradient.addColorStop(0, 'hsla(' + (color - 38) + ', 80%, 69%, .28)');
-        gradient.addColorStop(0.36, 'hsla(' + color + ', 84%, 67%, .08)');
-        gradient.addColorStop(0.68, 'hsla(' + (color + 22) + ', 74%, 62%, .13)');
-        gradient.addColorStop(1, 'hsla(' + (color + 40) + ', 79%, 63%, .32)');
-        trace(radius * (1 - layer * 0.035), amplitude * (1 + layer * 0.09), layer * 0.8, bands, 0.98 + layer * 0.006);
+      const barWidth = Math.min(width * 0.09, 34);
+      const gap = barWidth * 0.45;
+      const groupWidth = barWidth * 5 + gap * 4;
+      const maxHeight = Math.min(height * 0.74, 240);
+      // Five rounded bars mirror LiveKit Agents UI's Bar design. Speech height
+      // uses PCM/frequency bands; only processing states use a decorative wave.
+      for (let i = 0; i < 5; i += 1) {
+        const envelope = [0.55, 0.82, 1, 0.82, 0.55][i];
+        const spectrum = bands[i * 2] || 0;
+        const ripple = reduced ? 0.35 : (Math.sin(phase - i * 0.9) + 1) / 2;
+        const energy = quiet ? 0 : connecting ? 0.09 + ripple * 0.18
+          : volume > 0.015 ? Math.min(1, volume * (0.35 + spectrum * 0.65)) * envelope
+          : thinking ? 0.12 + ripple * 0.3 : 0;
+        const barHeight = Math.min(maxHeight, barWidth + energy * (maxHeight - barWidth));
+        const x = (width - groupWidth) / 2 + i * (barWidth + gap);
+        const y = (height - barHeight) / 2;
+        const gradient = context.createLinearGradient(x, y, x, y + barHeight);
+        gradient.addColorStop(0, 'hsl(' + (hue - 12) + ', ' + (quiet ? 15 : 78) + '%, 64%)');
+        gradient.addColorStop(1, 'hsl(' + (hue + 12) + ', ' + (quiet ? 15 : 72) + '%, 46%)');
+        context.globalAlpha = quiet ? 0.4 : connecting ? 0.35 + ripple * 0.65 : 1;
+        context.beginPath();
+        context.roundRect(x, y, barWidth, barHeight, barWidth / 2);
         context.fillStyle = gradient;
         context.fill();
-        context.strokeStyle = 'hsla(' + (color - 10) + ', 76%, ' + (64 + layer * 2) + '%, ' + (0.28 - layer * 0.025) + ')';
-        context.lineWidth = 1.3 + volume * 1.8;
-        context.stroke();
       }
-      const rim = context.createLinearGradient(cx - radius, cy - radius, cx + radius, cy + radius);
-      rim.addColorStop(0, 'hsla(' + (hue - 45) + ', 85%, 68%, .9)');
-      rim.addColorStop(0.48, 'hsla(' + hue + ', 86%, 80%, .15)');
-      rim.addColorStop(1, 'hsla(' + (hue + 36) + ', 82%, 69%, .85)');
-      context.strokeStyle = rim;
-      context.shadowColor = 'hsla(' + hue + ', 80%, 66%, .5)';
-      context.shadowBlur = 9 + volume * 19;
-      context.lineWidth = 2.4 + volume * 4;
-      trace(radius, amplitude, 0, bands);
-      context.stroke();
       context.restore();
     }
 

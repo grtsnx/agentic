@@ -137,8 +137,7 @@ describe('AppController (e2e)', () => {
     });
     expect(v1.body.tags).toContainEqual({
       name: 'Chat',
-      description:
-        'Version 1 agent chat endpoints for validated, structured responses.',
+      description: 'Agent chat endpoints for validated, structured responses.',
     });
     expect(v1.body.paths).toHaveProperty('/v1');
     expect(v1.body.paths).not.toHaveProperty('/v2');
@@ -303,7 +302,7 @@ describe('AppController (e2e)', () => {
     expect(page.text).toContain('id="voice-connect"');
     expect(page.text).toContain('class="voice-visualizer"');
     expect(page.text).toContain('id="voice-session"');
-    expect(page.text).toContain('id="voice-aura"');
+    expect(page.text).toContain('id="voice-bars"');
     expect(page.text).toContain('id="voice-transcript"');
     expect(page.text).toContain('id="voice-end"');
     expect(livekitApp.text).toContain("fetch('/v1/voice/token'");
@@ -317,9 +316,9 @@ describe('AppController (e2e)', () => {
       'LivekitClient.RoomEvent.TranscriptionReceived',
     );
     expect(livekitApp.text).toContain('requestAnimationFrame(flushTranscript)');
-    expect(livekitApp.text).toContain('createAudioReactiveAura');
+    expect(livekitApp.text).toContain('createAudioReactiveBars');
     expect(livekitApp.text).toContain('audioContext.createAnalyser()');
-    expect(livekitApp.text).toContain('aura.setState(state)');
+    expect(livekitApp.text).toContain('visualizer.setState(state)');
     expect(livekitApp.text).toContain("'agent-speaking'");
     expect(livekitApp.text).toContain("'user-speaking'");
     expect(livekitApp.text).toContain("'agentic:voice-transcript'");
@@ -345,7 +344,7 @@ describe('AppController (e2e)', () => {
     expect(styles.text).toContain(".voice-status[data-state='thinking']");
     expect(styles.text).toContain('.voice-session:not([hidden])');
     expect(styles.text).toContain('.voice-transcript-panel');
-    expect(styles.text).toContain('.voice-aura-canvas');
+    expect(styles.text).toContain('.voice-bars-canvas');
     expect(styles.text).toContain("[data-state='agent-speaking']");
     expect(styles.text).toContain("[data-state='user-speaking']");
     expect(styles.text).toContain('@keyframes shimmer');

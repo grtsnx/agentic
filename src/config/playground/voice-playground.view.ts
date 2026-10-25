@@ -22,9 +22,7 @@ export const VOICE_PLAYGROUND_VIEW = `
           </div>
           <div class="voice-center">
             <div class="voice-agent-visual" aria-hidden="true">
-              <div class="voice-orbit voice-orbit-one"></div>
-              <div class="voice-orbit voice-orbit-two"></div>
-              <canvas id="voice-aura" class="voice-aura-canvas"></canvas>
+              <canvas id="voice-bars" class="voice-bars-canvas"></canvas>
             </div>
             <div class="voice-stage-copy">
               <p id="voice-session-state" class="voice-state-label" role="status">Ready when you are</p>
@@ -98,9 +96,7 @@ export const VOICE_PLAYGROUND_STYLES = `
 .voice-elapsed { color: #969ba7; font: .7rem/1.2 ui-monospace, monospace; font-variant-numeric: tabular-nums; }
 .voice-center { display: flex; min-width: 0; min-height: 0; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
 .voice-agent-visual { position: relative; flex-shrink: 1; min-height: 100px; width: min(440px, 58vh, 100%); aspect-ratio: 1; margin: -22px 0 -18px; isolation: isolate; }
-.voice-aura-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.voice-orbit { position: absolute; left: 50%; top: 50%; width: 78%; aspect-ratio: 1; border: 1px solid #c8d5e126; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
-.voice-orbit-two { width: 96%; border-style: dashed; border-color: #c8d5e11c; }
+.voice-bars-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .voice-stage-copy { position: relative; flex: 0 0 auto; }
 .voice-state-label { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 12px; color: var(--voice-blue); font-size: .68rem; font-weight: 550; letter-spacing: .03em; }
 .voice-state-label::before { width: 4px; height: 4px; border-radius: 50%; background: currentColor; content: ''; }
