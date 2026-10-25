@@ -142,10 +142,10 @@ export const ANSWER_ACTIONS_APP = `
 export const ANSWER_ACTIONS_STYLES = `
 .answer-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 .answer-actions button, .sources-close { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 36px; min-height: 36px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); cursor: pointer; font: inherit; font-size: .72rem; }
-.answer-actions button:hover, .sources-close:hover { color: var(--text); background: var(--surface-subtle); }
+.answer-actions button:hover svg, .sources-close:hover svg, .source-card:hover svg { color: var(--text); transform: scale(1.12); }
 .answer-actions button:disabled { cursor: wait; opacity: .6; }
 .answer-actions .sources-button { padding: 6px 9px; }
-.answer-actions svg, .sources-sheet svg { width: 18px; height: 18px; flex-shrink: 0; }
+.answer-actions svg, .sources-sheet svg { width: 18px; height: 18px; flex-shrink: 0; transition: color .15s ease, transform .15s ease; }
 .answer-action-status { color: var(--muted); font-size: .7rem; }
 .sources-sheet { position: fixed; inset: 12px 12px 12px auto; margin: 0; padding: 0; width: min(420px, calc(100vw - 24px)); height: calc(100dvh - 24px); max-width: none; max-height: none; overflow: hidden; border: 1px solid var(--border); border-radius: 20px; color: var(--text); background: var(--surface); box-shadow: 0 20px 70px #0002; }
 .sources-sheet[open] { display: flex; flex-direction: column; animation: sources-enter .18s ease-out; }
@@ -156,8 +156,7 @@ export const ANSWER_ACTIONS_STYLES = `
 .sources-count { margin: 0; padding: 18px 22px 8px; color: var(--muted); font-size: .74rem; }
 .sources-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 12px 20px; }
 .sources-list .source-card { display: flex; align-items: flex-start; gap: 12px; margin: 4px 0; padding: 16px 10px; border-radius: 12px; color: var(--text); text-decoration: none; }
-.sources-list .source-card:hover { background: var(--surface-subtle); }
-.source-globe { display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; border: 1px solid var(--border); border-radius: 10px; color: var(--muted); background: var(--surface-subtle); }
+.source-globe { display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; color: var(--muted); }
 .source-details { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 7px; }
 .source-domain { color: var(--muted); font-size: .73rem; overflow-wrap: anywhere; }
 .source-title { font-size: .87rem; font-weight: 550; line-height: 1.5; overflow-wrap: anywhere; }
@@ -167,5 +166,5 @@ export const ANSWER_ACTIONS_STYLES = `
 .answer-actions button:focus-visible, .sources-sheet button:focus-visible, .source-card:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 @keyframes sources-enter { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
 @media (max-width: 600px) { .sources-sheet { inset: 0; width: 100%; height: 100dvh; border-radius: 0; border: 0; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); } .answer-actions button, .sources-close { min-width: 44px; min-height: 44px; } }
-@media (prefers-reduced-motion: reduce) { .sources-sheet[open] { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .sources-sheet[open] { animation: none; } .answer-actions svg, .sources-sheet svg { transition: none; } }
 `;

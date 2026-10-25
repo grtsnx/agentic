@@ -141,6 +141,34 @@ describe('chat interruption handling', () => {
 });
 
 describe('live progress and citations', () => {
+  it.each([
+    ['thinking', 'Thinking', 'thinking'],
+    ['tool', 'Searching the web', 'searching'],
+    ['tool', 'Reading a page', 'reading'],
+    ['thinking', 'Reviewing sources', 'reviewing'],
+    ['thinking', 'Reviewing information', 'reviewing'],
+    ['thinking', 'Organizing context', 'organizing'],
+    ['tool', 'Using a tool', 'tool'],
+    ['handoff', 'Working on your request', 'handoff'],
+    ['approval', 'Waiting for approval', 'approval'],
+    ['responding', 'Responding', 'responding'],
+    ['thinking', 'Stopping', 'stopping'],
+  ])(
+    'uses the %s event to show the %s indicator',
+    (phase, message, activity) => {
+      const ui = setup();
+      ui.socket.emit('chat.status', { phase, message });
+      const status = ui.body.children.find(
+        (node) => node.className === 'agent-status',
+      )!;
+      expect(status.dataset).toMatchObject({ activity });
+      expect(status.hidden).toBe(false);
+      expect(status.querySelector('.status-label').textContent).toBe(message);
+      ui.socket.emit('chat.delta', { delta: ' Result.' });
+      expect(status.hidden).toBe(true);
+    },
+  );
+
   it('does not let a queued streaming render overwrite the completed response', () => {
     const ui = setup(true);
     ui.socket.emit('chat.delta', { delta: ' A pending chunk.' });

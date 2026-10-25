@@ -1,4 +1,9 @@
 import {
+  ACTIVITY_INDICATOR_VIEW,
+  ACTIVITY_INDICATOR_APP,
+  ACTIVITY_INDICATOR_STYLES,
+} from './activity-indicator.asset.js';
+import {
   ANSWER_ACTIONS_VIEW,
   ANSWER_ACTIONS_APP,
   ANSWER_ACTIONS_STYLES,
@@ -221,9 +226,10 @@ export const PLAYGROUND_APP = `(() => {
     const message = createMessage('assistant');
     const status = document.createElement('div');
     status.className = 'agent-status';
+    status.dataset.activity = 'thinking';
     status.setAttribute('role', 'status');
     status.setAttribute('aria-live', 'polite');
-    status.innerHTML = '<span class="thinking-orb" aria-hidden="true"><i></i><i></i><i></i></span><span class="status-copy"><span class="status-label">Thinking</span><small class="status-detail" hidden></small></span><span class="status-elapsed">0ms</span>';
+    status.innerHTML = ${JSON.stringify(ACTIVITY_INDICATOR_VIEW)} + '<span class="status-copy"><span class="status-label">Thinking</span><small class="status-detail" hidden></small></span><span class="status-elapsed">0ms</span>';
     message.body.insertBefore(status, message.content);
     assistantMessage = {
       ...message,
@@ -231,6 +237,7 @@ export const PLAYGROUND_APP = `(() => {
       finished: false,
       renderPending: false,
       status,
+      activitySymbol: status.querySelector('.activity-symbol'),
       statusLabel: status.querySelector('.status-label'),
       statusDetail: status.querySelector('.status-detail'),
       elapsed: status.querySelector('.status-elapsed'),
@@ -242,10 +249,13 @@ export const PLAYGROUND_APP = `(() => {
     return assistantMessage ?? createAssistant();
   }
 
+  ${ACTIVITY_INDICATOR_APP}
+
   function updateStatus(data) {
     const message = ensureAssistant();
     message.status.hidden = false;
     message.status.dataset.phase = data.phase ?? 'thinking';
+    updateActivityIndicator(message, data);
     message.statusLabel.textContent = data.message ?? 'Thinking';
     const detail = data.detail ?? ({ 'Searching the web': 'Looking up relevant sources', 'Reading a page': 'Retrieving page content', 'Reviewing sources': 'Checking the returned information' }[data.message] ?? '');
     message.statusDetail.textContent = detail;
@@ -558,11 +568,7 @@ html[data-theme='dark'] .theme-icon-moon { display: none; }
 .response-notice { margin-top: 12px; color: var(--danger); font-size: .85rem; }
 .agent-status { display: flex; align-items: center; gap: 8px; min-height: 28px; color: var(--muted); font-size: .9rem; }
 .agent-status[hidden] { display: none; }
-.thinking-orb { position: relative; width: 20px; height: 20px; flex: 0 0 20px; animation: orb-spin 2.2s linear infinite; }
-.thinking-orb i { position: absolute; width: 5px; height: 5px; border-radius: 50%; background: var(--text); box-shadow: 0 0 8px rgba(24, 24, 27, .18); }
-.thinking-orb i:nth-child(1) { top: 1px; left: 8px; }
-.thinking-orb i:nth-child(2) { right: 1px; bottom: 3px; animation: orb-breathe 1.1s ease-in-out infinite .15s; }
-.thinking-orb i:nth-child(3) { left: 1px; bottom: 3px; animation: orb-breathe 1.1s ease-in-out infinite .3s; }
+${ACTIVITY_INDICATOR_STYLES}
 .status-label { color: transparent; background: linear-gradient(100deg, #71717a 20%, #18181b 45%, #a1a1aa 70%); background-size: 220% 100%; background-clip: text; -webkit-background-clip: text; animation: shimmer 1.8s linear infinite; }
 .status-copy { min-width: 0; }
 .status-detail { display: block; color: var(--muted); font-size: .78rem; line-height: 1.5; }
@@ -593,7 +599,6 @@ textarea::placeholder { color: #8a93a5; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 #voice-audio { display: none; }
 @keyframes shimmer { to { background-position: -220% 0; } }
-@keyframes orb-spin { to { transform: rotate(360deg); } }
 @keyframes orb-breathe { 50% { opacity: .3; transform: scale(.65); } }
 @keyframes voice-pulse { 50% { opacity: .35; } }
 @keyframes voice-think { 50% { height: 10px; transform: translateY(-2px); } }
