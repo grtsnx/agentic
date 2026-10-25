@@ -137,6 +137,60 @@ describe('optional Clef routing', () => {
       await new ClefService(new ConfigService(settings)).route('Debug this'),
     ).toMatchObject({ reason: 'timeout', model: 'gpt-6-luna' });
   });
+  it.each([0.9, 0.5])(
+    'accounts for reported usage even when probability %s falls back',
+    async (probability) => {
+      vi.stubGlobal(
+        'fetch',
+        vi
+          .fn()
+          .mockResolvedValue(
+            new Response(
+              JSON.stringify({
+                success: true,
+                result: {
+                  usage: { input_tokens: 1000, output_tokens: 0 },
+                  answers: {
+                    needs_complex: { type: 'noul', noul: probability },
+                  },
+                },
+              }),
+              { headers: { 'cf-ray': 'synthetic-request' } },
+            ),
+          ),
+      );
+      const result = await new ClefService(new ConfigService(settings)).route(
+        'Question',
+      );
+      expect(result.usage).toEqual({ input_tokens: 1000, output_tokens: 0 });
+      expect(result.estimatedCostUsd).toBeCloseTo(0.000038, 10);
+      expect(result.requestId).toBe('synthetic-request');
+      expect(result.reason).toBe(
+        probability === 0.5 ? 'uncertain' : 'classified',
+      );
+    },
+  );
+  it('rejects malformed usage instead of reporting invented cost', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({
+              success: true,
+              result: {
+                usage: { input_tokens: -2, output_tokens: 0 },
+                answers: { needs_complex: { type: 'noul', noul: 0.9 } },
+              },
+            }),
+          ),
+        ),
+    );
+    expect(
+      await new ClefService(new ConfigService(settings)).route('Question'),
+    ).toMatchObject({ reason: 'invalid_response', estimatedCostUsd: null });
+  });
   it('propagates cancellation instead of continuing with a fallback', async () => {
     const controller = new AbortController();
     controller.abort(new Error('cancelled'));

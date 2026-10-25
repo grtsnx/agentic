@@ -39,6 +39,13 @@ class RuntimeCallDto {
   calls!: number;
 }
 
+class RoutingUsageDto {
+  @ApiProperty({ example: 263 })
+  input_tokens!: number;
+  @ApiProperty({ example: 0 })
+  output_tokens!: number;
+}
+
 class RuntimeRoutingDto {
   @ApiProperty({ enum: ['gpt-5-nano', 'gpt-6-luna'], example: 'gpt-6-luna' })
   model!: string;
@@ -58,9 +65,15 @@ class RuntimeRoutingDto {
     nullable: true,
     example: null,
     description:
-      'Unknown classifier cost; excluded from generation token and cost totals.',
+      'Classifier list-price estimate from provider usage; excludes free allowances and is separate from generation cost.',
   })
-  estimatedCostUsd!: null;
+  estimatedCostUsd!: number | null;
+  @ApiPropertyOptional({ type: RoutingUsageDto })
+  usage?: RoutingUsageDto;
+  @ApiPropertyOptional({
+    description: 'Provider request reference for usage reconciliation.',
+  })
+  requestId?: string;
 }
 
 export class OpenaiRuntimeDto {

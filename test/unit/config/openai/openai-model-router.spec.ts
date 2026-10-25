@@ -1,4 +1,8 @@
-import { routeOpenaiModel } from '@/config';
+import {
+  routeOpenaiModel,
+  isDirectTextRequest,
+  openaiModelSettings,
+} from '@/config';
 
 describe('routeOpenaiModel', () => {
   it.each([
@@ -66,5 +70,47 @@ describe('routing regressions', () => {
     expect(routeOpenaiModel('Hello', { hasAttachments: true })).toBe(
       'gpt-5-nano',
     );
+  });
+});
+
+describe('fast direct responses', () => {
+  it.each([
+    'Hello!',
+    'What is 17 times 23? Reply with just the number.',
+    'Convert "tangerine seven" to uppercase. Return only those two words.',
+    'Repeat that code in uppercase.',
+  ])('recognizes a bounded direct text task: %s', (message) => {
+    expect(isDirectTextRequest(message)).toBe(true);
+    expect(
+      routeOpenaiModel(message, {
+        hasAttachments: true,
+        recentUserMessages: ['Debug my API.'],
+      }),
+    ).toBe('gpt-5-nano');
+  });
+  it.each([
+    'Hello, search the web for current news.',
+    'Calculate my tax bill.',
+    'Convert this file and send it to Jane.',
+    'What is 17 times 23? Then run the code.',
+    'Summarize the attached PDF.',
+  ])('preserves tool availability for other requests: %s', (message) =>
+    expect(isDirectTextRequest(message)).toBe(false),
+  );
+  it('retains compatible reasoning for tool calls', () => {
+    expect(openaiModelSettings('gpt-5-nano', true)).toEqual({
+      reasoning: { effort: 'low' },
+    });
+    expect(openaiModelSettings('gpt-5-nano', false)).toEqual({
+      reasoning: { effort: 'minimal' },
+    });
+    expect(openaiModelSettings('gpt-6-luna', true)).toEqual({});
+  });
+  it('recognizes software fixes without exact engineering keywords', () => {
+    expect(
+      routeOpenaiModel(
+        'fix th enative participant aware issue in the voice worker',
+      ),
+    ).toBe('gpt-6-luna');
   });
 });

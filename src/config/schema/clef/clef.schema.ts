@@ -1,10 +1,16 @@
 import { z } from 'zod';
 import { OPENAI_MODELS } from '../../openai/openai-model-router.js';
 
+export const clefUsageSchema = z.object({
+  input_tokens: z.number().int().nonnegative(),
+  output_tokens: z.number().int().nonnegative(),
+});
+
 // A noul question returns a probability, never an arbitrary model name or executable action.
 export const clefResponseSchema = z.object({
   success: z.literal(true),
   result: z.object({
+    usage: clefUsageSchema.optional(),
     answers: z.object({
       // Clef returns typed answers. A `noul` answer is an object containing
       // the probability, rather than the probability at the answer root.
@@ -21,6 +27,7 @@ export const modelRoutingSchema = z
     source: z.enum(['local', 'clef']),
     reason: z.enum([
       'classified',
+      'fast_path',
       'disabled',
       'credentials_missing',
       'uncertain',
@@ -31,7 +38,9 @@ export const modelRoutingSchema = z
     ]),
     probability: z.number().min(0).max(1).optional(),
     durationMs: z.number().int().nonnegative(),
-    // Provider billing is separate from generation usage until verified usage is available.
-    estimatedCostUsd: z.null(),
+    // List-price estimate based on reported usage, not the invoice after free allowances.
+    estimatedCostUsd: z.number().nonnegative().nullable(),
+    usage: clefUsageSchema.optional(),
+    requestId: z.string().max(128).optional(),
   })
   .strict();

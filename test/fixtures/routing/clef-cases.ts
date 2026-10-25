@@ -1,4 +1,5 @@
 import type { OpenaiModel, OpenaiRoutingContext } from '@/config';
+// Frozen task-policy labels: repeat these plus new regressions; do not relabel to fit provider output.
 export const clefCases: Array<{
   id: string;
   message: string;
@@ -75,6 +76,49 @@ export const clefCases: Array<{
   {
     id: 'typo-repair',
     message: 'fix th enative participant aware issue in the voice worker',
+    expected: 'gpt-6-luna',
+  },
+  {
+    id: 'simple-transform-after-code',
+    message: 'Repeat that code in uppercase.',
+    context: {
+      recentUserMessages: ['Debug this TypeScript API.'],
+      hasAttachments: true,
+    },
+    expected: 'gpt-5-nano',
+  },
+  { id: 'arithmetic', message: 'What is 17 times 23?', expected: 'gpt-5-nano' },
+  {
+    id: 'quoted-transform',
+    message: 'Convert "tangerine seven" to uppercase.',
+    expected: 'gpt-5-nano',
+  },
+  {
+    id: 'software-repair',
+    message: 'fix the reconnect bug in my websocket service',
+    expected: 'gpt-6-luna',
+  },
+  {
+    id: 'new-topic',
+    message: 'Who wrote Pride and Prejudice?',
+    context: { recentUserMessages: ['Design a secure API.'] },
+    expected: 'gpt-5-nano',
+  },
+  {
+    id: 'workflow',
+    message:
+      'Research competing products, compare prices, and recommend an architecture.',
+    expected: 'gpt-6-luna',
+  },
+  {
+    id: 'definition-after-code',
+    message: 'What is a database?',
+    context: { recentUserMessages: ['Debug this API.'] },
+    expected: 'gpt-5-nano',
+  },
+  {
+    id: 'approval-variation',
+    message: 'Run JavaScript that prints hello, but ask me to approve first.',
     expected: 'gpt-6-luna',
   },
 ];

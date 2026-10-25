@@ -22,6 +22,24 @@ const ACKNOWLEDGEMENT =
 const DEFINITION =
   /^(?:what (?:is|are|does)\b|define\b|explain the (?:term|meaning)\b)/i;
 
+// These closed forms need neither retrieval nor external actions. Keep this
+// deliberately narrow so optimization never removes tools from substantive work.
+export function isDirectTextRequest(message: string): boolean {
+  const text = message.trim();
+  return (
+    ACKNOWLEDGEMENT.test(text) ||
+    /^(?:what is |calculate )?-?\d{1,8}\s*(?:[+*\/-]|times|plus|minus)\s*-?\d{1,8}[?.!]*(?: reply with just (?:the number|the answer)\.)?$/i.test(
+      text,
+    ) ||
+    /^(?:convert|make) ["“][^"”\n]{1,240}["”] (?:to|into) (?:uppercase|lowercase)[.!]?(?: return only (?:the text|those (?:two )?words)\.)?$/i.test(
+      text,
+    ) ||
+    /^(?:repeat|put|convert) (?:that|it|this)(?: code)? (?:in|to) (?:uppercase|lowercase)[.!]?$/i.test(
+      text,
+    )
+  );
+}
+
 function classifyTask(message: string): OpenaiModel {
   // A definition mentioning technical words is not an engineering task.
   if (
@@ -30,6 +48,12 @@ function classifyTask(message: string): OpenaiModel {
     !/\b(?:and|then|how|why|compare|versus|vs)\b/i.test(message)
   )
     return OPENAI_MODELS.economical;
+  if (
+    /\b(?:fix|repair)\b.*\b(?:bug|error|issue|worker|service|api|code)\b/i.test(
+      message,
+    )
+  )
+    return OPENAI_MODELS.complex;
   if (TASK_INTENT.test(message)) return OPENAI_MODELS.complex;
   let score = message.length >= 1_200 ? 2 : message.length >= 500 ? 1 : 0;
   for (const signal of COMPLEXITY_SIGNALS) if (signal.test(message)) score += 1;
@@ -45,7 +69,7 @@ export function routeOpenaiModel(
   context: OpenaiRoutingContext = {},
 ): OpenaiModel {
   const normalized = message.trim();
-  if (ACKNOWLEDGEMENT.test(normalized)) return OPENAI_MODELS.economical;
+  if (isDirectTextRequest(normalized)) return OPENAI_MODELS.economical;
   if (classifyTask(normalized) === OPENAI_MODELS.complex)
     return OPENAI_MODELS.complex;
   const followUp = normalized.length <= 320 && FOLLOW_UP.test(normalized);
@@ -74,8 +98,11 @@ export function routeOpenaiModel(
 }
 
 // Simple requests do not need the provider's default reasoning budget.
-export function openaiModelSettings(model: OpenaiModel): ModelSettings {
+export function openaiModelSettings(
+  model: OpenaiModel,
+  hasTools = true,
+): ModelSettings {
   return model === OPENAI_MODELS.economical
-    ? { reasoning: { effort: 'low' } }
+    ? { reasoning: { effort: hasTools ? 'low' : 'minimal' } }
     : {};
 }

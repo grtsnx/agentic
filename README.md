@@ -313,7 +313,7 @@ Ordered from foundations to advanced capabilities. ✅ Verified complete · ⬜ 
 - ✅ Add a native LiveKit voice console command with explicit `.env` loading and verify a synthetic audio conversation.
 - ✅ Validate human microphone capture and audible replies on macOS (user confirmed, 2026-10-25).
 - ✅ Validate the Linux ARM64 Compose image: API health, playground delivery, native voice bindings, and LiveKit Cloud worker registration (2026-10-25).
-- ⬜ Run the Windows/Linux CI matrix to verify builds, tests, and native voice-worker loading.
+- ✅ Run the Windows/Linux CI matrix to verify builds, tests, and native voice-worker loading (user confirmed, 2026-10-25).
 - ⬜ Validate human microphone capture on Windows and Linux before marking cross-platform voice CLI input complete; test machines are not yet available.
 - ⬜ Add telephony only after an explicitly approved phone-number purchase and SIP dispatch design.
 - ✅ Display human approval requests when privileged tools are introduced.

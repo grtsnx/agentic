@@ -29,6 +29,7 @@ import {
   OPENAI_MODELS,
   routeOpenaiModel,
   openaiModelSettings,
+  isDirectTextRequest,
   mapProviderError,
   type OpenaiModel,
   WebToolsService,
@@ -73,16 +74,19 @@ export class OpenaiService {
     const model = routing.model;
     const searchEnabled = this.setting('WEB_SEARCH_ENABLED', true);
     const sources: WebSource[] = options.sources ?? [];
+    const tools = isDirectTextRequest(message)
+      ? []
+      : [
+          ...this.createTools(model, searchEnabled, signal, sources, options),
+          ...(options.tools ?? []),
+        ];
     const agent = new Agent({
       name: AGENT_NAME,
       instructions: AGENT_INSTRUCTIONS + (options.toolInstructions ?? ''),
       model,
-      modelSettings: openaiModelSettings(model),
+      modelSettings: openaiModelSettings(model, tools.length > 0),
       outputType: openaiOutputSchema,
-      tools: [
-        ...this.createTools(model, searchEnabled, signal, sources, options),
-        ...(options.tools ?? []),
-      ],
+      tools,
     });
 
     try {
@@ -136,15 +140,18 @@ export class OpenaiService {
     const model = routing.model;
     const searchEnabled = this.setting('WEB_SEARCH_ENABLED', true);
     const sources: WebSource[] = options.sources ?? [];
+    const tools = isDirectTextRequest(message)
+      ? []
+      : [
+          ...this.createTools(model, searchEnabled, signal, sources, options),
+          ...(options.tools ?? []),
+        ];
     const agent = new Agent({
       name: AGENT_NAME,
       instructions: AGENT_INSTRUCTIONS + (options.toolInstructions ?? ''),
       model,
-      modelSettings: openaiModelSettings(model),
-      tools: [
-        ...this.createTools(model, searchEnabled, signal, sources, options),
-        ...(options.tools ?? []),
-      ],
+      modelSettings: openaiModelSettings(model, tools.length > 0),
+      tools,
     });
     let stream;
     try {
@@ -216,6 +223,14 @@ export class OpenaiService {
     options: OpenaiStreamOptions,
   ): Promise<ModelRoutingDecision> {
     try {
+      if (isDirectTextRequest(message))
+        return {
+          model: OPENAI_MODELS.economical,
+          source: 'local',
+          reason: 'fast_path',
+          durationMs: 0,
+          estimatedCostUsd: 0,
+        };
       const history = (await options.session?.getItems(24)) ?? [];
       const recentUserMessages = history.flatMap((item) => {
         if (!('role' in item) || item.role !== 'user' || !('content' in item))

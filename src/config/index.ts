@@ -11,6 +11,7 @@ export {
   OPENAI_MODELS,
   routeOpenaiModel,
   openaiModelSettings,
+  isDirectTextRequest,
 } from './openai/openai-model-router.js';
 export { mapProviderError } from './openai/provider-error.js';
 export { WebToolsService } from './agent/tools/web/web-tools.service.js';
@@ -43,4 +44,7 @@ export {
   FILE_ACCEPT,
 } from './agent/tools/file-policy.js';
 
-export { CLEF_QUESTION } from './openai/clef-routing.js';
+export {
+  CLEF_QUESTION,
+  CLEF_INPUT_USD_PER_MILLION,
+} from './openai/clef-routing.js';

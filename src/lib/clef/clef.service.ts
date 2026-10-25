@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   CLEF_QUESTION,
+  CLEF_INPUT_USD_PER_MILLION,
   OPENAI_MODELS,
   clefResponseSchema,
   routeOpenaiModel,
@@ -22,6 +23,15 @@ export class ClefService {
     signal?.throwIfAborted();
     const started = performance.now();
     const local = routeOpenaiModel(message, context);
+    let usage: ModelRoutingDecision['usage'];
+    let requestId: string | undefined;
+    const accounting = () => ({
+      estimatedCostUsd: usage
+        ? (usage.input_tokens * CLEF_INPUT_USD_PER_MILLION) / 1_000_000
+        : null,
+      ...(usage ? { usage } : {}),
+      ...(requestId ? { requestId } : {}),
+    });
     const fallback = (
       reason: ModelRoutingDecision['reason'],
       probability?: number,
@@ -30,7 +40,7 @@ export class ClefService {
       source: 'local',
       reason,
       durationMs: Math.max(0, Math.round(performance.now() - started)),
-      estimatedCostUsd: null,
+      ...accounting(),
       ...(probability === undefined ? {} : { probability }),
     });
     if (!this.config.get<boolean>('CLEF_ROUTING_ENABLED', false))
@@ -76,6 +86,7 @@ export class ClefService {
           }),
         },
       );
+      requestId = response.headers.get('cf-ray')?.slice(0, 128) || undefined;
       if (!response.ok) {
         await response.body?.cancel();
         return fallback('provider_error');
@@ -89,6 +100,8 @@ export class ClefService {
       }
       const parsed = clefResponseSchema.safeParse(payload);
       if (!parsed.success) return fallback('invalid_response');
+      // Uncertain decisions still incur provider usage. Keep accounting on fallback.
+      usage = parsed.data.result.usage;
       const probability = parsed.data.result.answers.needs_complex.noul;
       const confidence = this.config.get<number>(
         'CLEF_ROUTING_CONFIDENCE',
@@ -106,7 +119,7 @@ export class ClefService {
         reason: 'classified',
         probability,
         durationMs: Math.max(0, Math.round(performance.now() - started)),
-        estimatedCostUsd: null,
+        ...accounting(),
       };
     } catch {
       // Cancellation stops the whole turn. Provider faults only disable this optional decision.
