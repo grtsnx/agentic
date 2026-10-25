@@ -13,6 +13,9 @@ describe('voice agent', () => {
 
     expect(assistant.instructions).toContain('concise');
     expect(assistant.instructions).toContain('spoken conversation');
+    expect(assistant.instructions).toContain('playful');
+    expect(assistant.instructions).toContain('serious');
+    expect(assistant.instructions).toContain('laugh');
   });
 
   it('exports privacy-safe observability settings', () => {

@@ -283,6 +283,9 @@ describe('AppController (e2e)', () => {
     expect(page.text).toContain('/playground/livekit-app.js');
     expect(page.text).toContain('id="voice-connect"');
     expect(page.text).toContain('class="voice-visualizer"');
+    expect(page.text).toContain('id="voice-session"');
+    expect(page.text).toContain('id="voice-transcript"');
+    expect(page.text).toContain('id="voice-end"');
     expect(livekitApp.text).toContain("fetch('/v1/voice/token'");
     expect(script.text).not.toContain('LivekitClient.Room');
     expect(livekitApp.text).toContain('LivekitClient.Room');
@@ -290,6 +293,12 @@ describe('AppController (e2e)', () => {
       'LivekitClient.RoomEvent.ParticipantAttributesChanged',
     );
     expect(livekitApp.text).toContain("'lk.agent.state'");
+    expect(livekitApp.text).toContain(
+      'LivekitClient.RoomEvent.TranscriptionReceived',
+    );
+    expect(livekitApp.text).toContain('requestAnimationFrame(flushTranscript)');
+    expect(livekitApp.text).toContain("'agentic:voice-transcript'");
+    expect(script.text).toContain("'agentic:voice-transcript'");
     expect(livekit.text).toContain('LivekitClient');
     expect(page.text).not.toContain('https://hoppscotch.io');
     expect(page.text).not.toContain('/v1/chat');
@@ -300,6 +309,8 @@ describe('AppController (e2e)', () => {
     expect(styles.text).toContain('color-scheme: light');
     expect(styles.text).toContain('.thinking-orb');
     expect(styles.text).toContain(".voice-status[data-state='thinking']");
+    expect(styles.text).toContain('.voice-session:not([hidden])');
+    expect(styles.text).toContain('.voice-transcript-panel');
     expect(styles.text).toContain('@keyframes shimmer');
     expect(styles.text).toContain('.user .message-body');
     expect(styles.text).toContain('justify-self: end');
