@@ -4,6 +4,7 @@ const microphoneIcon = `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" 
 
 export const VOICE_PLAYGROUND_VIEW = `
     <section id="voice-session" class="voice-session" data-state="idle" role="dialog" aria-modal="true" aria-labelledby="voice-title" hidden>
+      <div id="voice-toast" class="voice-toast" role="status" aria-live="assertive" hidden></div>
       <header class="voice-session-header">
         <div class="voice-session-brand">
           <span class="brand-mark" aria-hidden="true">${AGENTIC_SYMBOL}</span>
@@ -73,6 +74,7 @@ export const VOICE_PLAYGROUND_STYLES = `
 .voice-session { --voice-blue: #5267cb; --voice-mint: #218b79; position: fixed; inset: 0; z-index: 100; display: grid; grid-template-rows: 76px minmax(0, 1fr); color: #252b37; background: #fff; }
 .voice-session[hidden], .voice-session [hidden] { display: none !important; }
 .voice-session:not([hidden]) { animation: voice-session-enter .3s ease-out; }
+.voice-toast { position: fixed; top: 86px; left: 50%; z-index: 3; max-width: min(420px, calc(100vw - 32px)); padding: 12px 16px; border: 1px solid #f4caca; border-radius: 12px; color: #9d4141; background: #fff7f7; box-shadow: 0 12px 28px #7c303018; font-size: .75rem; line-height: 1.45; transform: translateX(-50%); animation: voice-toast-in .2s ease-out; }
 .voice-session svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.65; stroke-linecap: round; stroke-linejoin: round; }
 .voice-session .agentic-symbol { width: 26px; height: 26px; stroke: none; }
 .voice-participant-avatar .agentic-symbol { width: 23px; height: 23px; }
@@ -185,4 +187,5 @@ export const VOICE_PLAYGROUND_STYLES = `
 }
 @media (max-width: 760px) { .voice-stage { height: clamp(440px, calc(100dvh - 82px), 570px); min-height: 440px; } .voice-session-layout { padding-bottom: max(10px, env(safe-area-inset-bottom)); } }
 @media (max-height: 500px) and (min-width: 761px) { .voice-session-layout { overflow-y: auto; } .voice-stage, .voice-transcript-panel { min-height: 430px; } }
+@keyframes voice-toast-in { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 `;

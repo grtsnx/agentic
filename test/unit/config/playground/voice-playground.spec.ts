@@ -185,17 +185,15 @@ describe('voice playground lifecycle', () => {
     expect(ui.element('start').hidden).toBe(false);
     expect(ui.element('transcript').children).toEqual([]);
   });
-  it('opens without recording, then preserves an agent already speaking during connection', async () => {
+  it('connects immediately from the voice entry point and preserves an agent already speaking', async () => {
     const ui = setup();
-    await ui.click('connect');
-    expect(ui.element('session').hidden).toBe(false);
-    expect(ui.fetch).not.toHaveBeenCalled();
-    expect(ui.local.setMicrophoneEnabled).not.toHaveBeenCalled();
     ui.room.connect.mockImplementation(async () => {
       ui.agent.attributes['lk.agent.state'] = 'speaking';
       ui.room.emit('ParticipantAttributesChanged', {}, ui.agent);
     });
-    await ui.click('start');
+    await ui.click('connect');
+    expect(ui.element('session').hidden).toBe(false);
+    expect(ui.fetch).toHaveBeenCalledOnce();
     expect(ui.element('session').dataset.state).toBe('agent-speaking');
     expect(ui.local.setMicrophoneEnabled).toHaveBeenCalledWith(true);
   });
@@ -301,6 +299,16 @@ describe('voice playground lifecycle', () => {
     expect(ui.element('mute').disabled).toBe(true);
     expect(ui.aura.reset).toHaveBeenCalled();
     expect(ui.room.eventNames()).toHaveLength(0);
+  });
+
+  it('shows a network toast when LiveKit reconnects', async () => {
+    const ui = setup();
+    await ui.start();
+    ui.room.emit('Reconnecting');
+    expect(ui.element('toast').hidden).toBe(false);
+    expect(ui.element('toast').textContent).toContain('Network issue');
+    ui.room.emit('Reconnected');
+    expect(ui.element('toast').hidden).toBe(true);
   });
 });
 

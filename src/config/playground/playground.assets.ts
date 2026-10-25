@@ -286,9 +286,12 @@ export const PLAYGROUND_APP = `(() => {
     const message = ensureAssistant();
     const metadata = document.createElement('div');
     metadata.className = 'runtime-chips';
+    const tokenUsage = runtime.tokens && Number.isFinite(runtime.tokens.input) && Number.isFinite(runtime.tokens.output) && Number.isFinite(runtime.tokens.total)
+      ? Number(runtime.tokens.input).toLocaleString() + ' in / ' + Number(runtime.tokens.output).toLocaleString() + ' out / ' + Number(runtime.tokens.total).toLocaleString() + ' total'
+      : undefined;
     const values = [
       formatDuration(runtime.durationMs),
-      runtime.tokens ? runtime.tokens.total + ' tokens' : undefined,
+      tokenUsage,
       runtime.cost ? '$' + Number(runtime.cost.estimatedUsd ?? 0).toFixed(6) : undefined,
       runtime.models?.[0]?.name,
     ].filter(Boolean);

@@ -42,8 +42,8 @@ export const VOICE_AURA_FACTORY = `
       if (!audioContext) return;
       try {
         const analyser = audioContext.createAnalyser();
-        analyser.fftSize = 512;
-        analyser.smoothingTimeConstant = 0.15;
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.05;
         const source = audioContext.createMediaStreamSource(new MediaStream([mediaTrack]));
         source.connect(analyser);
         sources.set(mediaTrack.id, {
@@ -69,7 +69,7 @@ export const VOICE_AURA_FACTORY = `
       const participant = participants[role];
       const bands = new Array(12).fill(0);
       if (!participant || (role === 'user' && !participant.isMicrophoneEnabled)) return { level: 0, bands };
-      let peak = Math.min(1, Math.max(0, participant.audioLevel || 0) * 3);
+      let peak = Math.min(1, Math.max(0, participant.audioLevel || 0) * 7);
       for (const entry of sources.values()) {
         if (entry.role !== role || entry.participant !== participant || entry.track.isMuted) continue;
         entry.analyser.getFloatTimeDomainData(entry.samples);
@@ -78,7 +78,7 @@ export const VOICE_AURA_FACTORY = `
         for (const sample of entry.samples) sum += sample * sample;
         const rms = Math.sqrt(sum / entry.samples.length);
         // Fast, perceptual gain makes soft speech visible without amplifying silence.
-        peak = Math.max(peak, Math.pow(Math.max(0, rms - 0.003) * 9, 0.72));
+        peak = Math.max(peak, Math.pow(Math.max(0, rms - 0.002) * 15, 0.64));
         for (let i = 0; i < bands.length; i += 1) {
           const bin = Math.min(entry.frequencies.length - 1, 2 + Math.round(Math.pow(i / 11, 1.6) * 100));
           bands[i] = Math.max(bands[i], entry.frequencies[bin] / 255);
@@ -113,10 +113,10 @@ export const VOICE_AURA_FACTORY = `
       const agent = readAudio('agent');
       for (const role of ['user', 'agent']) {
         const target = role === 'user' ? user.level : agent.level;
-        const timeConstant = target > levels[role] ? 0.025 : 0.12;
+        const timeConstant = target > levels[role] ? 0.008 : 0.065;
         levels[role] += (target - levels[role]) * (1 - Math.exp(-dt / timeConstant));
       }
-      if (now - lastMeterAt >= 32) {
+      if (now - lastMeterAt >= 16) {
         onLevels({ ...levels }, { user: user.bands, agent: agent.bands });
         lastMeterAt = now;
       }
@@ -127,9 +127,9 @@ export const VOICE_AURA_FACTORY = `
       const reduced = motionPreference.matches;
       const targetHue = isUser ? 166 : thinking ? 254 : state === 'error' ? 12 : state === 'muted' ? 217 : 211;
       hue += (targetHue - hue) * (1 - Math.exp(-dt / 0.18));
-      phase += dt * (reduced ? 0 : 0.45 + volume * 3 + (thinking ? 1.2 : 0));
-      const radius = Math.min(width, height) * (0.247 + volume * (reduced ? 0.012 : 0.055));
-      const amplitude = radius * (reduced ? 0.022 : 0.05 + volume * 0.22 + (thinking ? 0.035 : 0));
+      phase += dt * (reduced ? 0 : 0.65 + volume * 8 + (thinking ? 1.6 : 0));
+      const radius = Math.min(width, height) * (0.247 + volume * (reduced ? 0.018 : 0.095));
+      const amplitude = radius * (reduced ? 0.028 : 0.075 + volume * 0.36 + (thinking ? 0.05 : 0));
       context.clearRect(0, 0, width, height);
       const cx = width / 2;
       const cy = height / 2;

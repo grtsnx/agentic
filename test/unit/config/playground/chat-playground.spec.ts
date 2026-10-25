@@ -158,6 +158,20 @@ describe('chat interruption handling', () => {
       metadata.children.map((node) => node.textContent).join(' '),
     ).not.toContain('context_dev_search');
   });
+
+  it('displays input and output token usage separately', () => {
+    const ui = setup();
+    ui.socket.emit('chat.completed', {
+      response: {
+        message: 'Done',
+        runtime: {
+          tokens: { input: 21, output: 13, total: 34 },
+        },
+      },
+    });
+    expect(ui.body.textContent).toContain('21 in / 13 out / 34 total');
+    expect(ui.body.textContent).not.toContain('34 tokens');
+  });
 });
 
 describe('live progress and citations', () => {

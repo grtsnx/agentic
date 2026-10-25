@@ -7,7 +7,7 @@ export const LIVEKIT_BROWSER_APP = `(() => {
     'mute', 'quality', 'session', 'session-hint', 'session-state', 'title',
     'status', 'status-label', 'transcript', 'transcript-empty', 'transcript-panel',
     'transcript-toggle', 'live-label', 'user', 'agent', 'user-state', 'agent-state',
-    'user-meter', 'agent-meter', 'enable-audio',
+    'user-meter', 'agent-meter', 'enable-audio', 'toast',
   ].map((name) => [name, document.querySelector('#voice-' + name)]));
   const appShell = document.querySelector('.app-shell');
   const rows = new Map();
@@ -21,6 +21,7 @@ export const LIVEKIT_BROWSER_APP = `(() => {
   let microphoneReady = false;
   let transcriptFrame;
   let elapsedTimer;
+  let toastTimer;
   let startedAt;
   let activeSpeakers = new Set();
 
@@ -52,6 +53,21 @@ export const LIVEKIT_BROWSER_APP = `(() => {
   }
 
   const aura = createAudioReactiveAura(elements.aura, renderLevels);
+
+  function clearToast() {
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = undefined;
+    elements.toast.hidden = true;
+    elements.toast.textContent = '';
+  }
+
+  function showToast(message) {
+    if (!elements.toast) return;
+    if (toastTimer) clearTimeout(toastTimer);
+    elements.toast.textContent = message;
+    elements.toast.hidden = false;
+    toastTimer = setTimeout(clearToast, 6500);
+  }
 
   function isAgent(participant) {
     return participant?.isAgent === true;
@@ -115,8 +131,10 @@ export const LIVEKIT_BROWSER_APP = `(() => {
     appShell.inert = true;
     document.body.classList.add('voice-active');
     aura.start();
-    renderState('idle');
-    elements.start.focus();
+    renderState('connecting');
+    // The microphone button is the conversation entry point. Start signaling
+    // immediately so the user never lands in a second, inert screen.
+    void connect();
   }
 
   function closeSession() {
@@ -283,9 +301,11 @@ export const LIVEKIT_BROWSER_APP = `(() => {
       reconnecting = true;
       syncState();
       elements.quality.textContent = 'Reconnecting your conversation…';
+      showToast('Network issue. Reconnecting your voice conversation…');
     });
     on(LivekitClient.RoomEvent.Reconnected, () => {
       reconnecting = false;
+      clearToast();
       syncTracks(nextRoom);
       elements.quality.textContent = 'Connected · You can interrupt anytime';
     });
@@ -298,6 +318,7 @@ export const LIVEKIT_BROWSER_APP = `(() => {
       resetControls();
       renderState('disconnected');
       elements.quality.textContent = 'Connection ended · Your transcript remains here';
+      showToast('Network issue. Your voice conversation ended. Start again when ready.');
       nextRoom.removeAllListeners();
     });
   }
@@ -356,6 +377,7 @@ export const LIVEKIT_BROWSER_APP = `(() => {
       }
       microphoneReady = true;
       elements.mute.disabled = false;
+      clearToast();
       elements.quality.textContent = 'Connected · You can interrupt anytime';
       syncTracks(nextRoom);
     } catch (error) {
@@ -373,6 +395,8 @@ export const LIVEKIT_BROWSER_APP = `(() => {
         : name === 'NotFoundError' ? 'Connect a microphone and try again.'
         : name === 'AbortError' ? 'The connection took too long. Try again.'
         : 'We could not connect to voice. Check your connection and that the voice worker is running.';
+      const networkFailure = name === 'AbortError' || /network|fetch|failed|unavailable|signal|timeout|websocket/i.test(message);
+      if (networkFailure) showToast('Network issue. Check your connection and try again.');
       renderState('error', detail);
       elements.quality.textContent = 'Microphone off';
     } finally {
