@@ -246,6 +246,29 @@ describe('AppController (e2e)', () => {
     );
   });
 
+  it('serves a same-origin Socket.IO playground and local assets', async () => {
+    const page = await request(app.getHttpServer())
+      .get('/realtime')
+      .expect('Content-Type', /text\/html/)
+      .expect(200);
+    const script = await request(app.getHttpServer())
+      .get('/realtime/app.js')
+      .expect('Content-Type', /javascript/)
+      .expect(200);
+    const styles = await request(app.getHttpServer())
+      .get('/realtime/styles.css')
+      .expect('Content-Type', /text\/css/)
+      .expect(200);
+
+    expect(page.text).toContain('Socket.IO Realtime Chat');
+    expect(page.text).toContain('/socket.io/socket.io.js');
+    expect(page.text).toContain('/realtime/app.js');
+    expect(page.text).not.toContain('https://hoppscotch.io');
+    expect(script.text).toContain("io('/v1/chat'");
+    expect(script.text).toContain("matchMedia('(prefers-color-scheme: dark)')");
+    expect(styles.text).toContain('color-scheme: light dark');
+  });
+
   it.each(['/v1', '/v2'])('%s (GET)', async (path) => {
     await request(app.getHttpServer()).get(path).expect(200).expect({
       statusCode: 200,

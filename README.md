@@ -16,7 +16,7 @@ bun install --frozen-lockfile
 bun run start:dev
 ```
 
-Swagger UI runs at `http://localhost:3000/api`, and Scalar runs at `http://localhost:3000/docs`. Both use the version-specific OpenAPI documents at `/api/v1-json` and `/api/v2-json`. The application prints every enabled documentation URL when it starts.
+Swagger UI runs at `http://localhost:3000/api`, Scalar runs at `http://localhost:3000/docs`, and the embedded Socket.IO playground runs at `http://localhost:3000/realtime`. The application prints every enabled documentation URL when it starts.
 
 Start the interactive streaming CLI in another terminal:
 
@@ -28,7 +28,7 @@ The REST endpoint remains `POST /v1/chat`. Socket.IO streams on the `/v1/chat` n
 
 ## Socket.IO chat
 
-Connect a Socket.IO v4 client to `http://localhost:3000/v1/chat` with the WebSocket transport.
+Open `http://localhost:3000/realtime`, wait for **Connected**, enter a message, and select **Send**. The page displays streaming text, lifecycle events, tokens, estimated cost, models, and tools. Use **Cancel** to stop the active turn. The page uses the Socket.IO v4 client served by this application and connects to the `/v1/chat` namespace with the WebSocket transport.
 
 | Direction       | Event             | Data                                                         |
 | --------------- | ----------------- | ------------------------------------------------------------ |
@@ -41,20 +41,21 @@ Connect a Socket.IO v4 client to `http://localhost:3000/v1/chat` with the WebSoc
 | Server → client | `chat.cancelled`  | Confirms that the active model turn stopped.                 |
 | Server → client | `chat.error`      | A stable error code and safe message.                        |
 
-[Hoppscotch](https://hoppscotch.com/) is the recommended free tester: open **Realtime → Socket.IO**, choose Socket.IO v4, connect to the namespace above, listen for the server events, and emit `chat.send`. Hoppscotch also supports embeddable shared-request widgets; adding one here requires a generated public share URL. Use the desktop client or agent when browser origin restrictions prevent localhost access.
+The embedded playground is same-origin, so it works without adding a public website to `CORS_ORIGINS`. The Socket.IO adapter allows the API's own browser origin by default and rejects other browser origins unless they are explicitly configured. For optional external testing in [Hoppscotch](https://hoppscotch.com/), add its exact origin to `CORS_ORIGINS`; do not use `*`.
 
 ## Configuration
 
 The application validates configuration before it starts. Invalid ports, booleans, and CORS origins stop startup.
 
-| Variable          | Default               | Purpose                                                                     |
-| ----------------- | --------------------- | --------------------------------------------------------------------------- |
-| `NODE_ENV`        | `development`         | Selects development, test, or production behavior.                          |
-| `PORT`            | `3000`                | Sets the HTTP port.                                                         |
-| `PLATFORM_NAME`   | `Agentic`             | Names the API and OpenAPI document.                                         |
-| `CORS_ORIGINS`    | empty                 | Lists exact, comma-separated browser origins. Empty disables CORS.          |
-| `SWAGGER_ENABLED` | on outside production | Enables Swagger, Scalar, and OpenAPI JSON. Set it explicitly in production. |
-| `OBSERVE_ENABLED` | `false`               | Enables NestJS Observe when valid credentials are present.                  |
+| Variable                      | Default               | Purpose                                                                     |
+| ----------------------------- | --------------------- | --------------------------------------------------------------------------- |
+| `NODE_ENV`                    | `development`         | Selects development, test, or production behavior.                          |
+| `PORT`                        | `3000`                | Sets the HTTP port.                                                         |
+| `PLATFORM_NAME`               | `Agentic`             | Names the API and OpenAPI document.                                         |
+| `CORS_ORIGINS`                | empty                 | Lists exact, comma-separated browser origins. Empty disables CORS.          |
+| `SWAGGER_ENABLED`             | on outside production | Enables Swagger, Scalar, and OpenAPI JSON. Set it explicitly in production. |
+| `REALTIME_PLAYGROUND_ENABLED` | on outside production | Enables the embedded same-origin Socket.IO chat tester.                     |
+| `OBSERVE_ENABLED`             | `false`               | Enables NestJS Observe when valid credentials are present.                  |
 
 Never use `*` in `CORS_ORIGINS`. The server accepts only complete HTTP or HTTPS origins without paths.
 
@@ -76,6 +77,7 @@ src/                      # Application source.
 │   ├── filters/         # Global exception handling.
 │   └── interceptors/    # Global response transformation.
 ├── modules/              # Feature modules separated by API version.
+│   ├── realtime/         # Embedded same-origin Socket.IO playground.
 │   ├── v1/              # Stable version 1 feature boundary.
 │   └── v2/              # Clean boundary reserved for changed v2 contracts.
 ├── cli.ts                # Standalone CLI entry point.
@@ -116,6 +118,7 @@ Completion: v1 returns a live model response, rejects invalid input, and exposes
 
 - ✅ Add a CLI that uses the same application services as the REST API.
 - ✅ Stream model output over the CLI and a versioned Socket.IO namespace.
+- ✅ Provide an embedded same-origin playground for testing Socket.IO streams.
 - ✅ Cancel active CLI and Socket.IO turns without persisting partial sessions.
 - ✅ Display tokens, estimated cost, model calls, tool calls, and safe provider errors.
 - ⬜ Add configurable model timeouts and explicit non-zero CLI exit codes.

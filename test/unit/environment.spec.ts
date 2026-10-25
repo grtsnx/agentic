@@ -40,6 +40,17 @@ describe('validateEnvironment', () => {
     ).toBe(false);
   });
 
+  it('defaults the realtime playground on outside production', () => {
+    expect(
+      validateEnvironment({ NODE_ENV: 'development' })
+        .REALTIME_PLAYGROUND_ENABLED,
+    ).toBe(true);
+    expect(
+      validateEnvironment({ NODE_ENV: 'production' })
+        .REALTIME_PLAYGROUND_ENABLED,
+    ).toBe(false);
+  });
+
   it('rejects invalid ports and booleans', () => {
     expect(() => validateEnvironment({ PORT: '0' })).toThrow(/PORT/);
     expect(() => validateEnvironment({ OBSERVE_ENABLED: 'sometimes' })).toThrow(

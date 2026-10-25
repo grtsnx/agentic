@@ -78,6 +78,9 @@ export async function createApplication(): Promise<{
     OBSERVE_APP_SECRET: config.get<string>('OBSERVE_APP_SECRET'),
     OBSERVE_SERVICE_ID: config.get<string>('OBSERVE_SERVICE_ID'),
     SWAGGER_ENABLED: config.getOrThrow<boolean>('SWAGGER_ENABLED'),
+    REALTIME_PLAYGROUND_ENABLED: config.getOrThrow<boolean>(
+      'REALTIME_PLAYGROUND_ENABLED',
+    ),
   };
   configureApplication(app, environment);
   return { app, environment };

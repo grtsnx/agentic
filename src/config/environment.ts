@@ -58,6 +58,9 @@ const environmentSchema = z
     OBSERVE_APP_SECRET: z.string().trim().optional(),
     OBSERVE_SERVICE_ID: z.string().trim().optional(),
     SWAGGER_ENABLED: booleanValue('SWAGGER_ENABLED').optional(),
+    REALTIME_PLAYGROUND_ENABLED: booleanValue(
+      'REALTIME_PLAYGROUND_ENABLED',
+    ).optional(),
   })
   .superRefine((environment, context) => {
     if (!environment.OBSERVE_ENABLED) return;
@@ -87,6 +90,7 @@ export interface Environment {
   OBSERVE_APP_SECRET?: string;
   OBSERVE_SERVICE_ID?: string;
   SWAGGER_ENABLED: boolean;
+  REALTIME_PLAYGROUND_ENABLED: boolean;
 }
 
 export function validateEnvironment(
@@ -98,5 +102,7 @@ export function validateEnvironment(
     CORS_ORIGINS: corsOrigins(parsed.CORS_ORIGINS),
     OBSERVE_ENABLED: parsed.OBSERVE_ENABLED ?? false,
     SWAGGER_ENABLED: parsed.SWAGGER_ENABLED ?? parsed.NODE_ENV !== 'production',
+    REALTIME_PLAYGROUND_ENABLED:
+      parsed.REALTIME_PLAYGROUND_ENABLED ?? parsed.NODE_ENV !== 'production',
   };
 }

@@ -105,6 +105,25 @@ describe('ChatGateway (e2e)', () => {
     untrusted.disconnect();
   });
 
+  it('allows the embedded playground from the API origin by default', async () => {
+    const address = app.getHttpServer().address() as AddressInfo;
+    const origin = `http://127.0.0.1:${address.port}`;
+    const sameOrigin = io(`${origin}/v1/chat`, {
+      autoConnect: false,
+      transports: ['websocket'],
+      extraHeaders: { Origin: origin },
+    });
+
+    const connected = new Promise<void>((resolve, reject) => {
+      sameOrigin.on('connect', resolve);
+      sameOrigin.on('connect_error', reject);
+      sameOrigin.connect();
+    });
+
+    await expect(connected).resolves.toBeUndefined();
+    sameOrigin.disconnect();
+  });
+
   it('returns a safe event for invalid chat messages', async () => {
     const error = new Promise<Record<string, unknown>>((resolve, reject) => {
       socket.on('connect', () => {
