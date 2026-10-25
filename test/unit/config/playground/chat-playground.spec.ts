@@ -28,7 +28,19 @@ class Element extends EventEmitter {
   lastChild = { textContent: '' };
   classList = { add: vi.fn() };
   addEventListener = this.on;
-  setAttribute() {}
+  attributes = new Map<string, string>();
+  setAttribute(name: string, value: string) {
+    this.attributes.set(name, value);
+  }
+  focus = vi.fn();
+  open = false;
+  showModal() {
+    this.open = true;
+  }
+  close() {
+    this.open = false;
+    this.emit('close');
+  }
   append(...children: Element[]) {
     this.children.push(...children);
   }
@@ -53,6 +65,7 @@ function setup(deferFrames = false) {
     return nodes.get(selector)!;
   };
   const socket = Object.assign(new EventEmitter(), { connected: true });
+  const writeText = vi.fn().mockResolvedValue(undefined);
   runInNewContext(PLAYGROUND_APP, {
     io: () => socket,
     document: {
@@ -65,6 +78,8 @@ function setup(deferFrames = false) {
       addEventListener() {},
     },
     URL,
+    navigator: { clipboard: { writeText } },
+    setTimeout: vi.fn(),
     performance,
     requestAnimationFrame: (callback: () => void) =>
       deferFrames ? frames.push(callback) : callback(),
@@ -80,7 +95,7 @@ function setup(deferFrames = false) {
   const content = body.children.find(
     (node) => node.className === 'message-content',
   )!;
-  return { query, socket, body, content, flushFrames };
+  return { query, socket, body, content, flushFrames, writeText };
 }
 
 function descendants(element: Element): Element[] {
@@ -153,9 +168,10 @@ describe('live progress and citations', () => {
         .filter((node) => node.className === 'citation-badge')
         .map((node) => node.textContent),
     ).toEqual(['1 example.com', '1 example.com']);
-    const sources = ui.body.children.find(
-      (node) => node.className === 'message-sources',
-    )!;
+    descendants(ui.body)
+      .find((node) => node.className === 'sources-button')!
+      .emit('click');
+    const sources = ui.query('#sources-list');
     expect(
       sources.children.filter((node) => node.tagName === 'a'),
     ).toHaveLength(1);
@@ -201,9 +217,10 @@ describe('live progress and citations', () => {
     ).toBe('https://docs.nestjs.com/');
     expect(ui.content.innerHTML).toBe('');
     expect(ui.content.textContent).toContain('<img src=x onerror=alert(1)>');
-    const sources = ui.body.children.find(
-      (node) => node.className === 'message-sources',
-    )!;
+    descendants(ui.body)
+      .find((node) => node.className === 'sources-button')!
+      .emit('click');
+    const sources = ui.query('#sources-list');
     expect(
       sources.children
         .filter((node) => node.tagName === 'a')
@@ -280,5 +297,70 @@ describe('live progress and citations', () => {
     ).toEqual(['https://example.com/a_(b)']);
     expect(nodes.some((node) => node.tagName === 'img')).toBe(false);
     expect(nodes.filter((node) => node.tagName === 'code')).toHaveLength(2);
+  });
+});
+
+describe('answer actions and sources sheet', () => {
+  it('opens only the selected answer sources and restores focus when closed', () => {
+    const ui = setup();
+    ui.socket.emit('chat.completed', {
+      response: {
+        message: 'First answer',
+        sources: [{ title: 'First source', url: 'https://example.com/first' }],
+      },
+    });
+    const first = descendants(ui.body).find(
+      (node) => node.className === 'sources-button',
+    )!;
+    ui.query('#message').value = 'Another question';
+    ui.query('#send').emit('click');
+    ui.socket.emit('chat.completed', {
+      response: {
+        message: 'Second answer',
+        sources: [
+          { title: 'Second source', url: 'https://example.com/second' },
+        ],
+      },
+    });
+    const buttons = descendants(ui.query('#messages')).filter(
+      (node) => node.className === 'sources-button',
+    );
+    buttons[1]!.emit('click');
+    expect(ui.query('#sources-sheet').open).toBe(true);
+    expect(ui.query('#sources-list').textContent).toContain('Second source');
+    ui.query('#sources-close').emit('click');
+    expect(ui.query('#sources-sheet').open).toBe(false);
+    expect(buttons[1]!.focus).toHaveBeenCalled();
+    first.emit('click');
+    expect(ui.query('#sources-list').textContent).toContain('First source');
+    expect(ui.query('#sources-list').textContent).not.toContain(
+      'Second source',
+    );
+    expect(first.attributes.get('aria-expanded')).toBe('true');
+    ui.query('#sources-sheet').close();
+    expect(first.attributes.get('aria-expanded')).toBe('false');
+  });
+
+  it('copies the selected answer and handles clipboard failures honestly', async () => {
+    const ui = setup();
+    ui.socket.emit('chat.completed', {
+      response: { message: 'Copy **this answer**' },
+    });
+    const copy = descendants(ui.body).find(
+      (node) => node.className === 'copy-button',
+    )!;
+    expect(
+      descendants(ui.body).some((node) => node.className === 'sources-button'),
+    ).toBe(false);
+    copy.emit('click');
+    await Promise.resolve();
+    expect(ui.writeText).toHaveBeenCalledWith('Copy **this answer**');
+    await vi.waitFor(() => expect(ui.body.textContent).toContain('Copied'));
+    ui.writeText.mockRejectedValueOnce(new Error('Permission denied'));
+    copy.emit('click');
+    await Promise.resolve();
+    await vi.waitFor(() =>
+      expect(ui.body.textContent).toContain('Could not copy'),
+    );
   });
 });

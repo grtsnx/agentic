@@ -1,3 +1,8 @@
+import {
+  ANSWER_ACTIONS_VIEW,
+  ANSWER_ACTIONS_APP,
+  ANSWER_ACTIONS_STYLES,
+} from './answer-actions.asset.js';
 import { ANSWER_RENDERER } from './answer-renderer.asset.js';
 import { AGENTIC_FAVICON, AGENTIC_SYMBOL } from './brand.asset.js';
 import {
@@ -87,6 +92,7 @@ export const PLAYGROUND_PAGE = `<!doctype html>
       </footer>
     </div>
 
+    ${ANSWER_ACTIONS_VIEW}
     ${VOICE_PLAYGROUND_VIEW}
 
     <div id="voice-audio" aria-hidden="true"></div>
@@ -267,31 +273,7 @@ export const PLAYGROUND_APP = `(() => {
 
   ${ANSWER_RENDERER}
 
-  function addSources(sources = []) {
-    if (!assistantMessage?.body || !sources.length) return;
-    const list = document.createElement('div');
-    list.className = 'message-sources';
-    const label = document.createElement('strong');
-    label.textContent = 'Sources';
-    list.append(label);
-    const seen = new Set();
-    for (const source of sources) {
-      const url = sourceUrl(source?.url);
-      if (!url || !source?.title || seen.has(url.href)) continue;
-      seen.add(url.href);
-      const link = sourceLink('', url);
-      link.className = 'source-card';
-      const title = document.createElement('span');
-      title.className = 'source-title';
-      title.textContent = source.number + '. ' + source.title;
-      const domain = document.createElement('small');
-      domain.textContent = source.domain;
-      link.append(title, domain);
-      link.title = source.title + ' (' + source.domain + ')';
-      list.append(link);
-    }
-    if (seen.size) assistantMessage.body.append(list);
-  }
+  ${ANSWER_ACTIONS_APP}
 
   function interruptResponse(detail) {
     const message = ensureAssistant();
@@ -325,6 +307,7 @@ export const PLAYGROUND_APP = `(() => {
   }
 
   function resetConversation() {
+    closeSources();
     stopElapsed();
     elements.messages.replaceChildren();
     elements.empty.hidden = false;
@@ -385,8 +368,8 @@ export const PLAYGROUND_APP = `(() => {
     message.status.hidden = true;
     message.finished = true;
     const sources = renderAnswer(message.content, data.response?.message ?? message.rawText, data.response?.sources);
-    addSources(sources);
     addRuntime(data.response?.runtime);
+    addAnswerActions(message, data.response?.message ?? message.rawText, sources);
     assistantMessage = undefined;
     startedAt = undefined;
     scrollToLatest();
@@ -435,7 +418,8 @@ export const PLAYGROUND_APP = `(() => {
   elements.message.focus?.({ preventScroll: true });
 })();`;
 
-export const PLAYGROUND_STYLES = `:root {
+export const PLAYGROUND_STYLES = `
+${ANSWER_ACTIONS_STYLES}:root {
   color-scheme: light;
   --spacing: 0.25rem;
   --background: #ffffff;
@@ -586,16 +570,11 @@ html[data-theme='dark'] .theme-icon-moon { display: none; }
 .status-elapsed { min-width: 34px; color: #a1a1aa; font: .72rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .runtime-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 17px; }
 .runtime-chips span { padding: 4px 7px; border: 1px solid #edf0f5; border-radius: 6px; color: #788294; background: #fbfcfe; font: 400 .62rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; }
-.message-sources { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border); font-size: .78rem; }
-.message-sources strong { width: 100%; margin-bottom: 2px; color: var(--muted); font-size: .7rem; font-weight: 500; }
-.message-sources .source-card { display: flex; flex-direction: column; gap: 3px; flex: 0 1 220px; min-width: 0; max-width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); text-decoration: none; }
-.source-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
-.source-card small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: .68rem; }
 .message-content a { color: var(--text); text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
 .message-content .citation-badge { display: inline-block; vertical-align: baseline; max-width: min(100%, 200px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 7px; margin: 0 2px; border: 1px solid var(--border); border-radius: 99px; background: var(--surface-subtle); color: var(--muted); font-family: inherit; font-size: .65rem; line-height: 1.6; font-weight: 500; text-decoration: none; }
-.message-content .citation-badge:hover, .message-sources .source-card:hover { color: var(--text); border-color: var(--muted); background: var(--surface-subtle); }
+.message-content .citation-badge:hover { color: var(--text); border-color: var(--muted); background: var(--surface-subtle); }
 .message-content a:focus-visible, .source-card:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
-@media (max-width: 480px) { .message-sources .source-card { flex-basis: 100%; } .message-content .citation-badge { max-width: 160px; } }
+@media (max-width: 480px) { .message-content .citation-badge { max-width: 160px; } }
 .composer-wrap { position: relative; width: min(800px, calc(100% - 48px)); margin: 0 auto; padding: 0 0 22px; background: linear-gradient(to top, #fff 78%, #ffffff00); }
 .composer { padding: 17px 18px 12px; border: 1px solid #e0e5ef; border-radius: 23px; background: #fff; box-shadow: 0 4px 8px #30405b03, 0 16px 45px -22px #46577938; transition: border-color .2s, box-shadow .2s; }
 textarea { display: block; width: 100%; max-height: 180px; min-height: 55px; resize: none; padding: 2px 1px 14px; border: 0; outline: 0; background: transparent; color: var(--text); font-size: .88rem; line-height: 1.65; }
