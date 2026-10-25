@@ -26,6 +26,8 @@ bun run chat
 
 The REST endpoint remains `POST /v1/chat`. Socket.IO streams on the `/v1/chat` namespace. REST is stateless; each Socket.IO connection and CLI process keeps isolated, in-memory history that disappears on disconnect or exit.
 
+Chat requests are automatically routed without an extra model call. Lightweight requests use `gpt-5-nano`; complex code, architecture, security, multi-step, or large requests use `gpt-6-luna`. The router is capped at Luna, and the runtime metadata reports the model actually called.
+
 ## Socket.IO chat
 
 Open `http://localhost:3000/playground`, wait for **Online**, enter a message, and send it. The conversation shows a thinking orb, shimmering activity, elapsed time, and safe phases such as tool use, handoffs, and approvals, then hides that activity when response text begins. It never exposes private chain-of-thought. Runtime chips show total time, tokens, estimated cost, models, and tools after completion. Use the stop button to cancel the active turn.
@@ -109,6 +111,7 @@ Completion: a clean checkout passes every verification command and starts with i
 - ✅ Expose the validated `POST /v1/chat` endpoint without copying it into v2.
 - ✅ Wrap the OpenAI Agents SDK behind a shared NestJS service.
 - ✅ Return token usage, model/tool calls, and clearly labelled cost estimates.
+- ✅ Route lightweight work to GPT-5 Nano and promote complex work only as high as GPT-6 Luna.
 - ✅ Document each API version in Swagger, Scalar, and OpenAPI JSON.
 - ⬜ Verify a real provider response with a documented local smoke-test command.
 - ⬜ Map provider authentication, timeout, rate-limit, and availability failures to stable application errors.

@@ -18,3 +18,8 @@ export {
 } from './openai/schema/openai-stream.schema.js';
 export { OpenaiService } from './openai/openai.service.js';
 export type { OpenaiStreamOptions } from './openai/openai.service.js';
+export {
+  OPENAI_MODELS,
+  routeOpenaiModel,
+  type OpenaiModel,
+} from './openai/openai-model-router.js';

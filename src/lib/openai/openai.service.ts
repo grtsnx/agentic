@@ -10,8 +10,12 @@ import {
   type OpenaiStreamEvent,
 } from './schema/openai-stream.schema.js';
 import type { OpenaiRuntime } from './schema/openai-runtime.schema.js';
+import {
+  OPENAI_MODELS,
+  routeOpenaiModel,
+  type OpenaiModel,
+} from './openai-model-router.js';
 
-const MODEL_NAME = 'gpt-6-luna';
 const TOKENS_PER_MILLION = 1_000_000;
 
 // GPT-6 Luna uses higher standard-tier rates when one request exceeds this input size.
@@ -44,26 +48,20 @@ export interface OpenaiStreamOptions {
 
 @Injectable()
 export class OpenaiService {
-  private readonly agent = new Agent({
-    name: 'History tutor',
-    instructions: 'You answer history questions clearly and concisely.',
-    model: MODEL_NAME,
-    outputType: openaiOutputSchema,
-  });
-
-  private readonly streamingAgent = new Agent({
-    name: 'History tutor',
-    instructions: 'You answer history questions clearly and concisely.',
-    model: MODEL_NAME,
-  });
-
   createSession(): MemorySession {
     return new MemorySession();
   }
 
   async generateReply(message: string): Promise<OpenaiResponse> {
     const startedAt = performance.now();
-    const result = await run(this.agent, message);
+    const model = routeOpenaiModel(message);
+    const agent = new Agent({
+      name: 'History tutor',
+      instructions: 'You answer history questions clearly and concisely.',
+      model,
+      outputType: openaiOutputSchema,
+    });
+    const result = await run(agent, message);
     if (!result.finalOutput) {
       throw new ServiceUnavailableException(
         'The AI provider returned no structured output',
@@ -75,7 +73,7 @@ export class OpenaiService {
 
     return openaiResponseSchema.parse({
       ...output,
-      runtime: this.buildRuntime(result, performance.now() - startedAt),
+      runtime: this.buildRuntime(result, performance.now() - startedAt, model),
     });
   }
 
@@ -93,7 +91,13 @@ export class OpenaiService {
     yield thinking;
     lastStatus = this.statusKey(thinking);
 
-    const stream = await run(this.streamingAgent, message, {
+    const model = routeOpenaiModel(message);
+    const agent = new Agent({
+      name: 'History tutor',
+      instructions: 'You answer history questions clearly and concisely.',
+      model,
+    });
+    const stream = await run(agent, message, {
       stream: true,
       session: options.session,
       signal: options.signal,
@@ -134,7 +138,11 @@ export class OpenaiService {
       type: 'completed',
       response: openaiStreamResponseSchema.parse({
         message: stream.finalOutput,
-        runtime: this.buildRuntime(stream, performance.now() - startedAt),
+        runtime: this.buildRuntime(
+          stream,
+          performance.now() - startedAt,
+          model,
+        ),
       }),
     };
   }
@@ -247,6 +255,7 @@ export class OpenaiService {
   private buildRuntime(
     result: RuntimeSource,
     durationMs: number,
+    fallbackModel: OpenaiModel,
   ): OpenaiRuntime {
     const usage = result.state.usage;
     const tools = this.countCalls(
@@ -260,7 +269,7 @@ export class OpenaiService {
         const model = response.providerData?.model;
         return typeof model === 'string' && model.length > 0
           ? model
-          : MODEL_NAME;
+          : fallbackModel;
       }),
     );
 
@@ -280,7 +289,10 @@ export class OpenaiService {
         ),
       },
       cost: {
-        estimatedUsd: this.estimateModelCost(usage),
+        estimatedUsd: this.estimateModelCost(
+          usage,
+          models[0]?.name ?? fallbackModel,
+        ),
         currency: 'USD',
         exact: false,
         // Tool pricing varies by tool, so the model estimate covers the full run only without tools.
@@ -289,7 +301,7 @@ export class OpenaiService {
       models:
         models.length > 0
           ? models
-          : [{ name: MODEL_NAME, calls: usage.requests }],
+          : [{ name: fallbackModel, calls: usage.requests }],
       tools,
     };
   }
@@ -311,12 +323,15 @@ export class OpenaiService {
     }, 0);
   }
 
-  private estimateModelCost(usage: {
-    inputTokens: number;
-    outputTokens: number;
-    inputTokensDetails: TokenDetails[];
-  }): number {
-    // Rates are USD per one million tokens for GPT-6 Luna's standard tier.
+  private estimateModelCost(
+    usage: {
+      inputTokens: number;
+      outputTokens: number;
+      inputTokensDetails: TokenDetails[];
+    },
+    model: string,
+  ): number {
+    // Rates are USD per one million tokens on OpenAI's standard tier.
     // This is an estimate because the Agents SDK does not return the invoiced amount.
     const cachedInput = this.sumTokenDetail(
       usage.inputTokensDetails,
@@ -324,13 +339,17 @@ export class OpenaiService {
     );
     const uncachedInput = Math.max(0, usage.inputTokens - cachedInput);
     const longContext = usage.inputTokens > LONG_CONTEXT_THRESHOLD;
-    const inputRate = longContext ? 0.2 : 0.1;
-    const cachedInputRate = longContext ? 0.02 : 0.01;
-    const outputRate = longContext ? 0.75 : 0.5;
+    const rates = model.startsWith(OPENAI_MODELS.economical)
+      ? { input: 0.05, cachedInput: 0.005, output: 0.4 }
+      : {
+          input: longContext ? 0.2 : 0.1,
+          cachedInput: longContext ? 0.02 : 0.01,
+          output: longContext ? 0.75 : 0.5,
+        };
     const estimate =
-      (uncachedInput * inputRate +
-        cachedInput * cachedInputRate +
-        usage.outputTokens * outputRate) /
+      (uncachedInput * rates.input +
+        cachedInput * rates.cachedInput +
+        usage.outputTokens * rates.output) /
       TOKENS_PER_MILLION;
 
     return Number(estimate.toFixed(8));

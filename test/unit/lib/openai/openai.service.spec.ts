@@ -51,7 +51,7 @@ describe('OpenaiService', () => {
           outputTokensDetails: [{ reasoning_tokens: 15 }],
         },
       },
-      rawResponses: [{ providerData: { model: 'gpt-6-luna' } }],
+      rawResponses: [{ providerData: { model: 'gpt-5-nano-2025-08-07' } }],
       newItems: [
         { type: 'tool_call_item', toolName: 'web_search' },
         { type: 'tool_call_item', toolName: 'web_search' },
@@ -59,14 +59,6 @@ describe('OpenaiService', () => {
     });
 
     const service = new OpenaiService();
-    const config = agents.captureConfig.mock.calls[0]?.[0] as {
-      model?: string;
-      outputType?: { safeParse(value: unknown): { success: boolean } };
-    };
-
-    expect(config.model).toBe('gpt-6-luna');
-    expect(config.outputType).toBeDefined();
-    expect(config.outputType?.safeParse(output).success).toBe(true);
     await expect(service.generateReply('Question')).resolves.toEqual({
       ...output,
       runtime: {
@@ -79,15 +71,49 @@ describe('OpenaiService', () => {
           reasoningOutput: 15,
         },
         cost: {
-          estimatedUsd: 0.0000332,
+          estimatedUsd: 0.0000241,
           currency: 'USD',
           exact: false,
           includesToolCosts: false,
         },
-        models: [{ name: 'gpt-6-luna', calls: 1 }],
+        models: [{ name: 'gpt-5-nano-2025-08-07', calls: 1 }],
         tools: [{ name: 'web_search', calls: 2 }],
       },
     });
+    const config = agents.captureConfig.mock.calls[0]?.[0] as {
+      model?: string;
+      outputType?: { safeParse(value: unknown): { success: boolean } };
+    };
+
+    expect(config.model).toBe('gpt-5-nano');
+    expect(config.outputType).toBeDefined();
+    expect(config.outputType?.safeParse(output).success).toBe(true);
+  });
+
+  it('promotes complex requests to GPT-6 Luna', async () => {
+    agents.run.mockResolvedValue({
+      finalOutput: output,
+      state: {
+        usage: {
+          requests: 1,
+          inputTokens: 0,
+          outputTokens: 0,
+          totalTokens: 0,
+          inputTokensDetails: [],
+          outputTokensDetails: [],
+        },
+      },
+      rawResponses: [{ providerData: { model: 'gpt-6-luna' } }],
+      newItems: [],
+    });
+
+    await new OpenaiService().generateReply(
+      'Design and implement a secure distributed architecture with tests.',
+    );
+
+    expect(agents.captureConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'gpt-6-luna' }),
+    );
   });
 
   it('rejects a run without structured output', async () => {
@@ -130,7 +156,7 @@ describe('OpenaiService', () => {
           outputTokensDetails: [],
         },
       },
-      rawResponses: [{ providerData: { model: 'gpt-6-luna' } }],
+      rawResponses: [{ providerData: { model: 'gpt-5-nano' } }],
       newItems: [],
     };
     agents.run.mockResolvedValue(stream);
@@ -165,12 +191,12 @@ describe('OpenaiService', () => {
               reasoningOutput: 0,
             },
             cost: {
-              estimatedUsd: 0.000002,
+              estimatedUsd: 0.0000013,
               currency: 'USD',
               exact: false,
               includesToolCosts: true,
             },
-            models: [{ name: 'gpt-6-luna', calls: 1 }],
+            models: [{ name: 'gpt-5-nano', calls: 1 }],
             tools: [],
           },
         },
