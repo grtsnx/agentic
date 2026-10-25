@@ -1,11 +1,10 @@
 import { defineAgent, type JobContext, voice } from '@livekit/agents';
 import { validateEnvironment } from '../environment.js';
 import { createLiveKitVoiceModel } from '@/lib';
-
-const VOICE_INSTRUCTIONS = `You are Agentic, a helpful general-purpose AI assistant.
-Keep answers concise and natural for spoken conversation.
-Ask a short clarifying question when the user's intent is unclear.
-Do not read Markdown syntax, URLs, or long lists aloud unless the user asks.`;
+import {
+  VOICE_AGENT_INSTRUCTIONS,
+  VOICE_GREETING_INSTRUCTIONS,
+} from '@/config/agent/agent-instructions.js';
 
 // Export traces and redacted logs without retaining user audio or transcripts.
 export const VOICE_RECORDING_OPTIONS = {
@@ -18,7 +17,7 @@ export const VOICE_RECORDING_OPTIONS = {
 } as const;
 
 export function createLiveKitVoiceAssistant(): voice.Agent {
-  return voice.Agent.create({ instructions: VOICE_INSTRUCTIONS });
+  return voice.Agent.create({ instructions: VOICE_AGENT_INSTRUCTIONS });
 }
 
 export default defineAgent({
@@ -39,7 +38,7 @@ export default defineAgent({
     });
     await context.connect();
     await session.generateReply({
-      instructions: 'Greet the user briefly and ask how you can help.',
+      instructions: VOICE_GREETING_INSTRUCTIONS,
     });
   },
 });

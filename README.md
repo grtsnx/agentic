@@ -118,6 +118,7 @@ src/                      # Application source.
 ├── bootstrap/            # Security, validation, documentation, and startup setup.
 ├── cli/                  # Standalone Nest application context for terminal commands.
 ├── config/               # Runtime configuration and executable application setup.
+│   ├── agent/            # Shared Agentic identity and channel-specific delivery rules.
 │   ├── livekit/          # LiveKit voice agent and worker configuration.
 │   └── playground/       # Same-origin chat and voice playground.
 ├── dto/                  # Versioned API input and output contracts.

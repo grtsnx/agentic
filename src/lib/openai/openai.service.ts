@@ -15,6 +15,10 @@ import {
   routeOpenaiModel,
   type OpenaiModel,
 } from './openai-model-router.js';
+import {
+  AGENT_INSTRUCTIONS,
+  AGENT_NAME,
+} from '@/config/agent/agent-instructions.js';
 
 const TOKENS_PER_MILLION = 1_000_000;
 
@@ -56,8 +60,8 @@ export class OpenaiService {
     const startedAt = performance.now();
     const model = routeOpenaiModel(message);
     const agent = new Agent({
-      name: 'History tutor',
-      instructions: 'You answer history questions clearly and concisely.',
+      name: AGENT_NAME,
+      instructions: AGENT_INSTRUCTIONS,
       model,
       outputType: openaiOutputSchema,
     });
@@ -93,8 +97,8 @@ export class OpenaiService {
 
     const model = routeOpenaiModel(message);
     const agent = new Agent({
-      name: 'History tutor',
-      instructions: 'You answer history questions clearly and concisely.',
+      name: AGENT_NAME,
+      instructions: AGENT_INSTRUCTIONS,
       model,
     });
     const stream = await run(agent, message, {

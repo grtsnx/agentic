@@ -15,6 +15,10 @@ vi.mock('@openai/agents', () => ({
 }));
 
 import { OpenaiService } from '@/lib';
+import {
+  AGENT_INSTRUCTIONS,
+  AGENT_NAME,
+} from '@/config/agent/agent-instructions.js';
 
 describe('OpenaiService', () => {
   const output = {
@@ -81,10 +85,14 @@ describe('OpenaiService', () => {
       },
     });
     const config = agents.captureConfig.mock.calls[0]?.[0] as {
+      instructions?: string;
       model?: string;
+      name?: string;
       outputType?: { safeParse(value: unknown): { success: boolean } };
     };
 
+    expect(config.name).toBe(AGENT_NAME);
+    expect(config.instructions).toBe(AGENT_INSTRUCTIONS);
     expect(config.model).toBe('gpt-5-nano');
     expect(config.outputType).toBeDefined();
     expect(config.outputType?.safeParse(output).success).toBe(true);

@@ -44,7 +44,6 @@ export const PLAYGROUND_PAGE = `<!doctype html>
               </span>
             </div>
             <div class="composer-buttons">
-              <button id="voice-mute" class="voice-mute-button" type="button" hidden>Mute</button>
               <button id="voice-connect" class="voice-button" type="button" aria-pressed="false" aria-label="Start voice chat">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Z"/><path d="M18 11v1a6 6 0 0 1-12 0v-1M12 18v3M9 21h6"/></svg>
                 <span id="voice-label" class="sr-only">Start voice chat</span>
@@ -55,12 +54,48 @@ export const PLAYGROUND_PAGE = `<!doctype html>
           </div>
         </div>
         <p class="disclaimer">Agentic can make mistakes. Check important information.</p>
-        <details class="developer-details">
-          <summary>Activity log</summary>
-          <pre id="events">Waiting for a connection…</pre>
-        </details>
       </footer>
     </div>
+
+    <section id="voice-session" class="voice-session" data-state="connecting" hidden>
+      <header class="voice-session-header">
+        <div class="voice-session-brand">
+          <span class="brand-mark" aria-hidden="true">A</span>
+          <div><strong>Agentic Voice</strong><span>Realtime conversation</span></div>
+        </div>
+        <div class="voice-session-meta">
+          <span id="voice-quality">Checking connection…</span>
+          <span id="voice-elapsed">00:00</span>
+        </div>
+      </header>
+      <div class="voice-session-layout">
+        <main class="voice-stage">
+          <div class="voice-agent-visual" aria-hidden="true">
+            <canvas id="voice-aura" class="voice-aura-canvas"></canvas>
+            <span class="voice-core">✦</span>
+          </div>
+          <div class="voice-stage-copy">
+            <span class="voice-eyebrow">Live session</span>
+            <h1 id="voice-session-state">Connecting agent…</h1>
+            <p id="voice-session-hint">You can speak naturally. Interrupt whenever you need to.</p>
+          </div>
+          <div class="voice-control-bar">
+            <button id="voice-mute" class="voice-control" type="button" aria-pressed="false">
+              <span aria-hidden="true">⌁</span><small>Mute</small>
+            </button>
+            <button id="voice-end" class="voice-control voice-end" type="button">
+              <span aria-hidden="true">×</span><small>End</small>
+            </button>
+          </div>
+        </main>
+        <aside class="voice-transcript-panel" aria-label="Live voice transcript">
+          <header><div><span class="voice-eyebrow">Conversation</span><h2>Live transcript</h2></div><span class="live-pill"><i></i> Live</span></header>
+          <div id="voice-transcript" class="voice-transcript" aria-live="polite">
+            <p id="voice-transcript-empty" class="voice-transcript-empty">Your conversation will appear here in real time.</p>
+          </div>
+        </aside>
+      </div>
+    </section>
 
     <div id="voice-audio" aria-hidden="true"></div>
     <script src="/socket.io/socket.io.js"></script>
@@ -76,7 +111,6 @@ export const PLAYGROUND_APP = `(() => {
     connection: document.querySelector('#connection'),
     conversation: document.querySelector('#conversation'),
     empty: document.querySelector('#empty-state'),
-    events: document.querySelector('#events'),
     message: document.querySelector('#message'),
     messages: document.querySelector('#messages'),
     newChat: document.querySelector('#new-chat'),
@@ -120,13 +154,6 @@ export const PLAYGROUND_APP = `(() => {
     elapsedTimer = undefined;
   }
 
-  function log(event, data = {}) {
-    const line = '[' + new Date().toLocaleTimeString() + '] ' + event + ' ' + JSON.stringify(data);
-    elements.events.textContent = elements.events.textContent.startsWith('Waiting')
-      ? line
-      : line + '\\n' + elements.events.textContent;
-  }
-
   function setActive(value) {
     active = value;
     elements.send.disabled = value || !socket.connected;
@@ -157,6 +184,12 @@ export const PLAYGROUND_APP = `(() => {
     scrollToLatest();
     return { article, body, content };
   }
+
+  document.addEventListener('agentic:voice-transcript', (event) => {
+    const detail = event.detail;
+    if (!detail || !['user', 'assistant'].includes(detail.role) || !detail.text?.trim()) return;
+    createMessage(detail.role, detail.text.trim());
+  });
 
   function createAssistant() {
     const message = createMessage('assistant');
@@ -217,14 +250,12 @@ export const PLAYGROUND_APP = `(() => {
     elements.message.style.height = 'auto';
     setActive(true);
     socket.emit('chat.send', { message });
-    log('chat.send', { message });
   }
 
   function resetConversation() {
     stopElapsed();
     elements.messages.replaceChildren();
     elements.empty.hidden = false;
-    elements.events.textContent = 'Waiting for a connection…';
     elements.message.value = '';
     assistantMessage = undefined;
     responseStarted = false;
@@ -237,35 +268,30 @@ export const PLAYGROUND_APP = `(() => {
     elements.connection.lastChild.textContent = ' Online';
     elements.connection.dataset.state = 'online';
     setActive(false);
-    log('connect');
   });
 
-  socket.on('disconnect', (reason) => {
+  socket.on('disconnect', () => {
     stopElapsed();
     elements.connection.lastChild.textContent = ' Offline';
     elements.connection.dataset.state = 'offline';
     setActive(false);
-    log('disconnect', { reason });
   });
 
-  socket.on('connect_error', (error) => {
+  socket.on('connect_error', () => {
     stopElapsed();
     elements.connection.lastChild.textContent = ' Connection failed';
     elements.connection.dataset.state = 'offline';
     setActive(false);
-    log('connect_error', { message: error.message });
   });
 
-  socket.on('chat.started', (data) => {
+  socket.on('chat.started', () => {
     setActive(true);
     if (startedAt === undefined) startElapsed();
     updateStatus({ phase: 'thinking', message: 'Thinking' });
-    log('chat.started', data);
   });
 
   socket.on('chat.status', (data) => {
     updateStatus(data);
-    log('chat.status', data);
   });
 
   socket.on('chat.delta', (data) => {
@@ -285,16 +311,14 @@ export const PLAYGROUND_APP = `(() => {
     addRuntime(data.response?.runtime);
     assistantMessage = undefined;
     startedAt = undefined;
-    log('chat.completed', data);
     scrollToLatest();
   });
 
-  socket.on('chat.cancelling', (data) => {
+  socket.on('chat.cancelling', () => {
     updateStatus({ phase: 'thinking', message: 'Stopping' });
-    log('chat.cancelling', data);
   });
 
-  socket.on('chat.cancelled', (data) => {
+  socket.on('chat.cancelled', () => {
     const message = ensureAssistant();
     stopElapsed();
     setActive(false);
@@ -302,7 +326,6 @@ export const PLAYGROUND_APP = `(() => {
     if (!message.content.textContent) message.content.textContent = 'Response stopped.';
     assistantMessage = undefined;
     startedAt = undefined;
-    log('chat.cancelled', data);
   });
 
   socket.on('chat.error', (data) => {
@@ -314,7 +337,6 @@ export const PLAYGROUND_APP = `(() => {
     message.article.classList.add('error');
     assistantMessage = undefined;
     startedAt = undefined;
-    log('chat.error', data);
   });
 
   elements.send.addEventListener('click', send);
@@ -359,7 +381,8 @@ button { color: inherit; }
 .topbar-actions { display: flex; align-items: center; gap: 14px; }
 .voice-status { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: .7rem; }
 .voice-status[hidden] { display: none; }
-.voice-status[data-state='speaking'] { color: var(--success); }
+.voice-status[data-state='agent-speaking'] { color: #0284c7; }
+.voice-status[data-state='user-speaking'] { color: #059669; }
 .voice-status[data-state='thinking'] { color: #7c3aed; }
 .voice-status[data-state='error'] { color: var(--danger); }
 .voice-visualizer { display: inline-flex; height: 14px; align-items: center; gap: 2px; }
@@ -367,7 +390,8 @@ button { color: inherit; }
 .voice-status[data-state='connecting'] .voice-visualizer i,
 .voice-status[data-state='initializing'] .voice-visualizer i { animation: voice-pulse 1.2s ease-in-out infinite; }
 .voice-status[data-state='thinking'] .voice-visualizer i { animation: voice-think .9s ease-in-out infinite; }
-.voice-status[data-state='speaking'] .voice-visualizer i { animation: voice-wave .65s ease-in-out infinite; }
+.voice-status[data-state='agent-speaking'] .voice-visualizer i,
+.voice-status[data-state='user-speaking'] .voice-visualizer i { animation: voice-wave .65s ease-in-out infinite; }
 .voice-visualizer i:nth-child(2) { animation-delay: .12s !important; }
 .voice-visualizer i:nth-child(3) { animation-delay: .24s !important; }
 .voice-visualizer i:nth-child(4) { animation-delay: .36s !important; }
@@ -376,6 +400,55 @@ button { color: inherit; }
 .voice-button svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
 .voice-button[aria-pressed='true'] { color: #fff; background: var(--danger); animation: orb-breathe 1.4s ease-in-out infinite; }
 .voice-button:disabled { cursor: wait; opacity: .55; }
+.voice-session { position: fixed; inset: 0; z-index: 100; display: grid; grid-template-rows: 76px minmax(0, 1fr); background: #fff; }
+.voice-session[hidden] { display: none; }
+.voice-session:not([hidden]) { animation: voice-session-enter .28s ease-out; }
+.voice-session-header { display: flex; align-items: center; justify-content: space-between; padding: 0 30px; border-bottom: 1px solid rgba(228, 228, 231, .82); background: rgba(255, 255, 255, .84); box-shadow: 0 1px 20px rgba(24, 24, 27, .025); backdrop-filter: blur(24px); }
+.voice-session-brand { display: flex; align-items: center; gap: 12px; }
+.voice-session-brand div { display: grid; gap: 2px; }
+.voice-session-brand strong { font-size: .88rem; }
+.voice-session-brand span:not(.brand-mark) { color: var(--muted); font-size: .68rem; }
+.voice-session-meta { display: flex; align-items: center; gap: 8px; color: var(--muted); font: .68rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.voice-session-meta span { padding: 7px 10px; border: 1px solid rgba(228, 228, 231, .9); border-radius: 999px; background: rgba(250, 250, 250, .8); }
+.voice-session-layout { display: grid; min-height: 0; grid-template-columns: minmax(0, 1.5fr) minmax(360px, .78fr); }
+.voice-stage { position: relative; display: flex; min-width: 0; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; padding: 42px 48px; background: radial-gradient(circle at 50% 38%, rgba(186, 230, 253, .2), transparent 31%), radial-gradient(circle at 32% 72%, rgba(216, 180, 254, .12), transparent 28%), linear-gradient(145deg, #fff 0%, #fafafa 100%); text-align: center; }
+.voice-stage::after { position: absolute; inset: 0; pointer-events: none; background-image: radial-gradient(rgba(24, 24, 27, .055) .6px, transparent .6px); background-size: 18px 18px; mask-image: radial-gradient(circle at center, black, transparent 72%); content: ''; }
+.voice-agent-visual { position: relative; z-index: 1; display: grid; width: clamp(240px, 29vw, 350px); aspect-ratio: 1; place-items: center; margin-bottom: 14px; isolation: isolate; }
+.voice-agent-visual::before { position: absolute; z-index: -1; width: 72%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, rgba(14, 165, 233, .12), transparent 68%); filter: blur(18px); content: ''; }
+.voice-aura-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.voice-core { position: relative; display: grid; width: 19%; aspect-ratio: 1; place-items: center; border: 1px solid rgba(255, 255, 255, .85); border-radius: 50%; color: #fff; background: rgba(9, 9, 11, .88); box-shadow: 0 12px 38px rgba(2, 132, 199, .22); backdrop-filter: blur(12px); font-size: 1rem; }
+.voice-session[data-state='thinking'] .voice-core { animation: voice-core-think 1.2s ease-in-out infinite; }
+.voice-session[data-state='agent-speaking'] .voice-core { background: #0369a1; box-shadow: 0 12px 44px rgba(14, 165, 233, .34); }
+.voice-session[data-state='user-speaking'] .voice-core { background: #047857; box-shadow: 0 12px 44px rgba(16, 185, 129, .3); }
+.voice-session[data-state='error'] .voice-core,
+.voice-session[data-state='failed'] .voice-core { background: var(--danger); }
+.voice-stage-copy { position: relative; z-index: 1; min-height: 108px; }
+.voice-eyebrow { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: .64rem; font-weight: 750; letter-spacing: .13em; text-transform: uppercase; }
+.voice-stage .voice-eyebrow { padding: 6px 9px; border: 1px solid rgba(228, 228, 231, .9); border-radius: 999px; background: rgba(255, 255, 255, .72); backdrop-filter: blur(10px); }
+.voice-stage h1 { margin: 9px 0 8px; font-size: clamp(1.55rem, 3vw, 2.45rem); letter-spacing: -.045em; }
+.voice-stage p { max-width: 460px; margin: 0; color: var(--muted); font-size: .87rem; line-height: 1.6; }
+.voice-control-bar { position: relative; z-index: 1; display: flex; gap: 12px; margin-top: 20px; padding: 7px; border: 1px solid rgba(228, 228, 231, .88); border-radius: 24px; background: rgba(255, 255, 255, .72); box-shadow: 0 16px 46px rgba(24, 24, 27, .08); backdrop-filter: blur(16px); }
+.voice-control { display: grid; width: 58px; height: 58px; place-items: center; padding: 7px; border: 1px solid var(--border); border-radius: 17px; background: #fff; cursor: pointer; box-shadow: 0 5px 16px rgba(0, 0, 0, .04); transition: transform .18s ease, box-shadow .18s ease; }
+.voice-control:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(0, 0, 0, .08); }
+.voice-control span { font-size: 1.2rem; line-height: 1; }
+.voice-control small { color: var(--muted); font-size: .62rem; font-weight: 700; }
+.voice-control[aria-pressed='true'] { color: #fff; border-color: var(--accent); background: var(--accent); }
+.voice-control[aria-pressed='true'] small { color: #fff; }
+.voice-end { color: #fff; border-color: var(--danger); background: var(--danger); }
+.voice-end small { color: #fff; }
+.voice-transcript-panel { display: grid; min-width: 0; grid-template-rows: auto minmax(0, 1fr); border-left: 1px solid var(--border); background: linear-gradient(180deg, #fafafa, #f7f7f8); }
+.voice-transcript-panel > header { display: flex; align-items: center; justify-content: space-between; padding: 25px 26px 20px; border-bottom: 1px solid var(--border); }
+.voice-transcript-panel h2 { margin: 5px 0 0; font-size: 1.05rem; letter-spacing: -.025em; }
+.live-pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px; border: 1px solid #bbf7d0; border-radius: 999px; color: #15803d; background: #f0fdf4; font-size: .64rem; font-weight: 700; }
+.live-pill i { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; animation: voice-pulse 1.1s ease-in-out infinite; }
+.voice-transcript { overflow-y: auto; padding: 24px 26px 80px; scroll-behavior: smooth; }
+.voice-transcript-empty { margin: 20vh auto 0; max-width: 240px; color: #a1a1aa; text-align: center; font-size: .8rem; line-height: 1.6; }
+.voice-transcript-turn { margin-bottom: 20px; padding: 14px 15px; border: 1px solid rgba(228, 228, 231, .82); border-radius: 16px; background: rgba(255, 255, 255, .82); box-shadow: 0 5px 18px rgba(24, 24, 27, .035); }
+.voice-transcript-turn .speaker { margin-bottom: 7px; color: var(--muted); font-size: .68rem; font-weight: 700; }
+.voice-transcript-turn .words { margin: 0; color: var(--text); font-size: .9rem; line-height: 1.65; }
+.voice-transcript-turn.user { margin-left: 15%; border-color: #dbeafe; background: #eff6ff; text-align: right; }
+.voice-transcript-turn.user .words { display: inline-block; text-align: left; }
+.voice-transcript-turn.interim .words { color: var(--muted); }
 .connection { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: .78rem; }
 .connection-dot { width: 7px; height: 7px; border-radius: 999px; background: #a1a1aa; }
 .connection[data-state='online'] .connection-dot { background: var(--success); box-shadow: 0 0 0 3px #dcfce7; }
@@ -428,9 +501,6 @@ textarea::placeholder { color: #a1a1aa; }
 .send-button:disabled { cursor: not-allowed; opacity: .35; }
 .stop-button { color: #fff; background: var(--danger); font-size: .66rem; }
 .disclaimer { margin: 8px 0 0; color: #a1a1aa; text-align: center; font-size: .68rem; }
-.developer-details { position: absolute; right: 0; bottom: 12px; transform: translateX(calc(100% + 14px)); width: 230px; color: var(--muted); font-size: .72rem; }
-.developer-details summary { cursor: pointer; user-select: none; }
-.developer-details pre { max-height: 180px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-subtle); font: .65rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 #voice-audio { display: none; }
 @keyframes shimmer { to { background-position: -220% 0; } }
@@ -439,7 +509,9 @@ textarea::placeholder { color: #a1a1aa; }
 @keyframes voice-pulse { 50% { opacity: .35; } }
 @keyframes voice-think { 50% { height: 10px; transform: translateY(-2px); } }
 @keyframes voice-wave { 50% { height: 13px; } }
-@media (max-width: 1120px) { .developer-details { position: static; transform: none; width: 100%; margin-top: 7px; } }
+@keyframes voice-session-enter { from { opacity: 0; transform: scale(.985); } }
+@keyframes voice-core-think { 50% { transform: rotate(8deg) scale(.94); border-radius: 50%; } }
 @media (max-width: 640px) { .topbar { padding: 0 16px; } .connection, .voice-status { font-size: 0; } .connection-dot { margin-right: 2px; } .messages { padding-top: 28px; } .composer-hint { display: none; } }
+@media (max-width: 820px) { .voice-session { grid-template-rows: 64px minmax(0, 1fr); } .voice-session-header { padding: 0 16px; } .voice-session-meta span:first-child { display: none; } .voice-session-layout { grid-template-columns: 1fr; grid-template-rows: minmax(360px, 56%) minmax(0, 44%); } .voice-stage { padding: 20px 18px 18px; } .voice-agent-visual { width: min(220px, 52vw); margin-bottom: 2px; } .voice-stage-copy { min-height: 78px; } .voice-stage h1 { margin: 5px 0; } .voice-control-bar { margin-top: 8px; } .voice-control { width: 54px; height: 54px; border-radius: 17px; } .voice-transcript-panel { border-top: 1px solid var(--border); border-left: 0; } .voice-transcript-panel > header { padding: 16px 18px 13px; } .voice-transcript { padding: 18px 18px 50px; } .voice-transcript-empty { margin-top: 6vh; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
 `;
