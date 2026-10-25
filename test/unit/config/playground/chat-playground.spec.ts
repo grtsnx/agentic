@@ -114,14 +114,34 @@ describe('chat interruption handling', () => {
           (node) =>
             node.className === 'response-notice' && node.textContent.length > 0,
         ),
-      ).toBe(true);
-      expect(
-        ui.body.children.find((node) => node.className === 'agent-status')
-          ?.hidden,
-      ).toBe(true);
-      expect(ui.query('#stop').hidden).toBe(true);
+      ).toBe(event === 'chat.error');
+      const status = ui.body.children.find(
+        (node) => node.className === 'agent-status',
+      );
+      expect(status?.hidden).toBe(event === 'chat.error');
+      if (event === 'disconnect') {
+        expect(status?.querySelector('.status-label').textContent).toBe(
+          'Reconnecting',
+        );
+      }
+      expect(ui.query('#stop').hidden).toBe(event === 'chat.error');
     },
   );
+
+  it('shows reconnecting while Socket.IO retries an active response', () => {
+    const ui = setup();
+    ui.socket.emit('disconnect');
+    const status = ui.body.children.find(
+      (node) => node.className === 'agent-status',
+    )!;
+    expect(status.hidden).toBe(false);
+    expect(status.querySelector('.status-label').textContent).toBe(
+      'Reconnecting',
+    );
+    expect(status.querySelector('.status-detail').textContent).toBe(
+      'Trying to restore the connection',
+    );
+  });
 
   it('does not display internal tool names in completion metadata', () => {
     const ui = setup();

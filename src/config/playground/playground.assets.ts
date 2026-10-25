@@ -125,6 +125,7 @@ export const PLAYGROUND_APP = `(() => {
   let active = false;
   let assistantMessage;
   let elapsedTimer;
+  let reconnectTimer;
   let startedAt;
 
   const themeRoot = document.documentElement;
@@ -182,6 +183,21 @@ export const PLAYGROUND_APP = `(() => {
   function stopElapsed() {
     if (elapsedTimer) clearInterval(elapsedTimer);
     elapsedTimer = undefined;
+  }
+
+  function clearReconnectTimer() {
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    reconnectTimer = undefined;
+  }
+
+  function showReconnecting() {
+    if (!active) return;
+    setConnection('reconnecting', 'Reconnecting');
+    updateStatus({
+      phase: 'reconnecting',
+      message: 'Reconnecting',
+      detail: 'Trying to restore the connection',
+    });
   }
 
   function setActive(value) {
@@ -322,6 +338,7 @@ export const PLAYGROUND_APP = `(() => {
   }
 
   function resetConversation() {
+    clearReconnectTimer();
     assistantMessage?.orb.dispose();
     closeSources();
     stopElapsed();
@@ -336,21 +353,47 @@ export const PLAYGROUND_APP = `(() => {
   }
 
   socket.on('connect', () => {
+    const wasRecovering = active;
+    clearReconnectTimer();
     setConnection('online', 'Online');
+    if (wasRecovering) {
+      // Socket.IO cannot resume a server stream after a transport loss. Be
+      // explicit instead of leaving the user looking at a stale spinner.
+      interruptResponse('Connection restored. The previous response was interrupted. Please send it again.');
+      return;
+    }
     setActive(false);
   });
 
   socket.on('disconnect', () => {
-    if (active) interruptResponse('Connection interrupted. This answer is incomplete; send your request again once connected.');
-    stopElapsed();
-    setConnection('offline', 'Offline');
-    setActive(false);
+    if (!active) {
+      stopElapsed();
+      setConnection('offline', 'Offline');
+      setActive(false);
+      return;
+    }
+    showReconnecting();
+    clearReconnectTimer();
+    reconnectTimer = setTimeout(() => {
+      if (active && !socket.connected) {
+        interruptResponse('The connection could not be restored. Please try again.');
+      }
+    }, 12000);
   });
 
   socket.on('connect_error', () => {
+    if (active) {
+      showReconnecting();
+      return;
+    }
     stopElapsed();
     setConnection('offline', 'Connection failed');
     setActive(false);
+  });
+
+  globalThis.addEventListener?.('offline', showReconnecting);
+  globalThis.addEventListener?.('online', () => {
+    if (active && !socket.connected) showReconnecting();
   });
 
   socket.on('chat.started', () => {
@@ -465,6 +508,7 @@ button { color: inherit; }
 .brand { display: inline-flex; align-items: center; gap: 12px; color: var(--text); text-decoration: none; font-size: .94rem; font-weight: 650; letter-spacing: -.035em; }
 .brand-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 11px; color: #fff; background: var(--accent); transition: background .2s ease; }
 html[data-connection='online'] .brand-mark { background: var(--success); }
+html[data-connection='reconnecting'] .brand-mark { background: #d97706; }
 .agentic-symbol { display: block; width: 26px; height: 26px; }
 .welcome-aura .agentic-symbol { width: 38px; height: 38px; filter: drop-shadow(0 2px 8px #5f74b744); }
 .avatar .agentic-symbol { width: 24px; height: 24px; }
