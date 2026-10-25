@@ -8,8 +8,11 @@ import {
 
 const MODEL_NAME = 'gpt-6-astra';
 const TOKENS_PER_MILLION = 1_000_000;
+
+// GPT-6 Astra uses higher standard-tier rates when one request exceeds this input size.
 const LONG_CONTEXT_THRESHOLD = 272_000;
 
+// The SDK preserves provider-specific token breakdowns under dynamic keys.
 interface TokenDetails {
   [key: string]: number | TokenDetails;
 }
@@ -31,6 +34,7 @@ export class OpenaiService {
       );
     }
 
+    // Validate model-controlled data before attaching server-controlled runtime metadata.
     const output = openaiOutputSchema.parse(result.finalOutput);
     const usage = result.state.usage;
     const tools = this.countCalls(
@@ -68,6 +72,7 @@ export class OpenaiService {
           estimatedUsd: this.estimateModelCost(usage),
           currency: 'USD',
           exact: false,
+          // Tool pricing varies by tool, so the model estimate covers the full run only without tools.
           includesToolCosts: tools.length === 0,
         },
         models:
@@ -101,6 +106,8 @@ export class OpenaiService {
     outputTokens: number;
     inputTokensDetails: TokenDetails[];
   }): number {
+    // Rates are USD per one million tokens for GPT-6 Astra's standard tier.
+    // This is an estimate because the Agents SDK does not return the invoiced amount.
     const cachedInput = this.sumTokenDetail(
       usage.inputTokensDetails,
       'cached_tokens',
