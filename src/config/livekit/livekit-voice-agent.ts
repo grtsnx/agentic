@@ -45,16 +45,24 @@ export default defineAgent({
       throw new Error('VOICE_ENABLED must be true to start the voice worker');
     }
 
+    // SessionHost subscribes to state events during start(), before the SDK's
+    // parallel auto-connect finishes. Connect first so those events have a transport.
+    await context.connect();
+
     const session = new voice.AgentSession({
       llm: createLiveKitVoiceModel(environment),
+      // Both providers use a realtime model with its own server-side detection.
+      // Opt out of the SDK's default local VAD/TurnDetector pipeline explicitly.
+      vad: null,
+      turnHandling: { turnDetection: 'realtime_llm' },
     });
+    context.addShutdownCallback(() => session.close());
 
     await session.start({
       agent: createLiveKitVoiceAssistant(environment),
       room: context.room,
       record: VOICE_RECORDING_OPTIONS,
     });
-    await context.connect();
     await session.generateReply({
       instructions: VOICE_GREETING_INSTRUCTIONS,
     });

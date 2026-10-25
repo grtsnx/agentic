@@ -173,6 +173,12 @@ Run the commands above on macOS, Windows, and Linux with a working microphone an
 | Windows  | ⬜ Requires test machine                           | ⬜ Pending                     | ⬜ Pending                         |
 | Linux    | ⬜ Requires test machine                           | ⬜ Pending                     | ⬜ Pending                         |
 
+### Voice startup warnings
+
+The realtime voice session explicitly uses `turnHandling.turnDetection: 'realtime_llm'` with local VAD disabled. OpenAI or LiveKit Inference handles speech boundaries and interruptions. The worker connects the room before starting the session so early session events have an active transport, and closes the session on job shutdown. See [LiveKit turn detection](https://docs.livekit.io/agents/logic/turns/).
+
+A `speech scheduling is paused` warning can occur while an activity is starting, transitioning, or closing. If it happens during an otherwise active call, inspect the surrounding session error, disconnect, and close events; do not force-resume a closing session. `failed to send session event` concerns LiveKit session transport, and its redacted error alone cannot distinguish a startup race from a later disconnection. Keep redaction enabled. After changing the worker, restart `bun run voice:dev` and start a new voice conversation to validate the current session rather than an older Cloud report.
+
 ### Cloud observability
 
 In the selected Cloud project, open **Settings → Observability** and enable **Agent observability**. Start a new playground voice conversation with the worker running, end the conversation, then open its **Sessions → Agent insights** view and check for traces and logs. Older sessions do not backfill. The worker requests redacted traces and logs with audio and transcript retention disabled. Verified on 2026-10-25: session `RM_7pbfbScXGvNW` produced inference/speaking traces, session logs, and model latency metrics in Cloud Agent Insights; its temporary room and worker were cleaned up afterward. See [Agent insights](https://docs.livekit.io/testing/observability/insights/).
