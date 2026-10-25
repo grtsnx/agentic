@@ -33,6 +33,78 @@ The application validates configuration before it starts. Invalid ports, boolean
 
 Never use `*` in `CORS_ORIGINS`. The server accepts only complete HTTP or HTTPS origins without paths.
 
+## Project structure
+
+API versions own separate controllers, services, modules, and DTOs. Shared provider integrations stay under `lib/` so v1 and v2 can evolve independently without duplicating infrastructure.
+
+```text
+src/
+├── app/
+│   ├── app.controller.ts
+│   ├── app.module.ts
+│   └── app.service.ts
+├── bootstrap/
+│   ├── application.ts
+│   └── swagger.ts
+├── config/
+│   ├── environment.ts
+│   └── index.ts
+├── dto/
+│   ├── v1/
+│   │   ├── chat-request.dto.ts
+│   │   └── chat-response.dto.ts
+│   ├── v2/
+│   │   ├── chat-request.dto.ts
+│   │   └── chat-response.dto.ts
+│   └── index.ts
+├── lib/
+│   ├── openai/
+│   │   ├── openai.module.ts
+│   │   └── openai.service.ts
+│   ├── index.ts
+│   └── lib.module.ts
+├── middleware/
+│   ├── commons/
+│   │   ├── http-response.ts
+│   │   ├── index.ts
+│   │   └── request-id.middleware.ts
+│   ├── filters/
+│   │   ├── http-exception.filter.ts
+│   │   └── index.ts
+│   ├── interceptors/
+│   │   ├── index.ts
+│   │   └── response.interceptor.ts
+│   └── index.ts
+├── modules/
+│   ├── v1/
+│   │   ├── chat/
+│   │   │   ├── chat.controller.ts
+│   │   │   ├── chat.module.ts
+│   │   │   └── chat.service.ts
+│   │   └── v1.module.ts
+│   ├── v2/
+│   │   ├── chat/
+│   │   │   ├── chat.controller.ts
+│   │   │   ├── chat.module.ts
+│   │   │   └── chat.service.ts
+│   │   └── v2.module.ts
+│   └── index.ts
+└── main.ts
+test/
+├── e2e/
+│   ├── chat/
+│   │   └── chat.e2e-spec.ts
+│   ├── app.e2e-spec.ts
+│   └── middleware-error.e2e-spec.ts
+└── unit/
+    ├── modules/
+    │   ├── v1/chat/chat.service.spec.ts
+    │   └── v2/chat/chat.service.spec.ts
+    ├── app.controller.spec.ts
+    ├── environment.spec.ts
+    └── http-response.spec.ts
+```
+
 ## Health checks
 
 - `GET /v1/health/live` proves that the process can answer requests.

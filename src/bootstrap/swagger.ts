@@ -1,7 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { apiReference } from '@scalar/nestjs-api-reference';
-import type { Environment } from '@/config/index.js';
+import type { Environment } from '@/config';
 
 const apiVersions = ['1', '2'] as const;
 type ApiVersion = (typeof apiVersions)[number];

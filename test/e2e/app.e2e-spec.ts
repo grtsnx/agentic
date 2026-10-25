@@ -3,7 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '@/app';
 import { configureApplication } from '@/bootstrap/application.js';
-import { validateEnvironment } from '@/config/index.js';
+import { validateEnvironment } from '@/config';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication;

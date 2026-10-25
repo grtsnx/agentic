@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateEnvironment } from '@/config/environment.js';
+import { validateEnvironment } from '@/config';
 
 describe('validateEnvironment', () => {
   it('uses secure, stateless defaults', () => {
