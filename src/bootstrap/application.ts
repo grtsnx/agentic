@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { AppModule, ObserveInstrument } from '@/app';
 import type { Environment } from '@/config';
 import { RequestIdMiddleware } from '@/middleware';
+import { SecureSocketIoAdapter } from './socket-io.adapter.js';
 import { configureSwagger } from './swagger.js';
 
 export function configureApplication(
@@ -26,6 +27,9 @@ export function configureApplication(
   app.enableCsrfProtection({ trustedOrigins: environment.CORS_ORIGINS });
   app.enableVersioning({ type: VersioningType.URI });
   app.enableShutdownHooks();
+  app.useWebSocketAdapter(
+    new SecureSocketIoAdapter(app, environment.CORS_ORIGINS),
+  );
 
   if (environment.CORS_ORIGINS.length > 0) {
     app.enableCors({

@@ -18,6 +18,31 @@ bun run start:dev
 
 Swagger UI runs at `http://localhost:3000/api`, and Scalar runs at `http://localhost:3000/docs`. Both use the version-specific OpenAPI documents at `/api/v1-json` and `/api/v2-json`. The application prints every enabled documentation URL when it starts.
 
+Start the interactive streaming CLI in another terminal:
+
+```bash
+bun run chat
+```
+
+The REST endpoint remains `POST /v1/chat`. Socket.IO streams on the `/v1/chat` namespace. REST is stateless; each Socket.IO connection and CLI process keeps isolated, in-memory history that disappears on disconnect or exit.
+
+## Socket.IO chat
+
+Connect a Socket.IO v4 client to `http://localhost:3000/v1/chat` with the WebSocket transport.
+
+| Direction       | Event             | Data                                                         |
+| --------------- | ----------------- | ------------------------------------------------------------ |
+| Client → server | `chat.send`       | `{ "message": "Explain the Roman Republic" }`                |
+| Client → server | `chat.cancel`     | `{}`                                                         |
+| Server → client | `chat.started`    | `{ "requestId": "..." }`                                     |
+| Server → client | `chat.delta`      | `{ "requestId": "...", "delta": "partial text" }`            |
+| Server → client | `chat.completed`  | Final message plus tokens, estimated cost, models and tools. |
+| Server → client | `chat.cancelling` | Confirms that cancellation was requested.                    |
+| Server → client | `chat.cancelled`  | Confirms that the active model turn stopped.                 |
+| Server → client | `chat.error`      | A stable error code and safe message.                        |
+
+[Hoppscotch](https://hoppscotch.com/) is the recommended free tester: open **Realtime → Socket.IO**, choose Socket.IO v4, connect to the namespace above, listen for the server events, and emit `chat.send`. Hoppscotch also supports embeddable shared-request widgets; adding one here requires a generated public share URL. Use the desktop client or agent when browser origin restrictions prevent localhost access.
+
 ## Configuration
 
 The application validates configuration before it starts. Invalid ports, booleans, and CORS origins stop startup.
@@ -35,12 +60,13 @@ Never use `*` in `CORS_ORIGINS`. The server accepts only complete HTTP or HTTPS 
 
 ## Project structure
 
-API versions own separate controllers, services, modules, and DTOs. Shared provider integrations stay under `lib/` so v1 and v2 can evolve independently without duplicating infrastructure.
+Implemented API versions own their controllers, services, modules, and DTOs. V2 stays empty until a contract changes. Shared provider integrations stay under `lib/` so future versions can evolve without duplicating infrastructure.
 
 ```text
 src/                      # Application source.
 ├── app/                  # Root application and health endpoints.
 ├── bootstrap/            # Security, validation, documentation, and startup setup.
+├── cli/                  # Standalone Nest application context for terminal commands.
 ├── config/               # Validated runtime configuration.
 ├── dto/                  # Versioned API input and output contracts.
 ├── lib/                  # Shared provider and infrastructure adapters.
@@ -51,10 +77,11 @@ src/                      # Application source.
 │   └── interceptors/    # Global response transformation.
 ├── modules/              # Feature modules separated by API version.
 │   ├── v1/              # Stable version 1 feature boundary.
-│   └── v2/              # Independent version 2 feature boundary.
-└── main.ts               # Application entry point.
+│   └── v2/              # Clean boundary reserved for changed v2 contracts.
+├── cli.ts                # Standalone CLI entry point.
+└── main.ts               # HTTP and Socket.IO application entry point.
 test/                     # All automated tests.
-├── e2e/                  # Assembled application and HTTP tests.
+├── e2e/                  # Assembled HTTP and Socket.IO tests.
 └── unit/                 # Isolated unit tests grouped by feature.
 ```
 
@@ -75,29 +102,31 @@ Completion: a clean checkout passes every verification command and starts with i
 
 ### 2. Basic REST chat
 
-- ✅ Isolate v1 and v2 controllers, services, modules, and DTOs so either version can change safely.
-- ✅ Expose validated `POST /v1/chat` and `POST /v2/chat` endpoints.
+- ✅ Keep v1 chat isolated while reserving a clean v2 boundary for future contract changes.
+- ✅ Expose the validated `POST /v1/chat` endpoint without copying it into v2.
 - ✅ Wrap the OpenAI Agents SDK behind a shared NestJS service.
 - ✅ Return token usage, model/tool calls, and clearly labelled cost estimates.
 - ✅ Document each API version in Swagger, Scalar, and OpenAPI JSON.
 - ⬜ Verify a real provider response with a documented local smoke-test command.
 - ⬜ Map provider authentication, timeout, rate-limit, and availability failures to stable application errors.
 
-Completion: both versions return a live model response, reject invalid input, and expose useful provider failures without leaking secrets.
+Completion: v1 returns a live model response, rejects invalid input, and exposes useful provider failures without leaking secrets; v2 remains clean until it differs.
 
-### 3. CLI chat and streaming
+### 3. CLI and Socket.IO streaming
 
-- ⬜ Add a CLI that uses the same application services as the REST API.
-- ⬜ Stream model output over the CLI and an HTTP streaming endpoint.
-- ⬜ Support cancellation, timeouts, graceful interruption, and non-zero CLI exit codes.
-- ⬜ Display tool calls, approval requests, usage, and provider errors clearly.
+- ✅ Add a CLI that uses the same application services as the REST API.
+- ✅ Stream model output over the CLI and a versioned Socket.IO namespace.
+- ✅ Cancel active CLI and Socket.IO turns without persisting partial sessions.
+- ✅ Display tokens, estimated cost, model calls, tool calls, and safe provider errors.
+- ⬜ Add configurable model timeouts and explicit non-zero CLI exit codes.
+- ⬜ Display human approval requests when privileged tools are introduced.
 
-Completion: a user can start and cancel a streaming chat from the CLI or HTTP without duplicated agent logic.
+Completion: a user can start and cancel a streaming chat from the CLI or Socket.IO without duplicated agent logic.
 
 ### 4. Structured outputs and conversation sessions
 
 - ✅ Define schema-validated structured outputs for tasks that need machine-readable results.
-- ⬜ Add in-memory conversation sessions for local development without claiming durability.
+- ✅ Add in-memory Socket.IO and CLI sessions without claiming durability.
 - ⬜ Support session creation, continuation, expiration, and deletion.
 - ⬜ Enforce token and turn limits, and summarize context before it exceeds its budget.
 - ⬜ Test concurrent session isolation and malformed model output.

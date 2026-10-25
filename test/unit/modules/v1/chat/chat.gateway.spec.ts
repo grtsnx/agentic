@@ -37,4 +37,37 @@ describe('ChatV1Gateway', () => {
       expect.objectContaining({ session, signal: expect.any(AbortSignal) }),
     );
   });
+
+  it('prevents overlapping turns and cancels the active turn', async () => {
+    const openaiService = {
+      createSession: vi.fn(() => ({ id: 'session' })),
+      streamReply: vi.fn(async function* (
+        _message: string,
+        _options: { signal: AbortSignal },
+      ) {
+        await new Promise(() => undefined);
+        yield { type: 'delta', delta: '' } as const;
+      }),
+    };
+    const gateway = new ChatV1Gateway(openaiService as never);
+    const client = {} as Socket;
+    gateway.handleConnection(client);
+
+    gateway.sendMessage(client, { message: 'First' });
+    const busy = await lastValueFrom(
+      gateway.sendMessage(client, { message: 'Second' }),
+    );
+    const cancelling = gateway.cancel(client);
+    const signal = openaiService.streamReply.mock.calls[0]?.[1]?.signal;
+
+    expect(busy).toEqual({
+      event: 'chat.error',
+      data: {
+        code: 'CHAT_BUSY',
+        message: 'Wait for the active response or cancel it first.',
+      },
+    });
+    expect(cancelling).toEqual({ event: 'chat.cancelling', data: {} });
+    expect(signal?.aborted).toBe(true);
+  });
 });

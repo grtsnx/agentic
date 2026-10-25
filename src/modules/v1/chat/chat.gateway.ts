@@ -9,7 +9,15 @@ import {
   type OnGatewayDisconnect,
   type WsResponse,
 } from '@nestjs/websockets';
-import { catchError, concat, finalize, from, map, of, type Observable } from 'rxjs';
+import {
+  catchError,
+  concat,
+  finalize,
+  from,
+  map,
+  of,
+  type Observable,
+} from 'rxjs';
 import type { Socket } from 'socket.io';
 import { ChatV1RequestDto } from '@/dto';
 import { OpenaiService } from '@/lib';
@@ -31,12 +39,15 @@ type ChatSocketResponse = WsResponse<Record<string, unknown>>;
 export class ChatV1Gateway
   implements OnGatewayConnection<Socket>, OnGatewayDisconnect<Socket>
 {
+  // Each socket owns ephemeral history that becomes unreachable after disconnect.
   private readonly connections = new WeakMap<Socket, ConnectionState>();
 
   constructor(private readonly openaiService: OpenaiService) {}
 
   handleConnection(client: Socket): void {
-    this.connections.set(client, { session: this.openaiService.createSession() });
+    this.connections.set(client, {
+      session: this.openaiService.createSession(),
+    });
   }
 
   handleDisconnect(client: Socket): void {
@@ -50,6 +61,7 @@ export class ChatV1Gateway
     @MessageBody() request: ChatV1RequestDto,
   ): Observable<ChatSocketResponse> {
     const state = this.getConnectionState(client);
+    // Prevent concurrent turns from interleaving deltas in one conversation.
     if (state.abortController) {
       return of({
         event: 'chat.error',

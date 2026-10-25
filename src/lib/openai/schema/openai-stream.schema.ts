@@ -24,6 +24,4 @@ export const openaiStreamEventSchema = z.discriminatedUnion('type', [
 ]);
 
 export type OpenaiStreamEvent = z.infer<typeof openaiStreamEventSchema>;
-export type OpenaiStreamResponse = z.infer<
-  typeof openaiStreamResponseSchema
->;
+export type OpenaiStreamResponse = z.infer<typeof openaiStreamResponseSchema>;

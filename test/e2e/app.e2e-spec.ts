@@ -128,9 +128,17 @@ describe('AppController (e2e)', () => {
       name: 'Server',
       description: 'Core server status, health, and connectivity endpoints.',
     });
+    expect(v1.body.tags).toContainEqual({
+      name: 'Chat',
+      description:
+        'Version 1 agent chat endpoints for validated, structured responses.',
+    });
     expect(v1.body.paths).toHaveProperty('/v1');
     expect(v1.body.paths).not.toHaveProperty('/v2');
     expect(v2.body.info.version).toBe('v2');
+    expect(v2.body.tags).not.toContainEqual(
+      expect.objectContaining({ name: 'Chat' }),
+    );
     expect(v2.body.paths).toHaveProperty('/v2');
     expect(v2.body.paths).not.toHaveProperty('/v1');
   });

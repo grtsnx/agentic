@@ -143,15 +143,23 @@ export function configureSwagger(
   if (!environment.SWAGGER_ENABLED) return;
 
   const buildDocument = (version: ApiVersion) => {
-    const options = new DocumentBuilder()
+    const builder = new DocumentBuilder()
       .setTitle(environment.PLATFORM_NAME)
       .setDescription(`${environment.PLATFORM_NAME} API description`)
       .setVersion(`v${version}`)
       .addTag(
         'Server',
         'Core server status, health, and connectivity endpoints.',
-      )
-      .build();
+      );
+
+    if (version === '1') {
+      builder.addTag(
+        'Chat',
+        'Version 1 agent chat endpoints for validated, structured responses.',
+      );
+    }
+
+    const options = builder.build();
     const document = SwaggerModule.createDocument(app, options);
     const prefix = `/v${version}`;
     document.paths = Object.fromEntries(

@@ -82,11 +82,7 @@ describe('ChatGateway (e2e)', () => {
     await expect(completed).resolves.toMatchObject({
       response: { message: 'Hello' },
     });
-    expect(received).toEqual([
-      'chat.started',
-      'chat.delta',
-      'chat.completed',
-    ]);
+    expect(received).toEqual(['chat.started', 'chat.delta', 'chat.completed']);
   });
 
   it('rejects browser connections from untrusted origins', async () => {
@@ -107,6 +103,22 @@ describe('ChatGateway (e2e)', () => {
 
     await expect(rejected).resolves.toBeUndefined();
     untrusted.disconnect();
+  });
+
+  it('returns a safe event for invalid chat messages', async () => {
+    const error = new Promise<Record<string, unknown>>((resolve, reject) => {
+      socket.on('connect', () => {
+        socket.emit('chat.send', { message: '' });
+      });
+      socket.on('chat.error', resolve);
+      socket.on('connect_error', reject);
+      socket.connect();
+    });
+
+    await expect(error).resolves.toEqual({
+      code: 'INVALID_MESSAGE',
+      message: 'The WebSocket message is invalid.',
+    });
   });
 
   afterEach(async () => {
