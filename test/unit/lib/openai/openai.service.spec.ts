@@ -1,8 +1,7 @@
-import { ServiceUnavailableException } from '@nestjs/common';
-
 const agents = vi.hoisted(() => ({
   captureConfig: vi.fn(),
   run: vi.fn(),
+  webSearchTool: vi.fn((options) => ({ name: 'web_search', options })),
 }));
 
 vi.mock('@openai/agents', () => ({
@@ -12,6 +11,7 @@ vi.mock('@openai/agents', () => ({
     }
   },
   run: agents.run,
+  webSearchTool: agents.webSearchTool,
 }));
 
 import { OpenaiService } from '@/lib';
@@ -33,6 +33,7 @@ describe('OpenaiService', () => {
   beforeEach(() => {
     agents.captureConfig.mockClear();
     agents.run.mockReset();
+    agents.webSearchTool.mockClear();
   });
 
   afterEach(() => {
@@ -65,6 +66,7 @@ describe('OpenaiService', () => {
     const service = new OpenaiService();
     await expect(service.generateReply('Question')).resolves.toEqual({
       ...output,
+      sources: [],
       runtime: {
         durationMs: 250,
         tokens: {
@@ -129,7 +131,105 @@ describe('OpenaiService', () => {
 
     await expect(
       new OpenaiService().generateReply('Question'),
-    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    ).rejects.toMatchObject({ code: 'PROVIDER_INVALID_RESPONSE' });
+  });
+
+  it('rejects malformed structured model output with a stable error', async () => {
+    agents.run.mockResolvedValue({ finalOutput: { status: 'completed' } });
+
+    await expect(
+      new OpenaiService().generateReply('Question'),
+    ).rejects.toMatchObject({ code: 'PROVIDER_INVALID_RESPONSE' });
+  });
+
+  it('configures web-search domain controls and a provider timeout', async () => {
+    agents.run.mockResolvedValue({
+      finalOutput: output,
+      state: {
+        usage: {
+          requests: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          totalTokens: 0,
+          inputTokensDetails: [],
+          outputTokensDetails: [],
+        },
+      },
+      rawResponses: [],
+      newItems: [],
+    });
+    const values = {
+      MODEL_TIMEOUT_MS: 5_000,
+      WEB_SEARCH_TIMEOUT_MS: 1_000,
+      WEB_SEARCH_ENABLED: true,
+      WEB_SEARCH_ALLOWED_DOMAINS: ['openai.com'],
+    };
+    const config = { get: vi.fn((key: keyof typeof values) => values[key]) };
+
+    await new OpenaiService(config as never).generateReply(
+      'latest OpenAI news',
+    );
+
+    expect(agents.webSearchTool).toHaveBeenCalledWith(
+      expect.objectContaining({ filters: { allowedDomains: ['openai.com'] } }),
+    );
+    expect(agents.run).toHaveBeenCalledWith(
+      expect.anything(),
+      'latest OpenAI news',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+  });
+
+  it('extracts deduplicated citation metadata from provider annotations', async () => {
+    agents.run.mockResolvedValue({
+      finalOutput: output,
+      state: {
+        usage: {
+          requests: 1,
+          inputTokens: 1,
+          outputTokens: 1,
+          totalTokens: 2,
+          inputTokensDetails: [],
+          outputTokensDetails: [],
+        },
+      },
+      rawResponses: [
+        {
+          providerData: {
+            output: [
+              {
+                content: [
+                  {
+                    annotations: [
+                      {
+                        type: 'url_citation',
+                        title: 'OpenAI docs',
+                        url: 'https://developers.openai.com/docs',
+                        start_index: 1,
+                        end_index: 4,
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+      newItems: [],
+    });
+
+    const response = await new OpenaiService().generateReply('Question');
+
+    expect(response.sources).toEqual([
+      {
+        title: 'OpenAI docs',
+        url: 'https://developers.openai.com/docs',
+        domain: 'developers.openai.com',
+        startIndex: 1,
+        endIndex: 4,
+      },
+    ]);
   });
 
   it('streams text deltas and finishes with runtime metadata', async () => {
@@ -189,6 +289,7 @@ describe('OpenaiService', () => {
         type: 'completed',
         response: {
           message: 'Hello world',
+          sources: [],
           runtime: {
             durationMs: 250,
             tokens: {

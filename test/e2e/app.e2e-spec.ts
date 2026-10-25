@@ -181,6 +181,13 @@ describe('AppController (e2e)', () => {
         keyPoints: ['Political violence weakened republican institutions.'],
         suggestedActions: [],
         followUpQuestions: ['Would you like a timeline of the civil wars?'],
+        sources: [
+          {
+            title: 'OpenAI web search guide',
+            url: 'https://developers.openai.com/api/docs/guides/tools-web-search',
+            domain: 'developers.openai.com',
+          },
+        ],
         runtime: {
           durationMs: 1840,
           tokens: {

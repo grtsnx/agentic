@@ -25,6 +25,7 @@ export {
 } from './openai/schema/openai-stream.schema.js';
 export { OpenaiService } from './openai/openai.service.js';
 export type { OpenaiStreamOptions } from './openai/openai.service.js';
+export { mapProviderError } from './openai/provider-error.js';
 export {
   OPENAI_MODELS,
   routeOpenaiModel,

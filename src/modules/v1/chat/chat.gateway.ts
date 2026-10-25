@@ -21,7 +21,7 @@ import {
 import type { Socket } from 'socket.io';
 import { ChatV1RequestDto } from '@/dto';
 import { OpenaiService } from '@/lib';
-import { WebsocketExceptionFilter } from '@/middleware';
+import { ApplicationException, WebsocketExceptionFilter } from '@/middleware';
 
 interface ConnectionState {
   abortController?: AbortController;
@@ -107,7 +107,7 @@ export class ChatV1Gateway
           data: { requestId, response: event.response },
         };
       }),
-      catchError(() =>
+      catchError((error: unknown) =>
         of({
           event: abortController.signal.aborted
             ? 'chat.cancelled'
@@ -117,8 +117,17 @@ export class ChatV1Gateway
             ...(abortController.signal.aborted
               ? {}
               : {
-                  code: 'STREAM_FAILED',
-                  message: 'The chat stream could not be completed.',
+                  code:
+                    error instanceof ApplicationException
+                      ? error.code
+                      : 'STREAM_FAILED',
+                  message:
+                    error instanceof ApplicationException
+                      ? error.message
+                      : 'The chat stream could not be completed.',
+                  ...(error instanceof ApplicationException
+                    ? { retryable: error.retryable }
+                    : {}),
                 }),
           },
         }),

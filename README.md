@@ -1,6 +1,6 @@
 # Agentic
 
-Agentic is a stateless NestJS API foundation for provider-specific agent experiments. The application exposes versioned APIs, health checks, OpenAPI documents, structured responses, and global error handling.
+Agentic is a NestJS foundation for provider-specific agent experiments. It exposes versioned APIs, bounded in-memory sessions, health checks, OpenAPI documents, structured responses, and global error handling without database or Redis persistence.
 
 ## Requirements
 
@@ -24,7 +24,19 @@ Start the interactive streaming CLI in another terminal:
 bun run chat
 ```
 
-The REST endpoint remains `POST /v1/chat`. Socket.IO streams on the `/v1/chat` namespace. REST is stateless; each Socket.IO connection and CLI process keeps isolated, in-memory history that disappears on disconnect or exit.
+The stateless REST endpoint remains `POST /v1/chat`. Session REST endpoints create, continue, expire, and delete isolated in-memory conversations under `/v1/chat/sessions`. Socket.IO streams on the `/v1/chat` namespace. All conversation state disappears when the process restarts; durable persistence remains intentionally deferred until the database milestone.
+
+Verify the configured provider with one small, real request:
+
+```bash
+bun run smoke:provider
+```
+
+The command requires `OPENAI_API_KEY` in `.env`, validates the structured response and usage metadata, prints only safe model/token details, and exits non-zero on failure.
+
+Create and continue an in-memory REST session with `POST /v1/chat/sessions` and `POST /v1/chat/sessions/:id/messages`; delete it with `DELETE /v1/chat/sessions/:id`. Session IDs are UUIDs, expiry slides after each successful turn, overlapping turns on one session are rejected, and separate sessions never share provider history.
+
+Hosted web search follows the [official OpenAI web-search contract](https://developers.openai.com/api/docs/guides/tools-web-search). Set `WEB_SEARCH_ALLOWED_DOMAINS` to restrict results. Provider URL annotations are normalized into source metadata and rendered as visible, clickable citations in the playground; model-written URLs are not trusted as source records.
 
 Chat requests are automatically routed without an extra model call. Lightweight requests use `gpt-5-nano`; complex code, architecture, security, multi-step, or large requests use `gpt-6-luna`. The router is capped at Luna, and the runtime metadata reports the model actually called.
 
@@ -66,21 +78,34 @@ To use your OpenAI account directly while retaining LiveKit's WebRTC transport, 
 
 The connected Cloud project currently has no deployed Cloud agent and no purchased phone number. The local worker is intentional for development; deploy it only when a continuously hosted voice agent is required.
 
+### LiveKit TODO
+
+- ✅ Keep LiveKit SDK integration under `lib/` and expose voice through the v1 module.
+- ✅ Switch LiveKit Inference and direct OpenAI voice adapters with `VOICE_PROVIDER`.
+- ✅ Issue short-lived, room-scoped, microphone-only tokens without browser secrets.
+- ✅ Run a named TypeScript voice worker with shared chat/voice instructions.
+- ✅ Show participant-aware listening, thinking, speaking, transcript, and connection states.
+- ✅ Disable Cloud audio and transcript retention in worker configuration.
+- ⬜ Deploy the worker to a continuously hosted environment when local development is no longer sufficient.
+- ⬜ Enable and validate LiveKit Agent Observability in the Cloud project.
+- ⬜ Add telephony only after an explicitly approved phone-number purchase and SIP dispatch design.
+- ⬜ Add voice CLI input only after selecting and testing a cross-platform audio capture path.
+
 ## Socket.IO chat
 
 Open `http://localhost:3000/playground`, wait for **Online**, enter a message, and send it. The conversation shows a thinking orb, shimmering activity, elapsed time, and safe phases such as tool use, handoffs, and approvals, then hides that activity when response text begins. It never exposes private chain-of-thought. Runtime chips show total time, tokens, estimated cost, models, and tools after completion. Use the stop button to cancel the active turn.
 
-| Direction       | Event             | Data                                                               |
-| --------------- | ----------------- | ------------------------------------------------------------------ |
-| Client → server | `chat.send`       | `{ "message": "Explain the Roman Republic" }`                      |
-| Client → server | `chat.cancel`     | `{}`                                                               |
-| Server → client | `chat.started`    | `{ "requestId": "..." }`                                           |
-| Server → client | `chat.status`     | Safe activity phase and label; never private chain-of-thought.     |
-| Server → client | `chat.delta`      | `{ "requestId": "...", "delta": "partial text" }`                  |
-| Server → client | `chat.completed`  | Final message plus time, tokens, estimated cost, models and tools. |
-| Server → client | `chat.cancelling` | Confirms that cancellation was requested.                          |
-| Server → client | `chat.cancelled`  | Confirms that the active model turn stopped.                       |
-| Server → client | `chat.error`      | A stable error code and safe message.                              |
+| Direction       | Event             | Data                                                                    |
+| --------------- | ----------------- | ----------------------------------------------------------------------- |
+| Client → server | `chat.send`       | `{ "message": "Explain the Roman Republic" }`                           |
+| Client → server | `chat.cancel`     | `{}`                                                                    |
+| Server → client | `chat.started`    | `{ "requestId": "..." }`                                                |
+| Server → client | `chat.status`     | Safe activity phase and label; never private chain-of-thought.          |
+| Server → client | `chat.delta`      | `{ "requestId": "...", "delta": "partial text" }`                       |
+| Server → client | `chat.completed`  | Final message, clickable sources, time, tokens, cost, models and tools. |
+| Server → client | `chat.cancelling` | Confirms that cancellation was requested.                               |
+| Server → client | `chat.cancelled`  | Confirms that the active model turn stopped.                            |
+| Server → client | `chat.error`      | A stable error code and safe message.                                   |
 
 The embedded playground is same-origin, so it works without adding a public website to `CORS_ORIGINS`. The Socket.IO adapter allows the API's own browser origin by default and rejects other browser origins unless they are explicitly configured. For optional external testing in [Hoppscotch](https://hoppscotch.com/), add its exact origin to `CORS_ORIGINS`; do not use `*`.
 
@@ -105,6 +130,13 @@ The application validates configuration before it starts. Invalid ports, boolean
 | `LIVEKIT_API_KEY`             | empty                 | Server-side LiveKit key; required when voice is enabled.                    |
 | `LIVEKIT_API_SECRET`          | empty                 | Server-side LiveKit secret; required when voice is enabled.                 |
 | `LIVEKIT_AGENT_NAME`          | `agentic-voice`       | Explicit dispatch name shared by tokens and the worker.                     |
+| `MODEL_TIMEOUT_MS`            | `60000`               | Maximum duration of a normal model run.                                     |
+| `WEB_SEARCH_ENABLED`          | `true`                | Makes hosted web search available for model-selected use.                   |
+| `WEB_SEARCH_TIMEOUT_MS`       | `30000`               | Bounds runs that can invoke hosted web search.                              |
+| `WEB_SEARCH_ALLOWED_DOMAINS`  | empty                 | Optional comma-separated allowlist of up to 100 domain names.               |
+| `SESSION_TTL_MS`              | `1800000`             | Sliding lifetime of an in-memory REST chat session.                         |
+| `SESSION_MAX_TURNS`           | `50`                  | Maximum completed turns in one in-memory session.                           |
+| `SESSION_MAX_TOKENS`          | `32000`               | Estimated context budget that triggers bounded summarization.               |
 
 Never use `*` in `CORS_ORIGINS`. The server accepts only complete HTTP or HTTPS origins without paths.
 
@@ -128,6 +160,7 @@ src/                      # Application source.
 ├── middleware/           # Global HTTP behavior.
 │   ├── commons/         # Shared response and request utilities.
 │   ├── filters/         # Global exception handling.
+│   ├── errors/          # Stable, deliberately public application errors.
 │   └── interceptors/    # Global response transformation.
 ├── modules/              # Feature modules separated by API version.
 │   ├── v1/              # Stable version 1 features, including chat and voice.
@@ -137,6 +170,7 @@ src/                      # Application source.
 └── voice.ts              # LiveKit Agents worker entry point.
 test/                     # All automated tests.
 ├── e2e/                  # Assembled HTTP and Socket.IO tests.
+├── smoke/                # Explicit opt-in tests against real providers.
 └── unit/                 # Isolated unit tests grouped by feature.
 ```
 
@@ -163,8 +197,8 @@ Completion: a clean checkout passes every verification command and starts with i
 - ✅ Return token usage, model/tool calls, and clearly labelled cost estimates.
 - ✅ Route lightweight work to GPT-5 Nano and promote complex work only as high as GPT-6 Luna.
 - ✅ Document each API version in Swagger, Scalar, and OpenAPI JSON.
-- ⬜ Verify a real provider response with a documented local smoke-test command.
-- ⬜ Map provider authentication, timeout, rate-limit, and availability failures to stable application errors.
+- ✅ Verify a real provider response with a documented local smoke-test command.
+- ✅ Map provider authentication, timeout, rate-limit, and availability failures to stable application errors.
 
 Completion: v1 returns a live model response, rejects invalid input, and exposes useful provider failures without leaking secrets; v2 remains clean until it differs.
 
@@ -177,7 +211,7 @@ Completion: v1 returns a live model response, rejects invalid input, and exposes
 - ✅ Issue short-lived, room-scoped, microphone-only voice tokens without exposing secrets.
 - ✅ Cancel active CLI and Socket.IO turns without persisting partial sessions.
 - ✅ Display tokens, estimated cost, model calls, tool calls, and safe provider errors.
-- ⬜ Add configurable model timeouts and explicit non-zero CLI exit codes.
+- ✅ Add configurable model timeouts and explicit non-zero CLI exit codes.
 - ⬜ Display human approval requests when privileged tools are introduced.
 
 Completion: a user can start and cancel a streaming chat from the CLI or Socket.IO without duplicated agent logic.
@@ -186,15 +220,15 @@ Completion: a user can start and cancel a streaming chat from the CLI or Socket.
 
 - ✅ Define schema-validated structured outputs for tasks that need machine-readable results.
 - ✅ Add in-memory Socket.IO and CLI sessions without claiming durability.
-- ⬜ Support session creation, continuation, expiration, and deletion.
-- ⬜ Enforce token and turn limits, and summarize context before it exceeds its budget.
-- ⬜ Test concurrent session isolation and malformed model output.
+- ✅ Support session creation, continuation, expiration, and deletion.
+- ✅ Enforce token and turn limits, and summarize context before it exceeds its budget.
+- ✅ Test concurrent session isolation and malformed model output.
 
 Completion: two concurrent sessions preserve separate context and every structured response passes its declared schema.
 
 ### 5. Hosted tools: web, files, and code
 
-- ⬜ Add web search with citations, source metadata, domain controls, and timeout limits.
+- ✅ Add web search with citations, source metadata, domain controls, and timeout limits.
 - ⬜ Add page retrieval that treats remote content as untrusted data rather than instructions.
 - ⬜ Add file upload, type and size validation, extraction, and scoped retrieval.
 - ⬜ Add sandboxed code execution with CPU, memory, time, network, and filesystem limits.

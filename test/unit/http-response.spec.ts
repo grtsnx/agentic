@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
 import { describeException, httpResponse, statusType } from '@/middleware';
+import { ApplicationException } from '@/middleware';
 
 describe('HTTP response helpers', () => {
   it('maps known and unknown status codes', () => {
@@ -46,6 +47,23 @@ describe('HTTP response helpers', () => {
     ).toEqual({
       statusCode: 500,
       message: 'Internal server error',
+    });
+  });
+
+  it('preserves stable application errors while hiding arbitrary 5xx errors', () => {
+    expect(
+      describeException(
+        new ApplicationException(
+          'PROVIDER_TIMEOUT',
+          'The provider timed out.',
+          504,
+          true,
+        ),
+      ),
+    ).toEqual({
+      statusCode: 504,
+      message: 'The provider timed out.',
+      data: { code: 'PROVIDER_TIMEOUT', retryable: true },
     });
   });
 

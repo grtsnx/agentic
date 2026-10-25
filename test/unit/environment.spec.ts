@@ -12,7 +12,28 @@ describe('validateEnvironment', () => {
       SWAGGER_ENABLED: true,
       VOICE_ENABLED: false,
       VOICE_PROVIDER: 'livekit',
+      MODEL_TIMEOUT_MS: 60_000,
+      WEB_SEARCH_TIMEOUT_MS: 30_000,
+      WEB_SEARCH_ALLOWED_DOMAINS: [],
+      SESSION_TTL_MS: 1_800_000,
+      SESSION_MAX_TURNS: 50,
+      SESSION_MAX_TOKENS: 32_000,
     });
+  });
+
+  it('normalizes and validates web-search domains', () => {
+    expect(
+      validateEnvironment({
+        WEB_SEARCH_ALLOWED_DOMAINS:
+          'docs.example.com, example.org,docs.example.com',
+      }).WEB_SEARCH_ALLOWED_DOMAINS,
+    ).toEqual(['docs.example.com', 'example.org']);
+
+    expect(() =>
+      validateEnvironment({
+        WEB_SEARCH_ALLOWED_DOMAINS: 'https://example.com',
+      }),
+    ).toThrow(/domain names/i);
   });
 
   it('normalizes and deduplicates CORS origins', () => {

@@ -48,6 +48,36 @@ function corsOrigins(value: unknown): string[] {
   return [...new Set(origins)];
 }
 
+function domainNames(value: unknown): string[] {
+  if (value === undefined || value === '') return [];
+  const values = Array.isArray(value) ? value : String(value).split(',');
+  const domains = [
+    ...new Set(
+      values
+        .map(String)
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  ];
+
+  if (
+    domains.length > 100 ||
+    domains.some(
+      (domain) =>
+        domain.length > 253 ||
+        !/^(?:[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?\.)*[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?$/i.test(
+          domain,
+        ),
+    )
+  ) {
+    throw new Error(
+      'WEB_SEARCH_ALLOWED_DOMAINS must contain at most 100 domain names without schemes or paths',
+    );
+  }
+
+  return domains.map((domain) => domain.toLowerCase());
+}
+
 const environmentSchema = z
   .object({
     NODE_ENV: z.enum(environments).default('development'),
@@ -71,6 +101,33 @@ const environmentSchema = z
     LIVEKIT_API_SECRET: z.string().trim().optional(),
     LIVEKIT_AGENT_NAME: z.string().trim().min(1).default('agentic-voice'),
     OPENAI_API_KEY: z.string().trim().optional(),
+    MODEL_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .min(1_000)
+      .max(300_000)
+      .default(60_000),
+    WEB_SEARCH_ENABLED: booleanValue('WEB_SEARCH_ENABLED').default(true),
+    WEB_SEARCH_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .min(1_000)
+      .max(120_000)
+      .default(30_000),
+    WEB_SEARCH_ALLOWED_DOMAINS: z.unknown().optional(),
+    SESSION_TTL_MS: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(86_400_000)
+      .default(1_800_000),
+    SESSION_MAX_TURNS: z.coerce.number().int().min(1).max(1_000).default(50),
+    SESSION_MAX_TOKENS: z.coerce
+      .number()
+      .int()
+      .min(100)
+      .max(1_000_000)
+      .default(32_000),
   })
   .superRefine((environment, context) => {
     if (environment.OBSERVE_ENABLED) {
@@ -148,6 +205,13 @@ export interface Environment {
   LIVEKIT_API_SECRET?: string;
   LIVEKIT_AGENT_NAME: string;
   OPENAI_API_KEY?: string;
+  MODEL_TIMEOUT_MS: number;
+  WEB_SEARCH_ENABLED: boolean;
+  WEB_SEARCH_TIMEOUT_MS: number;
+  WEB_SEARCH_ALLOWED_DOMAINS: string[];
+  SESSION_TTL_MS: number;
+  SESSION_MAX_TURNS: number;
+  SESSION_MAX_TOKENS: number;
 }
 
 export function validateEnvironment(
@@ -157,6 +221,7 @@ export function validateEnvironment(
   return {
     ...parsed,
     CORS_ORIGINS: corsOrigins(parsed.CORS_ORIGINS),
+    WEB_SEARCH_ALLOWED_DOMAINS: domainNames(parsed.WEB_SEARCH_ALLOWED_DOMAINS),
     OBSERVE_ENABLED: parsed.OBSERVE_ENABLED ?? false,
     SWAGGER_ENABLED: parsed.SWAGGER_ENABLED ?? parsed.NODE_ENV !== 'production',
     REALTIME_PLAYGROUND_ENABLED:

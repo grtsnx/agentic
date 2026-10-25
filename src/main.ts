@@ -8,6 +8,7 @@ const baseUrl = `http://localhost:${environment.PORT}`;
 const logger = new ConsoleLogger('Bootstrap');
 logger.log(`Application: ${baseUrl}`);
 logger.log(`REST chat v1: ${baseUrl}/v1/chat`);
+logger.log(`REST chat sessions v1: ${baseUrl}/v1/chat/sessions`);
 logger.log(`Socket.IO v1 namespace: ${baseUrl}/v1/chat`);
 if (environment.REALTIME_PLAYGROUND_ENABLED) {
   logger.log(`Chat and voice playground: ${baseUrl}/playground`);

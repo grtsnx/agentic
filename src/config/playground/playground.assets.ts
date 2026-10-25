@@ -238,6 +238,25 @@ export const PLAYGROUND_APP = `(() => {
     message.body.append(metadata);
   }
 
+  function addSources(sources = []) {
+    if (!assistantMessage?.body || !sources.length) return;
+    const list = document.createElement('div');
+    list.className = 'message-sources';
+    const label = document.createElement('strong');
+    label.textContent = 'Sources';
+    list.append(label);
+    for (const source of sources) {
+      if (!source?.url || !source?.title) continue;
+      const link = document.createElement('a');
+      link.href = source.url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = source.title;
+      list.append(link);
+    }
+    assistantMessage.body.append(list);
+  }
+
   function send() {
     const message = elements.message.value.trim();
     if (!message || active || !socket.connected) return;
@@ -308,6 +327,7 @@ export const PLAYGROUND_APP = `(() => {
     setActive(false);
     message.status.hidden = true;
     message.content.textContent = data.response?.message ?? message.content.textContent;
+    addSources(data.response?.sources);
     addRuntime(data.response?.runtime);
     assistantMessage = undefined;
     startedAt = undefined;
@@ -485,6 +505,9 @@ button { color: inherit; }
 .status-elapsed { min-width: 34px; color: #a1a1aa; font: .72rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .runtime-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
 .runtime-chips span { padding: 4px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); background: var(--surface); font: 600 .7rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.message-sources { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; font-size: .78rem; }
+.message-sources strong { color: var(--muted); }
+.message-sources a { color: #2563eb; text-underline-offset: 3px; }
 .composer-wrap { position: relative; width: min(780px, calc(100% - 32px)); margin: 0 auto; padding: 0 0 14px; background: linear-gradient(to top, #fff 78%, rgba(255, 255, 255, 0)); }
 .composer { padding: 13px 14px 10px; border: 1px solid #d4d4d8; border-radius: 18px; background: #fff; box-shadow: 0 10px 34px rgba(0, 0, 0, .08); }
 textarea { display: block; width: 100%; max-height: 180px; resize: none; padding: 3px 4px 12px; border: 0; outline: 0; background: transparent; color: var(--text); line-height: 1.5; }

@@ -1,6 +1,19 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { OpenaiRuntimeDto } from '../common/openai-runtime.dto.js';
 
+export class ChatSourceDto {
+  @ApiProperty({ example: 'OpenAI web search guide' })
+  title!: string;
+
+  @ApiProperty({
+    example: 'https://developers.openai.com/api/docs/guides/tools-web-search',
+  })
+  url!: string;
+
+  @ApiProperty({ example: 'developers.openai.com' })
+  domain!: string;
+}
+
 export class ChatV1ResponseDto {
   @ApiProperty({
     enum: ['completed', 'needs_input', 'refused'],
@@ -30,6 +43,9 @@ export class ChatV1ResponseDto {
     type: [String],
   })
   followUpQuestions!: string[];
+
+  @ApiProperty({ type: [ChatSourceDto] })
+  sources!: ChatSourceDto[];
 
   @ApiProperty({ type: OpenaiRuntimeDto })
   runtime!: OpenaiRuntimeDto;

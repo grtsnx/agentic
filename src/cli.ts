@@ -8,7 +8,11 @@ const app = await NestFactory.createApplicationContext(CliModule, {
 });
 
 try {
-  await app.get(CliService).run(process.stdin, process.stdout);
+  process.exitCode = await app
+    .get(CliService)
+    .run(process.stdin, process.stdout);
+} catch {
+  process.exitCode = 1;
 } finally {
   await app.close();
 }

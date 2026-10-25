@@ -9,6 +9,11 @@ import { OpenaiService } from '@/lib';
 describe('ChatController (e2e)', () => {
   let app: INestApplication;
   const generateReply = vi.fn();
+  const createSession = vi.fn(() => ({
+    getItems: vi.fn(async () => []),
+    clearSession: vi.fn(),
+    addItems: vi.fn(),
+  }));
   const structuredOutput = {
     status: 'completed',
     message: 'Test response',
@@ -22,7 +27,7 @@ describe('ChatController (e2e)', () => {
     generateReply.mockReset().mockResolvedValue(structuredOutput);
     const module = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(OpenaiService)
-      .useValue({ generateReply })
+      .useValue({ generateReply, createSession })
       .compile();
 
     app = module.createNestApplication({ logger: false });
@@ -52,6 +57,26 @@ describe('ChatController (e2e)', () => {
       .send({ message: 'Hello' })
       .expect(404);
     expect(generateReply).not.toHaveBeenCalled();
+  });
+
+  it('creates, continues, and deletes an in-memory session', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/v1/chat/sessions')
+      .send()
+      .expect(201);
+    const id = created.body.data.id as string;
+
+    await request(app.getHttpServer())
+      .post(`/v1/chat/sessions/${id}/messages`)
+      .send({ message: 'Continue' })
+      .expect(200);
+    await request(app.getHttpServer())
+      .delete(`/v1/chat/sessions/${id}`)
+      .expect(204);
+    await request(app.getHttpServer())
+      .post(`/v1/chat/sessions/${id}/messages`)
+      .send({ message: 'Too late' })
+      .expect(404);
   });
 
   it.each([

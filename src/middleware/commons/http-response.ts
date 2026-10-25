@@ -1,4 +1,5 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
+import { ApplicationException } from '../errors/application.exception.js';
 
 export function statusType(statusCode: number): string {
   const name = HttpStatus[statusCode as HttpStatus];
@@ -39,7 +40,10 @@ export function describeException(exception: unknown): {
 
   const statusCode = exception.getStatus();
 
-  if (statusCode >= HttpStatus.INTERNAL_SERVER_ERROR) {
+  if (
+    statusCode >= HttpStatus.INTERNAL_SERVER_ERROR &&
+    !(exception instanceof ApplicationException)
+  ) {
     return {
       statusCode,
       message: 'Internal server error',

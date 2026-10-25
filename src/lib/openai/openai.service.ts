@@ -1,5 +1,12 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
-import { Agent, MemorySession, run, type RunStreamEvent } from '@openai/agents';
+import { Injectable, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import {
+  Agent,
+  MemorySession,
+  run,
+  webSearchTool,
+  type RunStreamEvent,
+} from '@openai/agents';
 import {
   openaiOutputSchema,
   openaiResponseSchema,
@@ -19,6 +26,8 @@ import {
   AGENT_INSTRUCTIONS,
   AGENT_NAME,
 } from '@/config/agent/agent-instructions.js';
+import { ApplicationException } from '@/middleware/errors/application.exception.js';
+import { mapProviderError } from './provider-error.js';
 
 const TOKENS_PER_MILLION = 1_000_000;
 
@@ -50,35 +59,60 @@ export interface OpenaiStreamOptions {
   signal?: AbortSignal;
 }
 
+export interface OpenaiReplyOptions extends OpenaiStreamOptions {}
+
 @Injectable()
 export class OpenaiService {
+  constructor(@Optional() private readonly config?: ConfigService) {}
+
   createSession(): MemorySession {
     return new MemorySession();
   }
 
-  async generateReply(message: string): Promise<OpenaiResponse> {
+  async generateReply(
+    message: string,
+    options: OpenaiReplyOptions = {},
+  ): Promise<OpenaiResponse> {
     const startedAt = performance.now();
     const model = routeOpenaiModel(message);
+    const searchEnabled = this.setting('WEB_SEARCH_ENABLED', true);
     const agent = new Agent({
       name: AGENT_NAME,
       instructions: AGENT_INSTRUCTIONS,
       model,
       outputType: openaiOutputSchema,
+      tools: this.createTools(searchEnabled),
     });
-    const result = await run(agent, message);
-    if (!result.finalOutput) {
-      throw new ServiceUnavailableException(
-        'The AI provider returned no structured output',
-      );
+    const signal = this.runSignal(options.signal, searchEnabled);
+
+    try {
+      const result = await run(agent, message, {
+        ...(options.session ? { session: options.session } : {}),
+        signal,
+      });
+      if (!result.finalOutput) {
+        throw new ApplicationException(
+          'PROVIDER_INVALID_RESPONSE',
+          'The AI provider returned no structured output.',
+          502,
+          true,
+        );
+      }
+
+      // Validate model-controlled data before attaching server-controlled metadata.
+      const output = openaiOutputSchema.parse(result.finalOutput);
+      return openaiResponseSchema.parse({
+        ...output,
+        sources: this.extractSources(result),
+        runtime: this.buildRuntime(
+          result,
+          performance.now() - startedAt,
+          model,
+        ),
+      });
+    } catch (error) {
+      throw mapProviderError(error);
     }
-
-    // Validate model-controlled data before attaching server-controlled runtime metadata.
-    const output = openaiOutputSchema.parse(result.finalOutput);
-
-    return openaiResponseSchema.parse({
-      ...output,
-      runtime: this.buildRuntime(result, performance.now() - startedAt, model),
-    });
   }
 
   async *streamReply(
@@ -96,59 +130,148 @@ export class OpenaiService {
     lastStatus = this.statusKey(thinking);
 
     const model = routeOpenaiModel(message);
+    const searchEnabled = this.setting('WEB_SEARCH_ENABLED', true);
     const agent = new Agent({
       name: AGENT_NAME,
       instructions: AGENT_INSTRUCTIONS,
       model,
+      tools: this.createTools(searchEnabled),
     });
-    const stream = await run(agent, message, {
-      stream: true,
-      session: options.session,
-      signal: options.signal,
-    });
+    let stream;
+    try {
+      stream = await run(agent, message, {
+        stream: true,
+        session: options.session,
+        signal: this.runSignal(options.signal, searchEnabled),
+      });
+    } catch (error) {
+      throw mapProviderError(error);
+    }
 
-    for await (const event of stream) {
-      const status = this.describeStreamEvent(event);
-      if (status && this.statusKey(status) !== lastStatus) {
-        yield status;
-        lastStatus = this.statusKey(status);
-      }
-
-      if (
-        event.type === 'raw_model_stream_event' &&
-        event.data.type === 'output_text_delta'
-      ) {
-        const responding = {
-          type: 'status',
-          phase: 'responding',
-          message: 'Responding',
-        } as const;
-        if (this.statusKey(responding) !== lastStatus) {
-          yield responding;
-          lastStatus = this.statusKey(responding);
+    try {
+      for await (const event of stream) {
+        const status = this.describeStreamEvent(event);
+        if (status && this.statusKey(status) !== lastStatus) {
+          yield status;
+          lastStatus = this.statusKey(status);
         }
-        yield { type: 'delta', delta: event.data.delta };
+
+        if (
+          event.type === 'raw_model_stream_event' &&
+          event.data.type === 'output_text_delta'
+        ) {
+          const responding = {
+            type: 'status',
+            phase: 'responding',
+            message: 'Responding',
+          } as const;
+          if (this.statusKey(responding) !== lastStatus) {
+            yield responding;
+            lastStatus = this.statusKey(responding);
+          }
+          yield { type: 'delta', delta: event.data.delta };
+        }
       }
-    }
 
-    await stream.completed;
-    if (!stream.finalOutput) {
-      throw new ServiceUnavailableException(
-        'The AI provider returned no streamed output',
-      );
-    }
+      await stream.completed;
+      if (!stream.finalOutput) {
+        throw new ApplicationException(
+          'PROVIDER_INVALID_RESPONSE',
+          'The AI provider returned no streamed output.',
+          502,
+          true,
+        );
+      }
 
-    yield {
-      type: 'completed',
-      response: openaiStreamResponseSchema.parse({
-        message: stream.finalOutput,
-        runtime: this.buildRuntime(
-          stream,
-          performance.now() - startedAt,
-          model,
-        ),
-      }),
+      yield {
+        type: 'completed',
+        response: openaiStreamResponseSchema.parse({
+          message: stream.finalOutput,
+          sources: this.extractSources(stream),
+          runtime: this.buildRuntime(
+            stream,
+            performance.now() - startedAt,
+            model,
+          ),
+        }),
+      };
+    } catch (error) {
+      throw mapProviderError(error);
+    }
+  }
+
+  private createTools(searchEnabled: boolean) {
+    const domains = this.setting<string[]>('WEB_SEARCH_ALLOWED_DOMAINS', []);
+    return searchEnabled
+      ? [
+          webSearchTool({
+            searchContextSize: 'medium',
+            ...(domains.length > 0
+              ? { filters: { allowedDomains: domains } }
+              : {}),
+          }),
+        ]
+      : [];
+  }
+
+  private runSignal(
+    external: AbortSignal | undefined,
+    search: boolean,
+  ): AbortSignal {
+    const modelTimeout = this.setting('MODEL_TIMEOUT_MS', 60_000);
+    const searchTimeout = this.setting('WEB_SEARCH_TIMEOUT_MS', 30_000);
+    const timeout = AbortSignal.timeout(
+      search ? Math.min(modelTimeout, searchTimeout) : modelTimeout,
+    );
+    return external ? AbortSignal.any([external, timeout]) : timeout;
+  }
+
+  private setting<T>(key: string, fallback: T): T {
+    return this.config?.get<T>(key) ?? fallback;
+  }
+
+  private extractSources(result: RuntimeSource): Array<{
+    title: string;
+    url: string;
+    domain: string;
+    startIndex?: number;
+    endIndex?: number;
+  }> {
+    const found = new Map<
+      string,
+      ReturnType<OpenaiService['extractSources']>[number]
+    >();
+    const visit = (value: unknown): void => {
+      if (!value || typeof value !== 'object') return;
+      const record = value as Record<string, unknown>;
+      if (
+        record.type === 'url_citation' &&
+        typeof record.url === 'string' &&
+        typeof record.title === 'string'
+      ) {
+        try {
+          const url = new URL(record.url);
+          if (!['http:', 'https:'].includes(url.protocol)) return;
+          found.set(url.href, {
+            title: record.title,
+            url: url.href,
+            domain: url.hostname,
+            ...(typeof record.start_index === 'number'
+              ? { startIndex: record.start_index }
+              : {}),
+            ...(typeof record.end_index === 'number'
+              ? { endIndex: record.end_index }
+              : {}),
+          });
+        } catch {
+          // Ignore malformed provider annotations rather than exposing unsafe links.
+        }
+      }
+      for (const child of Object.values(record)) visit(child);
     };
+    visit(result.newItems);
+    visit(result.rawResponses);
+    return [...found.values()];
   }
 
   private describeStreamEvent(

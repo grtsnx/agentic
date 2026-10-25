@@ -1,10 +1,12 @@
 import { z } from 'zod';
 import { openaiRuntimeSchema } from './openai-runtime.schema.js';
+import { openaiSourceSchema } from './openai-output.schema.js';
 
 export const openaiStreamResponseSchema = z
   .object({
     message: z.string().min(1),
     runtime: openaiRuntimeSchema,
+    sources: z.array(openaiSourceSchema).default([]),
   })
   .strict();
 

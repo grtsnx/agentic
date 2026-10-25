@@ -10,12 +10,13 @@ type CliOutput = Writable & { isTTY?: boolean };
 export class CliService {
   constructor(private readonly openaiService: OpenaiService) {}
 
-  async run(input: CliInput, output: CliOutput): Promise<void> {
+  async run(input: CliInput, output: CliOutput): Promise<number> {
     const session = this.openaiService.createSession();
     const terminal = Boolean(input.isTTY && output.isTTY);
     const lines = createInterface({ input, output, terminal });
     const status = this.createStatusRenderer(output, terminal);
     let activeTurn: AbortController | undefined;
+    let exitCode = 0;
 
     // Ctrl+C cancels the current model turn before it closes the CLI.
     lines.on('SIGINT', () => {
@@ -71,6 +72,7 @@ export class CliService {
           }
         }
       } catch {
+        exitCode = 1;
         status.clear();
         output.write(
           activeTurn.signal.aborted
@@ -86,6 +88,7 @@ export class CliService {
     }
 
     lines.close();
+    return exitCode;
   }
 
   private createStatusRenderer(

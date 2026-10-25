@@ -110,6 +110,15 @@ export async function createApplication(): Promise<{
     LIVEKIT_API_SECRET: config.get<string>('LIVEKIT_API_SECRET'),
     LIVEKIT_AGENT_NAME: config.getOrThrow<string>('LIVEKIT_AGENT_NAME'),
     OPENAI_API_KEY: config.get<string>('OPENAI_API_KEY'),
+    MODEL_TIMEOUT_MS: config.getOrThrow<number>('MODEL_TIMEOUT_MS'),
+    WEB_SEARCH_ENABLED: config.getOrThrow<boolean>('WEB_SEARCH_ENABLED'),
+    WEB_SEARCH_TIMEOUT_MS: config.getOrThrow<number>('WEB_SEARCH_TIMEOUT_MS'),
+    WEB_SEARCH_ALLOWED_DOMAINS: config.getOrThrow<string[]>(
+      'WEB_SEARCH_ALLOWED_DOMAINS',
+    ),
+    SESSION_TTL_MS: config.getOrThrow<number>('SESSION_TTL_MS'),
+    SESSION_MAX_TURNS: config.getOrThrow<number>('SESSION_MAX_TURNS'),
+    SESSION_MAX_TOKENS: config.getOrThrow<number>('SESSION_MAX_TOKENS'),
   };
   configureApplication(app, environment);
   return { app, environment };
