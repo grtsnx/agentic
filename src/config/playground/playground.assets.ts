@@ -38,7 +38,10 @@ export const PLAYGROUND_PAGE = `<!doctype html>
           <div class="composer-actions">
             <div class="composer-status">
               <span class="composer-hint">Enter to send · Shift + Enter for a new line</span>
-              <span id="voice-status" class="voice-status" role="status" hidden>Voice offline</span>
+              <span id="voice-status" class="voice-status" role="status" hidden>
+                <span class="voice-visualizer" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+                <span id="voice-status-label">Voice offline</span>
+              </span>
             </div>
             <div class="composer-buttons">
               <button id="voice-mute" class="voice-mute-button" type="button" hidden>Mute</button>
@@ -354,9 +357,20 @@ button { color: inherit; }
 .brand-mark, .agent-orb { display: grid; place-items: center; color: #fff; background: var(--accent); }
 .brand-mark { width: 30px; height: 30px; border-radius: 9px; font-size: .85rem; }
 .topbar-actions { display: flex; align-items: center; gap: 14px; }
-.voice-status { color: var(--muted); font-size: .7rem; }
+.voice-status { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: .7rem; }
+.voice-status[hidden] { display: none; }
 .voice-status[data-state='speaking'] { color: var(--success); }
+.voice-status[data-state='thinking'] { color: #7c3aed; }
 .voice-status[data-state='error'] { color: var(--danger); }
+.voice-visualizer { display: inline-flex; height: 14px; align-items: center; gap: 2px; }
+.voice-visualizer i { width: 2px; height: 4px; border-radius: 999px; background: currentColor; transform-origin: center; }
+.voice-status[data-state='connecting'] .voice-visualizer i,
+.voice-status[data-state='initializing'] .voice-visualizer i { animation: voice-pulse 1.2s ease-in-out infinite; }
+.voice-status[data-state='thinking'] .voice-visualizer i { animation: voice-think .9s ease-in-out infinite; }
+.voice-status[data-state='speaking'] .voice-visualizer i { animation: voice-wave .65s ease-in-out infinite; }
+.voice-visualizer i:nth-child(2) { animation-delay: .12s !important; }
+.voice-visualizer i:nth-child(3) { animation-delay: .24s !important; }
+.voice-visualizer i:nth-child(4) { animation-delay: .36s !important; }
 .voice-button { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 10px; color: var(--muted); background: transparent; cursor: pointer; }
 .voice-button:hover { color: var(--text); background: var(--surface-subtle); }
 .voice-button svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
@@ -422,6 +436,9 @@ textarea::placeholder { color: #a1a1aa; }
 @keyframes shimmer { to { background-position: -220% 0; } }
 @keyframes orb-spin { to { transform: rotate(360deg); } }
 @keyframes orb-breathe { 50% { opacity: .3; transform: scale(.65); } }
+@keyframes voice-pulse { 50% { opacity: .35; } }
+@keyframes voice-think { 50% { height: 10px; transform: translateY(-2px); } }
+@keyframes voice-wave { 50% { height: 13px; } }
 @media (max-width: 1120px) { .developer-details { position: static; transform: none; width: 100%; margin-top: 7px; } }
 @media (max-width: 640px) { .topbar { padding: 0 16px; } .connection, .voice-status { font-size: 0; } .connection-dot { margin-right: 2px; } .messages { padding-top: 28px; } .composer-hint { display: none; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }

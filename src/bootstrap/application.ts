@@ -19,10 +19,14 @@ export function configureApplication(
   const requestIdMiddleware = new RequestIdMiddleware();
   app.use(requestIdMiddleware.use.bind(requestIdMiddleware));
   app.useSecurityHeaders({
-    contentSecurityPolicy:
-      environment.NODE_ENV === 'production'
-        ? true
-        : { directives: { upgradeInsecureRequests: null } },
+    contentSecurityPolicy: {
+      directives: {
+        connectSrc: liveKitConnectSources(environment),
+        ...(environment.NODE_ENV === 'production'
+          ? {}
+          : { upgradeInsecureRequests: null }),
+      },
+    },
   });
   app.enableCsrfProtection({ trustedOrigins: environment.CORS_ORIGINS });
   app.enableVersioning({ type: VersioningType.URI });
@@ -54,6 +58,21 @@ export function configureApplication(
     }),
   );
   configureSwagger(app, environment);
+}
+
+function liveKitConnectSources(environment: Environment): string[] {
+  const sources = ["'self'"];
+  if (!environment.VOICE_ENABLED || !environment.LIVEKIT_URL) return sources;
+
+  const liveKitUrl = new URL(environment.LIVEKIT_URL);
+  if (liveKitUrl.hostname.endsWith('.livekit.cloud')) {
+    // Cloud region discovery uses HTTPS before signaling switches to WSS.
+    return [...sources, 'https://*.livekit.cloud', 'wss://*.livekit.cloud'];
+  }
+
+  const webUrl = new URL(liveKitUrl);
+  webUrl.protocol = liveKitUrl.protocol === 'wss:' ? 'https:' : 'http:';
+  return [...sources, webUrl.origin, liveKitUrl.origin];
 }
 
 export async function createApplication(): Promise<{

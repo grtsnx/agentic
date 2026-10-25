@@ -1,5 +1,6 @@
 import liveKitVoiceAgent, {
   createLiveKitVoiceAssistant,
+  VOICE_RECORDING_OPTIONS,
 } from '@/config/livekit/livekit-voice-agent.js';
 
 describe('voice agent', () => {
@@ -12,5 +13,16 @@ describe('voice agent', () => {
 
     expect(assistant.instructions).toContain('concise');
     expect(assistant.instructions).toContain('spoken conversation');
+  });
+
+  it('exports privacy-safe observability settings', () => {
+    expect(VOICE_RECORDING_OPTIONS).toEqual({
+      audio: false,
+      traces: true,
+      logs: true,
+      transcript: false,
+      redaction: true,
+      inputDelta: false,
+    });
   });
 });

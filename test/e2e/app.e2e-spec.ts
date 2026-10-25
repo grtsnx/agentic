@@ -20,6 +20,10 @@ describe('AppController (e2e)', () => {
         NODE_ENV: 'test',
         SWAGGER_ENABLED: true,
         CORS_ORIGINS: 'https://app.example.com',
+        VOICE_ENABLED: true,
+        LIVEKIT_URL: 'wss://agentic-test.livekit.cloud',
+        LIVEKIT_API_KEY: 'test-key',
+        LIVEKIT_API_SECRET: 'test-secret',
       }),
     );
     await app.init();
@@ -36,6 +40,9 @@ describe('AppController (e2e)', () => {
     expect(response.headers['x-request-id']).toMatch(/^[\w.-]{1,64}$/);
     expect(response.headers['content-security-policy']).not.toContain(
       'upgrade-insecure-requests',
+    );
+    expect(response.headers['content-security-policy']).toContain(
+      "connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud",
     );
   });
 
@@ -275,9 +282,14 @@ describe('AppController (e2e)', () => {
     expect(page.text).toContain('/playground/livekit-client.js');
     expect(page.text).toContain('/playground/livekit-app.js');
     expect(page.text).toContain('id="voice-connect"');
+    expect(page.text).toContain('class="voice-visualizer"');
     expect(livekitApp.text).toContain("fetch('/v1/voice/token'");
     expect(script.text).not.toContain('LivekitClient.Room');
     expect(livekitApp.text).toContain('LivekitClient.Room');
+    expect(livekitApp.text).toContain(
+      'LivekitClient.RoomEvent.ParticipantAttributesChanged',
+    );
+    expect(livekitApp.text).toContain("'lk.agent.state'");
     expect(livekit.text).toContain('LivekitClient');
     expect(page.text).not.toContain('https://hoppscotch.io');
     expect(page.text).not.toContain('/v1/chat');
@@ -287,6 +299,7 @@ describe('AppController (e2e)', () => {
     expect(script.text).toContain('formatDuration');
     expect(styles.text).toContain('color-scheme: light');
     expect(styles.text).toContain('.thinking-orb');
+    expect(styles.text).toContain(".voice-status[data-state='thinking']");
     expect(styles.text).toContain('@keyframes shimmer');
     expect(styles.text).toContain('.user .message-body');
     expect(styles.text).toContain('justify-self: end');

@@ -7,6 +7,16 @@ Keep answers concise and natural for spoken conversation.
 Ask a short clarifying question when the user's intent is unclear.
 Do not read Markdown syntax, URLs, or long lists aloud unless the user asks.`;
 
+// Export traces and redacted logs without retaining user audio or transcripts.
+export const VOICE_RECORDING_OPTIONS = {
+  audio: false,
+  traces: true,
+  logs: true,
+  transcript: false,
+  redaction: true,
+  inputDelta: false,
+} as const;
+
 export function createLiveKitVoiceAssistant(): voice.Agent {
   return voice.Agent.create({ instructions: VOICE_INSTRUCTIONS });
 }
@@ -25,6 +35,7 @@ export default defineAgent({
     await session.start({
       agent: createLiveKitVoiceAssistant(),
       room: context.room,
+      record: VOICE_RECORDING_OPTIONS,
     });
     await context.connect();
     await session.generateReply({
