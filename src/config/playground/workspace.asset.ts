@@ -28,6 +28,9 @@ export const WORKSPACE_STYLES = `
 .attach-button:focus-visible {outline:2px solid var(--text);outline-offset:2px;}
 .attach-button:disabled {opacity:.45;cursor:wait;}
 .composer-files {display:flex;gap:10px;overflow-x:auto;max-width:100%;padding:0 0 12px;scrollbar-width:thin;}
+.message-attachments {display:flex;justify-content:flex-end;flex-wrap:wrap;gap:10px;width:100%;min-width:0;margin-bottom:12px;}
+.message-attachments .composer-file {box-sizing:border-box;flex:0 1 158px;max-width:100%;}
+.message-attachments .composer-file-thumbnail {height:110px;}
 .composer-files[hidden],.composer-upload-notice[hidden] {display:none;}
 .composer-file {position:relative;display:flex;flex-direction:column;gap:8px;flex:0 0 158px;min-width:0;padding:14px;border:1px solid var(--border);border-radius:16px;background:var(--surface-subtle);color:var(--text);}
 .composer-file-open {display:flex;flex-direction:column;gap:8px;width:100%;padding:0;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer;}
@@ -81,6 +84,7 @@ function createWorkspacePanel() {
   let generation=0;
   let uploading=false;
   let attachedFiles=[];
+  const sentFileIds=new Set();
   let pendingFiles=[];
   const fileUrls=new Map();
   const fileLoads=new Map();
@@ -211,9 +215,11 @@ function createWorkspacePanel() {
   function renderFiles() {
     if(!fileCards)return;
     fileCards.replaceChildren();
-    const entries=[...attachedFiles,...pendingFiles.map(file=>({filename:file.name,bytes:file.size,pending:true}))];
+    const entries=[...attachedFiles.filter(file=>!sentFileIds.has(file.id)),...pendingFiles.map(file=>({filename:file.name,bytes:file.size,pending:true}))];
     fileCards.hidden=!entries.length;
-    for(const file of entries) {
+    for(const file of entries)fileCards.append(createFileCard(file));
+  }
+  function createFileCard(file,removable=true) {
       const card=text('div','');card.className='composer-file';card.setAttribute('role','listitem');card.title=file.filename;
       const type=text('span','');type.className='composer-file-type';
       // Only this fixed SVG is markup; filenames and provider values stay text nodes.
@@ -227,10 +233,19 @@ function createWorkspacePanel() {
       open.append(type,text('strong',file.filename));
       if(file.pending)open.append(text('small','Uploading…'));
       open.addEventListener('click',()=>void openPreview(file,open));card.append(open);
-      if(!file.pending){const remove=text('button','×');remove.type='button';remove.className='composer-file-remove';remove.setAttribute('aria-label','Remove '+file.filename);remove.title='Remove attachment';remove.addEventListener('click',()=>void removeFile(file,remove));card.append(remove);}
+      if(removable&&!file.pending){const remove=text('button','×');remove.type='button';remove.className='composer-file-remove';remove.setAttribute('aria-label','Remove '+file.filename);remove.title='Remove attachment';remove.addEventListener('click',()=>void removeFile(file,remove));card.append(remove);}
       if(file.pending)card.setAttribute('data-uploading','');
-      fileCards.append(card);
-    }
+      return card;
+  }
+  function moveToMessage(body,content) {
+    const files=attachedFiles.filter(file=>!sentFileIds.has(file.id));
+    if(!files.length)return;
+    const row=text('div','');row.className='message-attachments';row.setAttribute('role','list');row.setAttribute('aria-label','Sent attachments');
+    for(const file of files)row.append(createFileCard(file,false));
+    body.insertBefore(row,content);
+    // Sent files remain available to this chat, but are no longer composer drafts.
+    for(const file of files)sentFileIds.add(file.id);
+    renderFiles();uploadStatus('');
   }
   async function refresh() {
     if(!credentials) return;
@@ -319,8 +334,8 @@ function createWorkspacePanel() {
       if(current===generation){uploading=false;attach.disabled=false;pendingFiles=[];fileInput.value='';renderFiles();}
     }
   });
-  return {isUploading:()=>uploading,credentials:()=>credentials?{workspaceId:credentials.id,workspaceToken:credentials.token}:{},prepare:ensure,refresh:()=>refresh().catch(error=>{uploadStatus(error.message,true);}),
-    reset:async()=>{generation++;preview.close();clearPreview();for(const url of fileUrls.values())URL.revokeObjectURL(url);fileUrls.clear();fileLoads.clear();uploading=false;pendingFiles=[];attachedFiles=[];attach.disabled=false;fileInput.value='';renderFiles();uploadStatus('');const previous=credentials;credentials=undefined;for(const timer of approvalTimers)clearTimeout(timer);approvalTimers.clear();approvalCards.clear();
+  return {moveToMessage,isUploading:()=>uploading,credentials:()=>credentials?{workspaceId:credentials.id,workspaceToken:credentials.token}:{},prepare:ensure,refresh:()=>refresh().catch(error=>{uploadStatus(error.message,true);}),
+    reset:async()=>{generation++;preview.close();clearPreview();for(const url of fileUrls.values())URL.revokeObjectURL(url);fileUrls.clear();fileLoads.clear();uploading=false;pendingFiles=[];attachedFiles=[];sentFileIds.clear();attach.disabled=false;fileInput.value='';renderFiles();uploadStatus('');const previous=credentials;credentials=undefined;for(const timer of approvalTimers)clearTimeout(timer);approvalTimers.clear();approvalCards.clear();
       if(previous) await fetch('/v1/workspaces/'+previous.id,{method:'DELETE',headers:{Authorization:'Bearer '+previous.token},signal:AbortSignal.timeout(10000)}).catch(()=>{});
     }};
 }

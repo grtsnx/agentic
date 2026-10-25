@@ -341,7 +341,8 @@ export const PLAYGROUND_APP = `(() => {
   async function send() {
     const message = elements.message.value.trim();
     if (!message || active || !socket.connected || workspacePanel.isUploading()) return;
-    createMessage('user', message);
+    const userMessage=createMessage('user', message);
+    workspacePanel.moveToMessage(userMessage.body,userMessage.content);
     assistantMessage = undefined;
     createAssistant();
     startElapsed();

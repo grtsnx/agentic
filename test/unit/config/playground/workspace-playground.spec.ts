@@ -14,6 +14,9 @@ class Element {
   append(...children: Element[]) {
     this.children.push(...children);
   }
+  insertBefore(child: Element, before: Element) {
+    this.children.splice(this.children.indexOf(before), 0, child);
+  }
   replaceChildren(...children: Element[]) {
     this.children = children;
   }
@@ -50,6 +53,14 @@ function setup() {
       code: 'console.log("<script>untrusted</script>")',
     },
   };
+  const files = [
+    {
+      id: 'file-1',
+      filename: 'project-notes-with-a-long-name.docx',
+      bytes: 100,
+      kind: 'text',
+    },
+  ];
   const fetch = vi.fn(async (_path: string, options: RequestInit = {}) => ({
     ok: true,
     status: 200,
@@ -59,7 +70,7 @@ function setup() {
           ? String(_path).includes('/approvals/')
             ? { status: 'denied' }
             : { id: 'scope', token: 'secret' }
-          : { files: [], approvals: [action] },
+          : { files, approvals: [action] },
     }),
   }));
   const context = {
@@ -78,8 +89,9 @@ function setup() {
     prepare: () => Promise<unknown>;
     refresh: () => Promise<void>;
     reset: () => Promise<void>;
+    moveToMessage: (body: Element, content: Element) => void;
   };
-  return { panel, query, fetch, action, context };
+  return { panel, query, fetch, action, context, files };
 }
 
 describe('inline workspace approval cards', () => {
@@ -154,5 +166,41 @@ describe('inline workspace approval cards', () => {
       ),
     ).toBe(true);
     expect(footer.children.every((x) => x.disabled)).toBe(true);
+  });
+});
+
+describe('sent attachment placement', () => {
+  it('moves files above the user text and keeps them out of the composer after refresh', async () => {
+    const ui = setup();
+    await ui.panel.prepare();
+    await ui.panel.refresh();
+    expect(ui.query('#composer-files').children).toHaveLength(1);
+    const body = new Element();
+    const content = new Element();
+    body.append(content);
+    ui.panel.moveToMessage(body, content);
+    const row = body.children[0]!;
+    expect(row.className).toBe('message-attachments');
+    expect(row.children).toHaveLength(1);
+    expect(row.children[0]!.children).toHaveLength(1);
+    expect(row.children[0]!.children[0]!.listeners.has('click')).toBe(true);
+    expect(body.children[1]).toBe(content);
+    expect(ui.query('#composer-files').hidden).toBe(true);
+    await ui.panel.refresh();
+    expect(ui.query('#composer-files').hidden).toBe(true);
+    const next = new Element();
+    const nextText = new Element();
+    next.append(nextText);
+    ui.panel.moveToMessage(next, nextText);
+    expect(next.children).toHaveLength(1);
+    ui.files.push({
+      id: 'file-2',
+      filename: 'new.pdf',
+      bytes: 50,
+      kind: 'text',
+    });
+    await ui.panel.refresh();
+    expect(ui.query('#composer-files').children).toHaveLength(1);
+    expect(ui.query('#composer-files').hidden).toBe(false);
   });
 });
