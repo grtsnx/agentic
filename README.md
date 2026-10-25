@@ -24,17 +24,35 @@ bun run start:dev
 | Scalar     | http://localhost:3001/docs       |
 | Text CLI   | `bun run chat`                   |
 
-Chat uses a local heuristic router: simple requests go to `gpt-5-nano`; engineering tasks, attachment questions, and complex follow-ups go to `gpt-6-luna`. Follow-ups use bounded recent user context, and ordinary new topics can return to Nano. This is rule-based routing, not a semantic classifier. Responses include input/output tokens, model usage, and estimated model cost.
+Chat uses a local heuristic router: simple requests go to `gpt-5-nano`; engineering tasks, attachment questions, and complex follow-ups go to `gpt-6-luna`. Follow-ups use bounded recent user context, and ordinary new topics can return to Nano. Optional Clef-flash classification can override this local fallback. Responses include input/output tokens, model usage, and estimated model cost.
 
 ## Configuration
 
 See [.env.example](.env.example) for settings and defaults. Configuration is validated at startup. Keep credentials in your local `.env` and restart affected services after changes.
 
 - `CORS_ORIGINS`: exact, comma-separated browser origins. Use `http://localhost:3001` locally, never `*`.
-- `MODEL_TIMEOUT_MS`: total text-generation deadline, including hosted search.
+- `MODEL_TIMEOUT_MS`: total text-generation deadline, including optional routing and hosted search.
 - `SESSION_TTL_MS`, `SESSION_MAX_TURNS`, `SESSION_MAX_TOKENS`: conversation lifetime and context limits.
 - `WEB_SEARCH_ENABLED`, `WEB_SEARCH_ALLOWED_DOMAINS`: hosted search and optional domain restrictions.
 - `SWAGGER_ENABLED`, `REALTIME_PLAYGROUND_ENABLED`: documentation and playground availability.
+
+## Optional Clef routing
+
+[Cloudflare Clef-flash](https://developers.cloudflare.com/workers-ai/models/clef-flash/) classifies difficulty; OpenAI still generates answers. In Cloudflare, open **Workers AI → Use REST API** to create a Workers AI token and copy your Account ID ([credential guide](https://developers.cloudflare.com/workers-ai/get-started/rest-api/)). Add them to `.env`:
+
+```env
+CLOUDFLARE_ACCOUNT_ID=
+CLOUDFLARE_API_TOKEN=
+CLEF_ROUTING_ENABLED=false
+CLEF_ROUTING_TIMEOUT_MS=1500
+CLEF_ROUTING_CONFIDENCE=0.75
+```
+
+Run `bun run benchmark:routing` before enabling Clef. It makes paid classifier requests for 14 labeled prompts, without generating answers or executing tools. The report at `.tmp/clef-routing-benchmark.json` compares local and effective accuracy, classifier-only accuracy, fallback rate, and p50/p95 latency. The command fails if no real Clef decisions succeed or effective accuracy is below 85%; this small fixture is a smoke benchmark, not proof of production quality. Live validation is still pending credentials.
+
+After reviewing the report, set `CLEF_ROUTING_ENABLED=true` and restart the API/CLI. The classifier sees the latest text (up to 8,000 characters), six recent user messages (up to 1,000 characters each), and whether attachments exist. File content, images, tool output, and credentials are not included in classifier state. Timeouts, uncertain probabilities, malformed replies, and provider failures fall back locally; cancellation stops the turn. No automatic classifier retries. At most eight classifier requests run concurrently per process.
+
+`runtime.routing` reports the selected model, classifier/fallback source, reason, probability when available, and routing duration. Clef billing is **not included** in generation token/cost totals; classifier cost remains `null` until usage is verified. Voice keeps its configured realtime model. Approval decisions remain explicit human actions.
 
 ## Optional web tools
 
@@ -214,7 +232,7 @@ src/
 │   ├── schema/           # Zod schemas and categorized types/.
 │   └── playground/       # Chat and voice UI.
 ├── dto/                  # API input and output contracts.
-├── lib/                  # External provider modules and services.
+├── lib/                  # External integrations, including clef/ classifier module and service.
 ├── middleware/           # Filters, interceptors, errors, and shared utilities.
 ├── modules/              # Features in v1/; v2/ reserved for new contracts.
 ├── cli.ts                # Text CLI entry point.
@@ -249,6 +267,8 @@ Ordered from foundations to advanced capabilities. ✅ Verified complete · ⬜ 
 - ✅ Wrap the OpenAI Agents SDK behind a shared NestJS service.
 - ✅ Return token usage, model/tool calls, and clearly labelled cost estimates.
 - ✅ Route lightweight work to GPT-5 Nano and promote complex work only as high as GPT-6 Luna.
+- ✅ Add optional Clef-flash routing with bounded context, timeout, validated decisions, and local fallback.
+- ⬜ Validate Clef routing accuracy, latency, fallback rate, and billed cost against real Cloudflare responses before enabling it by default.
 - ✅ Document each API version in Swagger, Scalar, and OpenAPI JSON.
 - ✅ Verify a real provider response with a documented local smoke-test command.
 - ✅ Map provider authentication, timeout, rate-limit, and availability failures to stable application errors.

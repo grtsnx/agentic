@@ -188,6 +188,14 @@ describe('AppController (e2e)', () => {
           },
         ],
         runtime: {
+          routing: {
+            model: 'gpt-6-luna',
+            source: 'clef',
+            reason: 'classified',
+            probability: 0.94,
+            durationMs: 120,
+            estimatedCostUsd: null,
+          },
           durationMs: 1840,
           tokens: {
             input: 120,

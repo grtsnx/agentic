@@ -16,7 +16,7 @@ vi.mock('@openai/agents', () => ({
   tool: agents.tool,
 }));
 
-import { OpenaiService } from '@/lib';
+import { OpenaiService, ClefService } from '@/lib';
 import type { MemorySession } from '@openai/agents';
 import {
   WebToolsService,
@@ -245,16 +245,14 @@ describe('OpenaiService', () => {
         },
       });
       const engineering = {
-        getItems: vi
-          .fn()
-          .mockResolvedValue([
-            {
-              role: 'user',
-              content: [
-                { type: 'input_text', text: 'Debug this TypeScript API.' },
-              ],
-            },
-          ]),
+        getItems: vi.fn().mockResolvedValue([
+          {
+            role: 'user',
+            content: [
+              { type: 'input_text', text: 'Debug this TypeScript API.' },
+            ],
+          },
+        ]),
       } as unknown as MemorySession;
       const ordinary = {
         getItems: vi.fn().mockResolvedValue([
@@ -279,6 +277,68 @@ describe('OpenaiService', () => {
       expect(
         agents.captureConfig.mock.calls.map((call) => call[0].model),
       ).toEqual(['gpt-6-luna', 'gpt-5-nano']);
+    },
+  );
+
+  it.each([false, true])(
+    'applies and reports the classifier decision (stream=%s)',
+    async (streaming) => {
+      const clef = new ClefService(new ConfigService());
+      const decision = {
+        model: 'gpt-6-luna',
+        source: 'clef',
+        reason: 'classified',
+        probability: 0.9,
+        durationMs: 25,
+        estimatedCostUsd: null,
+      } as const;
+      const route = vi.spyOn(clef, 'route').mockResolvedValue(decision);
+      agents.run.mockResolvedValue({
+        finalOutput: streaming ? 'The answer.' : output,
+        state: {
+          usage: {
+            requests: 1,
+            inputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0,
+            inputTokensDetails: [],
+            outputTokensDetails: [],
+          },
+        },
+        rawResponses: [],
+        newItems: [],
+        completed: Promise.resolve(),
+        async *[Symbol.asyncIterator]() {
+          yield {
+            type: 'raw_model_stream_event',
+            data: { type: 'output_text_delta', delta: 'The answer.' },
+          };
+        },
+      });
+      const service = new OpenaiService(undefined, undefined, clef);
+      if (streaming) {
+        let completed = false;
+        for await (const event of service.streamReply('Hello', {
+          hasAttachments: true,
+        }))
+          if (event.type === 'completed') {
+            expect(event.response.runtime.routing).toEqual(decision);
+            completed = true;
+          }
+        expect(completed).toBe(true);
+      } else
+        expect(
+          (await service.generateReply('Hello', { hasAttachments: true }))
+            .runtime.routing,
+        ).toEqual(decision);
+      expect(agents.captureConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ model: 'gpt-6-luna' }),
+      );
+      expect(route).toHaveBeenCalledWith(
+        'Hello',
+        expect.objectContaining({ hasAttachments: true }),
+        expect.any(AbortSignal),
+      );
     },
   );
 

@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 class RuntimeTokenUsageDto {
   @ApiProperty({ example: 120 })
@@ -39,7 +39,33 @@ class RuntimeCallDto {
   calls!: number;
 }
 
+class RuntimeRoutingDto {
+  @ApiProperty({ enum: ['gpt-5-nano', 'gpt-6-luna'], example: 'gpt-6-luna' })
+  model!: string;
+  @ApiProperty({ enum: ['local', 'clef'], example: 'clef' })
+  source!: string;
+  @ApiProperty({
+    example: 'classified',
+    description: 'Classification or a stable local fallback reason.',
+  })
+  reason!: string;
+  @ApiPropertyOptional({ example: 0.94, minimum: 0, maximum: 1 })
+  probability?: number;
+  @ApiProperty({ example: 120 })
+  durationMs!: number;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    example: null,
+    description:
+      'Unknown classifier cost; excluded from generation token and cost totals.',
+  })
+  estimatedCostUsd!: null;
+}
+
 export class OpenaiRuntimeDto {
+  @ApiPropertyOptional({ type: RuntimeRoutingDto })
+  routing?: RuntimeRoutingDto;
   @ApiProperty({
     example: 1840,
     description: 'Total agent run time in milliseconds.',

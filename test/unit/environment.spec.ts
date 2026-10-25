@@ -149,3 +149,27 @@ describe('validateEnvironment', () => {
     ).toBe('openai');
   });
 });
+
+describe('Clef environment', () => {
+  it('is opt-in and requires credentials only when enabled', () => {
+    expect(validateEnvironment({}).CLEF_ROUTING_ENABLED).toBe(false);
+    expect(() => validateEnvironment({ CLEF_ROUTING_ENABLED: true })).toThrow(
+      /CLOUDFLARE/,
+    );
+    expect(
+      validateEnvironment({
+        CLEF_ROUTING_ENABLED: true,
+        CLOUDFLARE_ACCOUNT_ID: 'a'.repeat(32),
+        CLOUDFLARE_API_TOKEN: 'test',
+      }).CLEF_ROUTING_ENABLED,
+    ).toBe(true);
+  });
+  it.each([
+    { CLEF_ROUTING_TIMEOUT_MS: 0 },
+    { CLEF_ROUTING_TIMEOUT_MS: 10000 },
+    { CLEF_ROUTING_CONFIDENCE: 0.1 },
+    { CLOUDFLARE_ACCOUNT_ID: '../other-account' },
+  ])('rejects unsafe routing configuration', (input) => {
+    expect(() => validateEnvironment(input)).toThrow();
+  });
+});

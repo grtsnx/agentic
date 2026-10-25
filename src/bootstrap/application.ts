@@ -115,6 +115,15 @@ export async function createApplication(): Promise<{
     LIVEKIT_AGENT_NAME: config.getOrThrow<string>('LIVEKIT_AGENT_NAME'),
     LIVEKIT_PHONE_NUMBER: config.get<string>('LIVEKIT_PHONE_NUMBER'),
     OPENAI_API_KEY: config.get<string>('OPENAI_API_KEY'),
+    CLEF_ROUTING_ENABLED: config.getOrThrow<boolean>('CLEF_ROUTING_ENABLED'),
+    CLOUDFLARE_ACCOUNT_ID: config.get<string>('CLOUDFLARE_ACCOUNT_ID'),
+    CLOUDFLARE_API_TOKEN: config.get<string>('CLOUDFLARE_API_TOKEN'),
+    CLEF_ROUTING_TIMEOUT_MS: config.getOrThrow<number>(
+      'CLEF_ROUTING_TIMEOUT_MS',
+    ),
+    CLEF_ROUTING_CONFIDENCE: config.getOrThrow<number>(
+      'CLEF_ROUTING_CONFIDENCE',
+    ),
     MODEL_TIMEOUT_MS: config.getOrThrow<number>('MODEL_TIMEOUT_MS'),
     WEB_SEARCH_ENABLED: config.getOrThrow<boolean>('WEB_SEARCH_ENABLED'),
     WEB_SEARCH_ALLOWED_DOMAINS: config.getOrThrow<string[]>(
