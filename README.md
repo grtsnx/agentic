@@ -131,6 +131,28 @@ Socket.IO uses the `/v1/chat` namespace:
 
 The playground displays streamed answers, citations, sources, and usage. For external testing with [Hoppscotch](https://hoppscotch.com/), allow its exact origin in `CORS_ORIGINS`.
 
+## Files, actions, and specialists
+
+Click the **+ attach icon** inside the playground message box to upload UTF-8 TXT, Markdown, CSV, or JSON files. Attached files appear as cards above the input; ask about them in chat. Use **Files & actions** to review approvals. Limits are five files, 1 MiB per file, and 2 MiB per workspace. Retrieval returns scoped chunks with filenames and chunk numbers; uploaded text is treated as untrusted evidence. PDF, Office documents, and embedding-based retrieval are not supported yet.
+
+Workspaces expire after 30 minutes, allow one active operation and 50 chat turns, and use an independent bearer capability. The playground keeps that token in memory. REST clients create a workspace with `POST /v1/workspaces` and send its token as `Authorization: Bearer TOKEN` on subsequent workspace routes. Socket.IO clients send `workspaceId` and `workspaceToken` with `chat.send`. See Swagger for upload, retrieval, messages, delegation, approvals, cancellation, and audit endpoints.
+
+In the text CLI, use `/workspace` or `/attach PATH`, `/actions`, and `/approve ID`, `/deny ID`, or `/cancel ID`. The playground and CLI show the exact proposed code or file deletion, target, risk, and expiration before approval. A decision applies once to that immutable action and expires after five minutes. Models cannot approve their own actions. Safe reads run automatically; uploaded-file reads require the workspace capability. Message and payment tiers are classified but have no execution adapters yet.
+
+Specialists use the OpenAI Agents SDK: a manager delegates to a researcher or coder, which may hand off to a reviewer. They share the workspace's tools, approval boundary, trace, and cancellation. Each workflow is limited to 45 seconds, eight model calls, three specialist contributions, two reviewer handoffs, and one model call at a time. Conservative token reservations cap the workflow at 40,000 tokens, with at most 1,200 output tokens per call and a $0.02 estimated model-cost ceiling. Results include provenance, uncertainties, and partial failures.
+
+Each workspace retains up to 300 redacted, size-limited audit events with tool inputs, outputs, latency, outcome, and cost metadata. Model costs are estimates; external tool costs remain unknown when the provider does not supply them. Workspace state and approvals disappear on restart. These are local capability-scoped features, not durable storage or multi-user account authentication. Voice retains its existing read-only web tools.
+
+### Local code sandbox
+
+Code execution requires human approval, a trusted local Docker installation, and `SANDBOX_ENABLED=true`. Install the pinned image before starting the API:
+
+```bash
+docker pull node:26.12.1-bookworm-slim@sha256:28147155d47dc31abe0a46e0d12b59b2fb3d0a2dcc5dc65fce76a074180b16fe
+```
+
+JavaScript runs as a non-root user with no network, host mounts, credentials, or Linux capabilities. Limits include 0.5 CPU, 128 MiB memory, 32 processes, a read-only root, 16 MiB temporary storage, 32 KiB output, and an independent eight-second lifetime. Cleanup failures reserve capacity until removal succeeds. Containers share the Docker host kernel; this is not a hardened multi-tenant execution service. Compose disables execution because its application container has no Docker runner; do not mount the Docker socket into it.
+
 ## Testing
 
 All tests live in categorized folders under `test/`.
@@ -152,9 +174,13 @@ bun run smoke:search            # Hosted search and citations
 bun run smoke:tools             # Enabled external provider APIs
 bun run smoke:tool-selection    # Model tool selection with fixture results
 RUN_VOICE_SMOKE=true node --env-file=.env test/smoke/voice.smoke.mjs
+RUN_DELEGATION_SMOKE=true node --env-file=.env test/smoke/delegation.smoke.mjs
+RUN_WORKSPACE_SMOKE=true node --env-file=.env test/smoke/workspace.smoke.mjs
+bun run build
+RUN_SANDBOX_SMOKE=true node test/smoke/sandbox.smoke.mjs
 ```
 
-The voice check requires the API and worker. It verifies dispatch, a reply transcript, and received audio, not physical microphone or speaker operation.
+Workspace, delegation, and sandbox smoke checks require a current build; the sandbox check also requires Docker and the pinned image. The voice check requires the API and worker. It verifies dispatch, a reply transcript, and received audio, not physical microphone or speaker operation.
 
 ## Docker and releases
 
@@ -181,11 +207,10 @@ src/
 ├── bootstrap/            # Security, validation, docs, and startup.
 ├── cli/                  # Terminal application context.
 ├── config/               # Runtime configuration and application setup.
-│   ├── agent/            # Shared chat and voice instructions.
+│   ├── agent/            # Shared instructions and tools/ policies, web setup, sandbox limits.
 │   ├── livekit/          # Voice agent, worker, and console setup.
-│   ├── openai/           # Model routing and provider error mapping.
+│   ├── openai/           # Model routing, delegation budgets, and provider errors.
 │   ├── schema/           # Zod schemas and categorized types/.
-│   ├── web-tools/        # Shared tool policies and registration.
 │   └── playground/       # Chat and voice UI.
 ├── dto/                  # API input and output contracts.
 ├── lib/                  # External provider modules and services.
@@ -247,7 +272,7 @@ Ordered from foundations to advanced capabilities. ✅ Verified complete · ⬜ 
 - ⬜ Run the Windows/Linux CI matrix to verify builds, tests, and native voice-worker loading.
 - ⬜ Validate human microphone capture on Windows and Linux before marking cross-platform voice CLI input complete; test machines are not yet available.
 - ⬜ Add telephony only after an explicitly approved phone-number purchase and SIP dispatch design.
-- ⬜ Display human approval requests when privileged tools are introduced.
+- ✅ Display human approval requests when privileged tools are introduced.
 
 ### 4. Structured outputs and conversation sessions
 
@@ -268,27 +293,27 @@ Ordered from foundations to advanced capabilities. ✅ Verified complete · ⬜ 
 - ✅ Verify Context.dev search and Firecrawl page reading with real API keys, non-empty content, and source metadata (`bun run smoke:tools`, 2026-10-25).
 - ✅ Configure Valyu and verify real search content and source metadata with its live smoke test (2026-10-25).
 - ✅ Share flexible provider preferences across chat and voice, and verify seven live model-selection scenarios, including disabled-provider fallbacks (`bun run smoke:tool-selection`, 2026-10-25).
-- ⬜ Add file upload, type and size validation, extraction, and scoped retrieval.
-- ⬜ Add sandboxed code execution with CPU, memory, time, network, and filesystem limits.
-- ⬜ Record tool inputs, outputs, latency, cost, and failure state.
+- ✅ Add file upload, type and size validation, extraction, and scoped retrieval.
+- ✅ Add sandboxed code execution with CPU, memory, time, network, and filesystem limits.
+- ✅ Record tool inputs, outputs, latency, cost, and failure state.
 
 ### 6. Permission tiers and human approvals
 
-- ⬜ Classify tools as safe reads, sensitive reads, writes, messages, payments, or destructive actions.
-- ⬜ Allow policy-approved safe reads to run automatically.
-- ⬜ Require explicit approval before writes, messages, payments, or destructive actions.
-- ⬜ Show the exact action, target, scope, and risk before approval.
-- ⬜ Bind approvals to one immutable action and expire unused approvals.
-- ⬜ Deny, cancel, and audit actions safely.
+- ✅ Classify tools as safe reads, sensitive reads, writes, messages, payments, or destructive actions.
+- ✅ Allow policy-approved safe reads to run automatically.
+- ✅ Require explicit approval for implemented writes and destructive actions; message/payment adapters remain unavailable.
+- ✅ Show the exact action, target, scope, and risk before approval.
+- ✅ Bind approvals to one immutable action and expire unused approvals.
+- ✅ Deny, cancel, and audit actions safely.
 
 ### 7. Specialist agents, delegation, and handoffs
 
-- ⬜ Define specialist agents with narrow instructions, tools, budgets, and output contracts.
-- ⬜ Add manager delegation and peer handoffs through the OpenAI Agents SDK.
-- ⬜ Propagate trace, session, approval, and cancellation context across agents.
-- ⬜ Limit delegation depth, parallelism, tokens, time, and cost.
-- ⬜ Detect repeated work, handoff loops, and partial failure.
-- ⬜ Merge specialist results with provenance and conflict reporting.
+- ✅ Define specialist agents with narrow instructions, tools, budgets, and output contracts.
+- ✅ Add manager delegation and peer handoffs through the OpenAI Agents SDK.
+- ✅ Propagate trace, session, approval, and cancellation context across agents.
+- ✅ Limit delegation depth, parallelism, tokens, time, and cost.
+- ✅ Detect repeated work, handoff loops, and partial failure.
+- ✅ Merge specialist results with provenance and conflict reporting.
 
 ### 8. OpenAI-managed sandbox execution
 
@@ -343,7 +368,7 @@ Ordered from foundations to advanced capabilities. ✅ Verified complete · ⬜ 
 ### 14. Local Docker and self-hosted sandboxes
 
 - ⬜ Define a sandbox provider interface shared by managed, Docker, and future self-hosted runtimes.
-- ⬜ Run local Docker sandboxes as non-root with read-only filesystems, dropped capabilities, quotas, and isolated networks.
+- ✅ Run local Docker sandboxes as non-root with read-only filesystems, dropped capabilities, quotas, and isolated networks.
 - ⬜ Mount only task-scoped files and inject short-lived secrets at execution time.
 - ⬜ Add image allowlists, vulnerability scanning, cleanup, and orphan recovery.
 - ⬜ Document a self-hosted deployment and its threat model.

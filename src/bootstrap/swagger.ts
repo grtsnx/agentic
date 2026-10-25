@@ -148,6 +148,12 @@ export function configureSwagger(
 
   const buildDocument = (version: ApiVersion) => {
     const builder = new DocumentBuilder()
+      .addBearerAuth({
+        type: 'http',
+        scheme: 'bearer',
+        description:
+          'Workspace access token returned when creating a workspace.',
+      })
       .setTitle(environment.PLATFORM_NAME)
       .setDescription(`${environment.PLATFORM_NAME} API description`)
       .setVersion(`v${version}`)
@@ -157,6 +163,10 @@ export function configureSwagger(
       );
 
     if (version === '1') {
+      builder.addTag(
+        'Workspaces',
+        'Private files, bounded tools, specialist workflows, and human approvals.',
+      );
       builder.addTag(
         'Chat',
         'Agent chat endpoints for validated, structured responses.',

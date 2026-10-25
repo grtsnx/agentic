@@ -22,5 +22,18 @@ export {
   withinToolDeadline,
 } from './agent/tools/web/web-tool.policy.js';
 export { PlaygroundModule } from './playground/playground.module.js';
-export { TOOL_PERMISSIONS, permissionFor, requiresApproval, auditSnapshot, auditedTool } from './agent/tools/tool-policy.js';
+export {
+  TOOL_PERMISSIONS,
+  permissionFor,
+  requiresApproval,
+  auditSnapshot,
+  auditedTool,
+} from './agent/tools/tool-policy.js';
 export { BoundedAgentModel } from './openai/bounded-agent-model.js';
+
+export {
+  sandboxArguments,
+  SANDBOX_IMAGE,
+} from './agent/tools/sandbox-policy.js';
+
+export { FILE_MAX_BYTES, WORKSPACE_MAX_BYTES, FILE_MIME_TYPES, FILE_ACCEPT } from './agent/tools/file-policy.js';

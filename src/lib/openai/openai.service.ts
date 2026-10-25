@@ -58,14 +58,17 @@ export class OpenaiService {
     const model = routeOpenaiModel(message);
     const searchEnabled = this.setting('WEB_SEARCH_ENABLED', true);
     const signal = this.runSignal(options.signal);
-    const sources: WebSource[] = [];
+    const sources: WebSource[] = options.sources ?? [];
     const agent = new Agent({
       name: AGENT_NAME,
       instructions: AGENT_INSTRUCTIONS + (options.toolInstructions ?? ''),
       model,
       modelSettings: openaiModelSettings(model),
       outputType: openaiOutputSchema,
-      tools: [...this.createTools(model, searchEnabled, signal, sources, options), ...(options.tools ?? [])],
+      tools: [
+        ...this.createTools(model, searchEnabled, signal, sources, options),
+        ...(options.tools ?? []),
+      ],
     });
 
     try {
@@ -116,13 +119,16 @@ export class OpenaiService {
     const model = routeOpenaiModel(message);
     const searchEnabled = this.setting('WEB_SEARCH_ENABLED', true);
     const signal = this.runSignal(options.signal);
-    const sources: WebSource[] = [];
+    const sources: WebSource[] = options.sources ?? [];
     const agent = new Agent({
       name: AGENT_NAME,
       instructions: AGENT_INSTRUCTIONS + (options.toolInstructions ?? ''),
       model,
       modelSettings: openaiModelSettings(model),
-      tools: [...this.createTools(model, searchEnabled, signal, sources, options), ...(options.tools ?? [])],
+      tools: [
+        ...this.createTools(model, searchEnabled, signal, sources, options),
+        ...(options.tools ?? []),
+      ],
     });
     let stream;
     try {
@@ -195,10 +201,16 @@ export class OpenaiService {
     sources: WebSource[],
     options: OpenaiReplyOptions,
   ) {
+    if (options.scopedToolsOnly) return [];
     const domains = this.setting<string[]>('WEB_SEARCH_ALLOWED_DOMAINS', []);
     const external =
       this.webTools
-        ?.createTools((found) => sources.push(...found), options.onToolAudit, options.scopeId, options.traceId)
+        ?.createTools(
+          (found) => sources.push(...found),
+          options.onToolAudit,
+          options.scopeId,
+          options.traceId,
+        )
         .map((definition) =>
           tool({
             name: definition.name,

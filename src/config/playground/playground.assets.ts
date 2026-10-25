@@ -1,4 +1,12 @@
 import {
+  WORKSPACE_VIEW,
+  WORKSPACE_ATTACHMENTS,
+  WORKSPACE_ATTACH_BUTTON,
+  WORKSPACE_SHEET,
+  WORKSPACE_STYLES,
+  WORKSPACE_APP,
+} from './workspace.asset.js';
+import {
   ACTIVITY_INDICATOR_VIEW,
   ACTIVITY_INDICATOR_APP,
   ACTIVITY_INDICATOR_STYLES,
@@ -39,6 +47,7 @@ export const PLAYGROUND_PAGE = `<!doctype html>
           <span>Agentic</span>
         </a>
         <div class="topbar-actions">
+          ${WORKSPACE_VIEW}
           <span id="connection" class="sr-only" role="status">Connecting</span>
           <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Use dark theme">
             <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.53 1.72a.75.75 0 0 1 .16.82A8.97 8.97 0 0 0 9 6a9 9 0 0 0 9 9 8.97 8.97 0 0 0 3.46-.69.75.75 0 0 1 .98.98 10.5 10.5 0 0 1-9.69 6.46c-5.8 0-10.5-4.7-10.5-10.5 0-4.37 2.67-8.11 6.46-9.7a.75.75 0 0 1 .82.17Z"/></svg>
@@ -71,12 +80,15 @@ export const PLAYGROUND_PAGE = `<!doctype html>
         <div id="messages" class="messages scroll-fade" aria-live="polite"></div>
       </main>
 
+      ${WORKSPACE_SHEET}
       <footer class="composer-wrap">
         <div class="composer">
+          ${WORKSPACE_ATTACHMENTS}
           <label class="sr-only" for="message">Message Agentic</label>
           <textarea id="message" rows="1" maxlength="8000" placeholder="Ask anything, or think out loud…" autofocus></textarea>
           <div class="composer-actions">
             <div class="composer-status">
+              ${WORKSPACE_ATTACH_BUTTON}
               <span class="composer-hint">Enter to send · Shift + Enter for a new line</span>
               <span id="voice-status" class="voice-status" role="status" hidden>
                 <span class="voice-visualizer" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
@@ -122,6 +134,7 @@ export const PLAYGROUND_APP = `(() => {
     stop: document.querySelector('#stop'),
   };
 
+  ${WORKSPACE_APP}
   let active = false;
   let assistantMessage;
   let elapsedTimer;
@@ -329,7 +342,7 @@ export const PLAYGROUND_APP = `(() => {
 
   function send() {
     const message = elements.message.value.trim();
-    if (!message || active || !socket.connected) return;
+    if (!message || active || !socket.connected || workspacePanel.isUploading()) return;
     createMessage('user', message);
     assistantMessage = undefined;
     createAssistant();
@@ -337,10 +350,11 @@ export const PLAYGROUND_APP = `(() => {
     elements.message.value = '';
     elements.message.style.height = 'auto';
     setActive(true);
-    socket.emit('chat.send', { message });
+    socket.emit('chat.send', { message, ...workspacePanel.credentials() });
   }
 
   function resetConversation() {
+    void workspacePanel.reset();
     clearReconnectTimer();
     assistantMessage?.orb.dispose();
     closeSources();
@@ -425,6 +439,7 @@ export const PLAYGROUND_APP = `(() => {
   });
 
   socket.on('chat.completed', (data) => {
+    void workspacePanel.refresh();
     const message = ensureAssistant();
     stopElapsed();
     setActive(false);
@@ -445,6 +460,7 @@ export const PLAYGROUND_APP = `(() => {
   });
 
   socket.on('chat.cancelled', () => {
+    void workspacePanel.refresh();
     const message = ensureAssistant();
     stopElapsed();
     setActive(false);
@@ -458,6 +474,7 @@ export const PLAYGROUND_APP = `(() => {
   });
 
   socket.on('chat.error', (data) => {
+    void workspacePanel.refresh();
     interruptResponse(data.message ?? 'The response could not be completed. Please try again.');
   });
 
@@ -486,6 +503,7 @@ export const PLAYGROUND_APP = `(() => {
 })();`;
 
 export const PLAYGROUND_STYLES = `
+${WORKSPACE_STYLES}
 ${ANSWER_ACTIONS_STYLES}:root {
   color-scheme: light;
   --spacing: 0.25rem;

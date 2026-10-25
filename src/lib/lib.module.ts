@@ -1,3 +1,4 @@
+import { DocumentsModule } from './documents/documents.module.js';
 import { SandboxModule } from './sandbox/sandbox.module.js';
 import { Module } from '@nestjs/common';
 import { LiveKitModule } from './livekit/livekit.module.js';
@@ -8,6 +9,7 @@ import { ValyuModule } from './valyu/valyu.module.js';
 
 @Module({
   imports: [
+    DocumentsModule,
     SandboxModule,
     LiveKitModule,
     OpenaiModule,
@@ -16,6 +18,7 @@ import { ValyuModule } from './valyu/valyu.module.js';
     ValyuModule,
   ],
   exports: [
+    DocumentsModule,
     SandboxModule,
     LiveKitModule,
     OpenaiModule,

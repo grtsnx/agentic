@@ -18,18 +18,23 @@ describe('workspace isolation and approvals', () => {
     const action = { tool: 'execute_code' as const, code: 'console.log(1)' };
     const approval = store.propose(scope, action);
     action.code = 'console.log(2)';
-    expect(store.consume(scope, approval.id, 'approve').action).toEqual({tool: 'execute_code', code: 'console.log(1)'});
+    expect(store.consume(scope, approval.id, 'approve').action).toEqual({
+      tool: 'execute_code',
+      code: 'console.log(1)',
+    });
     expect(() => store.consume(scope, approval.id, 'approve')).toThrow();
   });
   it('denies, cancels, and expires without authorizing execution', () => {
     const store = create();
     const scope = store.authorize(...credentials(store));
     for (const decision of ['deny', 'cancel'] as const) {
-      const pending = store.propose(scope, {tool: 'execute_code', code: '1'});
-      expect(store.consume(scope, pending.id, decision).status).toBe(decision === 'deny' ? 'denied' : 'cancelled');
+      const pending = store.propose(scope, { tool: 'execute_code', code: '1' });
+      expect(store.consume(scope, pending.id, decision).status).toBe(
+        decision === 'deny' ? 'denied' : 'cancelled',
+      );
       expect(() => store.consume(scope, pending.id, 'approve')).toThrow();
     }
-    const pending = store.propose(scope, {tool: 'execute_code', code: '2'});
+    const pending = store.propose(scope, { tool: 'execute_code', code: '2' });
     vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 300_001);
     expect(() => store.consume(scope, pending.id, 'approve')).toThrow();
     vi.restoreAllMocks();

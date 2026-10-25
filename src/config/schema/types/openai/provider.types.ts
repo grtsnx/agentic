@@ -22,8 +22,12 @@ export interface RuntimeSource {
 
 export interface OpenaiStreamOptions {
   tools?: Tool[];
+  scopedToolsOnly?: boolean;
+  sources?: import('../web-tools/web-tool.types.js').WebSource[];
   toolInstructions?: string;
-  onToolAudit?: (event: import('../workspaces/workspace.types.js').ToolAudit) => void;
+  onToolAudit?: (
+    event: import('../workspaces/workspace.types.js').ToolAudit,
+  ) => void;
   scopeId?: string;
   traceId?: string;
   session?: MemorySession;

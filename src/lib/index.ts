@@ -17,3 +17,6 @@ export { OpenaiService } from './openai/openai.service.js';
 export { SandboxModule } from './sandbox/sandbox.module.js';
 export { SandboxService } from './sandbox/sandbox.service.js';
 export { DelegationService } from './openai/delegation.service.js';
+
+export { DocumentsService } from './documents/documents.service.js';
+export { DocumentsModule } from './documents/documents.module.js';

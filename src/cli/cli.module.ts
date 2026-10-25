@@ -1,3 +1,4 @@
+import { WorkspaceModule } from '@/modules';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { validateEnvironment } from '@/config';
@@ -12,6 +13,7 @@ import { CliService } from './cli.service.js';
       validate: validateEnvironment,
     }),
     OpenaiModule,
+    WorkspaceModule,
   ],
   providers: [CliService],
 })

@@ -1,6 +1,7 @@
 import { ConsoleLogger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { CliModule, CliService } from '@/cli';
+// The entrypoint shares its name with the directory; an alias rewrites to itself.
+import { CliModule, CliService } from './cli/index.js';
 
 const app = await NestFactory.createApplicationContext(CliModule, {
   logger: new ConsoleLogger({ logLevels: ['warn', 'error', 'fatal'] }),

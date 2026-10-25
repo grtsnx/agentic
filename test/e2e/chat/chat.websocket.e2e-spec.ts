@@ -6,6 +6,7 @@ import { AppModule } from '@/app';
 import { configureApplication } from '@/bootstrap';
 import { validateEnvironment } from '@/config';
 import { OpenaiService } from '@/lib';
+import { WorkspaceService } from '@/modules';
 
 describe('ChatGateway (e2e)', () => {
   let app: INestApplication;
@@ -95,6 +96,34 @@ describe('ChatGateway (e2e)', () => {
       'chat.delta',
       'chat.completed',
     ]);
+  });
+
+  it('passes authenticated workspace tools through Socket.IO to the model', async () => {
+    const workspace = app.get(WorkspaceService).store.create();
+    const completed = new Promise((resolve, reject) => {
+      socket.on('connect', () =>
+        socket.emit('chat.send', {
+          message: 'Propose a calculation',
+          workspaceId: workspace.id,
+          workspaceToken: workspace.token,
+        }),
+      );
+      socket.on('chat.completed', resolve);
+      socket.on('chat.error', reject);
+      socket.on('connect_error', reject);
+      socket.connect();
+    });
+    await completed;
+    expect(app.get(OpenaiService).streamReply).toHaveBeenCalledWith(
+      'Propose a calculation',
+      expect.objectContaining({
+        scopeId: workspace.id,
+        scopedToolsOnly: true,
+        tools: expect.arrayContaining([
+          expect.objectContaining({ name: 'execute_code' }),
+        ]),
+      }),
+    );
   });
 
   it('rejects browser connections from untrusted origins', async () => {

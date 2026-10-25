@@ -1,52 +1,129 @@
-import { Injectable, ServiceUnavailableException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  ServiceUnavailableException,
+  ConflictException,
+  type OnModuleDestroy,
+} from '@nestjs/common';
 import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
-import { sandboxArguments } from '../../config/sandbox/sandbox-policy.js';
+import { sandboxArguments } from '@/config';
 
 @Injectable()
-export class SandboxService {
+export class SandboxService implements OnModuleDestroy {
+  private readonly orphaned = new Set<string>();
+  private readonly reaper = setInterval(() => {
+    void this.reconcile();
+  }, 15_000).unref();
   private active = 0;
   constructor(private readonly config: ConfigService) {}
   async execute(code: string, external: AbortSignal) {
-    if (this.config.get('SANDBOX_ENABLED') !== true) throw new ServiceUnavailableException('Sandbox is disabled.');
-    if (this.active >= 2) throw new ConflictException('Sandbox capacity reached.');
+    if (this.config.get('SANDBOX_ENABLED') !== true)
+      throw new ServiceUnavailableException('Sandbox is disabled.');
+    if (this.active >= 2)
+      throw new ConflictException('Sandbox capacity reached.');
     external.throwIfAborted();
     this.active++;
     const name = `agentic-sandbox-${randomUUID()}`;
-    const signal = AbortSignal.any([external,AbortSignal.timeout(10_000)]);
+    const signal = AbortSignal.any([external, AbortSignal.timeout(10_000)]);
     let child: ReturnType<typeof spawn> | undefined;
     try {
-      return await new Promise<{stdout:string;stderr:string;exitCode:number;truncated:boolean}>((resolve,reject)=>{
-        let stdout=''; let stderr=''; let bytes=0; let stopped=false;
-        child=spawn('docker',sandboxArguments(name),{stdio:['pipe','pipe','pipe'],shell:false});
-        const stop=()=>{stopped=true;child?.kill('SIGKILL');};
-        signal.addEventListener('abort',stop,{once:true});
-        const collect=(data: Buffer, channel:'stdout'|'stderr')=>{
-          bytes+=data.length;
-          if(bytes>32_768) { stop(); return; }
-          if(channel==='stdout') stdout+=data.toString(); else stderr+=data.toString();
-        };
-        child.stdout?.on('data',(data:Buffer)=>collect(data,'stdout'));
-        child.stderr?.on('data',(data:Buffer)=>collect(data,'stderr'));
-        child.stdin?.on('error',()=>{});
-        child.once('error',()=>{signal.removeEventListener('abort',stop);reject(new ServiceUnavailableException('Docker sandbox could not start.'));});
-        child.once('close',code=>{
-          signal.removeEventListener('abort',stop);
-          if(signal.aborted) {reject(signal.reason);return;}
-          if(stopped) {reject(new Error('SANDBOX_OUTPUT_LIMIT'));return;}
-          if(code===125) {reject(new ServiceUnavailableException('Docker sandbox unavailable; ensure the pinned image is installed.'));return;}
-          resolve({stdout,stderr,exitCode:code??1,truncated:false});
+      return await new Promise<{
+        stdout: string;
+        stderr: string;
+        exitCode: number;
+        truncated: boolean;
+      }>((resolve, reject) => {
+        let stdout = '';
+        let stderr = '';
+        let bytes = 0;
+        let stopped = false;
+        child = spawn('docker', sandboxArguments(name), {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          shell: false,
         });
-        if(signal.aborted) stop(); else child.stdin?.end(code);
+        const stop = () => {
+          stopped = true;
+          child?.kill('SIGKILL');
+        };
+        signal.addEventListener('abort', stop, { once: true });
+        const collect = (data: Buffer, channel: 'stdout' | 'stderr') => {
+          bytes += data.length;
+          if (bytes > 32_768) {
+            stop();
+            return;
+          }
+          if (channel === 'stdout') stdout += data.toString();
+          else stderr += data.toString();
+        };
+        child.stdout?.on('data', (data: Buffer) => collect(data, 'stdout'));
+        child.stderr?.on('data', (data: Buffer) => collect(data, 'stderr'));
+        child.stdin?.on('error', () => {});
+        child.once('error', () => {
+          signal.removeEventListener('abort', stop);
+          reject(
+            new ServiceUnavailableException('Docker sandbox could not start.'),
+          );
+        });
+        child.once('close', (code) => {
+          signal.removeEventListener('abort', stop);
+          if (signal.aborted) {
+            reject(signal.reason);
+            return;
+          }
+          if (stopped) {
+            reject(new Error('SANDBOX_OUTPUT_LIMIT'));
+            return;
+          }
+          if (code === 125) {
+            reject(
+              new ServiceUnavailableException(
+                'Docker sandbox unavailable; ensure the pinned image is installed.',
+              ),
+            );
+            return;
+          }
+          resolve({ stdout, stderr, exitCode: code ?? 1, truncated: false });
+        });
+        if (signal.aborted) stop();
+        else child.stdin?.end(code);
       });
     } finally {
       // Killing the Docker CLI alone does not kill its container. Always remove it.
       child?.kill('SIGKILL');
-      try { await promisify(execFile)('docker',['rm','-f',name],{timeout:5_000,maxBuffer:4096}); }
-      catch { /* --rm may already have removed a completed container. */ }
-      this.active--;
+      if (await this.removeContainer(name)) this.active--;
+      else {
+        this.orphaned.add(name);
+        // Cleanup uncertainty takes precedence over success or an earlier execution error.
+        // eslint-disable-next-line no-unsafe-finally
+        throw new ServiceUnavailableException(
+          'Sandbox cleanup is pending; capacity remains reserved.',
+        );
+      }
     }
+  }
+  private async removeContainer(name: string): Promise<boolean> {
+    try {
+      await promisify(execFile)('docker', ['rm', '-f', name], {
+        timeout: 5_000,
+        maxBuffer: 4096,
+      });
+      return true;
+    } catch (error) {
+      return /No such container/i.test(
+        String((error as { stderr?: string }).stderr ?? ''),
+      );
+    }
+  }
+  private async reconcile() {
+    for (const name of this.orphaned) {
+      if ((await this.removeContainer(name)) && this.orphaned.delete(name))
+        this.active--;
+    }
+  }
+  async onModuleDestroy() {
+    clearInterval(this.reaper);
+    await this.reconcile();
   }
 }

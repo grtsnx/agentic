@@ -36,7 +36,10 @@ export class ChatV1Gateway
   // Each socket owns ephemeral history that becomes unreachable after disconnect.
   private readonly connections = new WeakMap<Socket, ConnectionState>();
 
-  constructor(private readonly openaiService: OpenaiService, @Optional() private readonly workspaces?: WorkspaceService) {}
+  constructor(
+    private readonly openaiService: OpenaiService,
+    @Optional() private readonly workspaces?: WorkspaceService,
+  ) {}
 
   handleConnection(client: Socket): void {
     this.connections.set(client, {
@@ -66,17 +69,28 @@ export class ChatV1Gateway
       });
     }
 
-    const workspace = request.workspaceId && this.workspaces
-      ? this.workspaces.store.authorize(request.workspaceId,request.workspaceToken ?? '') : undefined;
+    const workspace =
+      request.workspaceId && this.workspaces
+        ? this.workspaces.store.authorize(
+            request.workspaceId,
+            request.workspaceToken ?? '',
+          )
+        : undefined;
     const requestId = randomUUID();
     const abortController = new AbortController();
     state.abortController = abortController;
 
     const response$ = from(
-      workspace && this.workspaces ? this.workspaces.stream(workspace,request.message.trim(),abortController.signal) : this.openaiService.streamReply(request.message.trim(), {
-        session: state.session,
-        signal: abortController.signal,
-      }),
+      workspace && this.workspaces
+        ? this.workspaces.stream(
+            workspace,
+            request.message.trim(),
+            abortController.signal,
+          )
+        : this.openaiService.streamReply(request.message.trim(), {
+            session: state.session,
+            signal: abortController.signal,
+          }),
     ).pipe(
       map((event): ChatSocketResponse => {
         if (event.type === 'status') {
