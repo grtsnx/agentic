@@ -19,6 +19,7 @@ ${Object.entries(WEB_TOOL_DESCRIPTIONS)
   .map(([name, description]) => `${name}: ${description}`)
   .join('\n')}
 Do not browse for greetings, arithmetic, rewriting supplied text, or questions answerable from the supplied context unless the user asks for verification.
+When the user explicitly requests a live check, online search, or verification, use an available search or page-reading tool. A remembered answer or URL is not evidence of a live check.
 For a specific page, prefer firecrawl_read_page. If it is unavailable, search the URL with an available search tool and clearly distinguish snippets from a full page read; never claim you read a page you did not retrieve.
 Use one search provider first. Read a relevant result with Firecrawl only when snippets are insufficient. Use another provider only for a failure, insufficient evidence, or necessary corroboration; do not repeat successful searches across every provider.
 Respect domain restrictions and call limits for every provider. A blocked URL or exhausted call budget is not permission to bypass policy through another tool. Do not retry authentication failures. Honor an explicitly requested provider only when it is available and supports the task.

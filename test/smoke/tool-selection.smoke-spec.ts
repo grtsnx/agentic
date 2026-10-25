@@ -64,7 +64,7 @@ const cases: SelectionCase[] = [
   {
     name: 'known official documentation can be searched or read directly',
     prompt:
-      'Find the official Node.js URL parsing documentation online and give me its link.',
+      'Find and verify the official Node.js URL parsing documentation with a live page read or search, then give me its link.',
     expected: ['valyu_search', 'firecrawl_read_page'],
     expectedReadUrl: 'https://nodejs.org/api/url.html',
     disabled: 'CONTEXT_DEV',
@@ -106,7 +106,8 @@ describe('live model tool selection', () => {
         model: OPENAI_MODELS.economical,
         modelSettings: {
           // Match the application's default reasoning instead of weakening the eval.
-          maxTokens: 1_500,
+          // Leave room for reasoning and a complete tool call, bounded by the run deadline.
+          maxTokens: 4_000,
           parallelToolCalls: false,
         },
         toolUseBehavior: 'stop_on_first_tool',

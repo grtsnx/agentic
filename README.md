@@ -334,6 +334,7 @@ Completion: two concurrent sessions preserve separate context and every structur
 - ✅ Add page retrieval that treats remote content as untrusted data rather than instructions.
 - ✅ Verify Context.dev search and Firecrawl page reading with real API keys, non-empty content, and source metadata (`bun run smoke:tools`, 2026-10-25).
 - ✅ Configure Valyu and verify real search content and source metadata with its live smoke test (2026-10-25).
+- ✅ Share flexible provider preferences across chat and voice, and verify seven live model-selection scenarios, including disabled-provider fallbacks (`bun run smoke:tool-selection`, 2026-10-25).
 - ⬜ Add file upload, type and size validation, extraction, and scoped retrieval.
 - ⬜ Add sandboxed code execution with CPU, memory, time, network, and filesystem limits.
 - ⬜ Record tool inputs, outputs, latency, cost, and failure state.
