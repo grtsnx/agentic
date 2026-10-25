@@ -82,17 +82,31 @@ export class ChatV1Gateway
         signal: abortController.signal,
       }),
     ).pipe(
-      map((event): ChatSocketResponse =>
-        event.type === 'delta'
-          ? {
-              event: 'chat.delta',
-              data: { requestId, delta: event.delta },
-            }
-          : {
-              event: 'chat.completed',
-              data: { requestId, response: event.response },
+      map((event): ChatSocketResponse => {
+        if (event.type === 'status') {
+          return {
+            event: 'chat.status',
+            data: {
+              requestId,
+              phase: event.phase,
+              message: event.message,
+              ...(event.detail ? { detail: event.detail } : {}),
             },
-      ),
+          };
+        }
+
+        if (event.type === 'delta') {
+          return {
+            event: 'chat.delta',
+            data: { requestId, delta: event.delta },
+          };
+        }
+
+        return {
+          event: 'chat.completed',
+          data: { requestId, response: event.response },
+        };
+      }),
       catchError(() =>
         of({
           event: abortController.signal.aborted

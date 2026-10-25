@@ -16,7 +16,7 @@ import {
 
 @ApiExcludeController()
 @SkipThrottle()
-@Controller('realtime')
+@Controller('playground')
 export class RealtimeController {
   constructor(private readonly config: ConfigService) {}
 

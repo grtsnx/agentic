@@ -92,6 +92,11 @@ describe('OpenaiService', () => {
     const stream = {
       async *[Symbol.asyncIterator]() {
         yield {
+          type: 'run_item_stream_event',
+          name: 'tool_called',
+          item: { type: 'tool_call_item', toolName: 'web_search' },
+        };
+        yield {
           type: 'raw_model_stream_event',
           data: { type: 'output_text_delta', delta: 'Hello' },
         };
@@ -123,6 +128,14 @@ describe('OpenaiService', () => {
     }
 
     expect(events).toEqual([
+      { type: 'status', phase: 'thinking', message: 'Thinking' },
+      {
+        type: 'status',
+        phase: 'tool',
+        message: 'Using web search',
+        detail: 'web_search',
+      },
+      { type: 'status', phase: 'responding', message: 'Responding' },
       { type: 'delta', delta: 'Hello' },
       { type: 'delta', delta: ' world' },
       {

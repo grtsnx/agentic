@@ -10,7 +10,7 @@ logger.log(`Application: ${baseUrl}`);
 logger.log(`REST chat v1: ${baseUrl}/v1/chat`);
 logger.log(`Socket.IO v1 namespace: ${baseUrl}/v1/chat`);
 if (environment.REALTIME_PLAYGROUND_ENABLED) {
-  logger.log(`Socket.IO playground: ${baseUrl}/realtime`);
+  logger.log(`Socket.IO playground: ${baseUrl}/playground`);
 }
 logger.log(`Liveness: ${baseUrl}/v1/health/live`);
 logger.log(`Readiness: ${baseUrl}/v1/health/ready`);

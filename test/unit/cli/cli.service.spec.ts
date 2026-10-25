@@ -6,6 +6,11 @@ describe('CliService', () => {
     const openaiService = {
       createSession: vi.fn(() => ({ id: 'session' })),
       streamReply: vi.fn(async function* () {
+        yield {
+          type: 'status',
+          phase: 'thinking',
+          message: 'Thinking',
+        } as const;
         yield { type: 'delta', delta: 'Hello' } as const;
         yield {
           type: 'completed',
@@ -33,6 +38,8 @@ describe('CliService', () => {
     await new CliService(openaiService as never).run(input, writable);
 
     expect(output).toContain('Hello');
+    expect(output).toContain('Thinking');
+    expect(output).toContain('Agent: Hello');
     expect(output).toContain('Tokens: 10 in / 2 out / 12 total');
     expect(output).toContain('Estimated cost: $0.00020000 USD');
     expect(output).toContain('Models: gpt-6-astra (1)');

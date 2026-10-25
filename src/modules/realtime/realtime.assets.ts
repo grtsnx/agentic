@@ -3,76 +3,80 @@ export const REALTIME_PAGE = `<!doctype html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Socket.IO Realtime Chat</title>
-    <link rel="stylesheet" href="/realtime/styles.css" />
+    <title>Agentic</title>
+    <link rel="stylesheet" href="/playground/styles.css" />
   </head>
   <body>
-    <main>
-      <header>
-        <div>
-          <p class="eyebrow">Agentic developer tool</p>
-          <h1>Socket.IO Realtime Chat</h1>
-          <p>Test streaming chat against the local <code>/v1/chat</code> namespace.</p>
-        </div>
-        <div class="header-actions">
-          <span id="status" class="status" role="status">Connecting</span>
-          <button id="theme" class="secondary" type="button" aria-label="Toggle theme">Theme</button>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="/playground" aria-label="Agentic home">
+          <span class="brand-mark" aria-hidden="true">A</span>
+          <span>Agentic</span>
+        </a>
+        <div class="topbar-actions">
+          <span id="connection" class="connection" role="status">
+            <span class="connection-dot" aria-hidden="true"></span>
+            Connecting
+          </span>
+          <button id="new-chat" class="quiet-button" type="button">New chat</button>
         </div>
       </header>
 
-      <section class="panel composer" aria-labelledby="prompt-label">
-        <label id="prompt-label" for="message">Message</label>
-        <textarea id="message" rows="5" maxlength="8000" placeholder="Ask the agent something…"></textarea>
-        <div class="actions">
-          <button id="send" type="button">Send</button>
-          <button id="cancel" class="secondary" type="button" disabled>Cancel</button>
-          <button id="clear" class="ghost" type="button">Clear</button>
-        </div>
-      </section>
+      <main id="conversation" class="conversation">
+        <section id="empty-state" class="empty-state">
+          <span class="agent-orb" aria-hidden="true">✦</span>
+          <h1>How can I help you today?</h1>
+          <p>Ask a question and watch the agent work in real time.</p>
+        </section>
+        <div id="messages" class="messages" aria-live="polite"></div>
+      </main>
 
-      <div class="results">
-        <section class="panel" aria-labelledby="response-title">
-          <h2 id="response-title">Response</h2>
-          <pre id="response" aria-live="polite">No response yet.</pre>
-          <h3>Runtime</h3>
-          <pre id="runtime">Tokens, cost, models, and tools appear here.</pre>
-        </section>
-        <section class="panel" aria-labelledby="events-title">
-          <div class="section-heading">
-            <h2 id="events-title">Events</h2>
-            <span id="request-id" class="muted">No active request</span>
+      <footer class="composer-wrap">
+        <div class="composer">
+          <label class="sr-only" for="message">Message Agentic</label>
+          <textarea id="message" rows="1" maxlength="8000" placeholder="Message Agentic"></textarea>
+          <div class="composer-actions">
+            <span class="composer-hint">Enter to send · Shift + Enter for a new line</span>
+            <div class="composer-buttons">
+              <button id="stop" class="stop-button" type="button" aria-label="Stop response" hidden>■</button>
+              <button id="send" class="send-button" type="button" aria-label="Send message">↑</button>
+            </div>
           </div>
-          <pre id="events" aria-live="polite">Waiting for a connection…</pre>
-        </section>
-      </div>
-    </main>
+        </div>
+        <p class="disclaimer">Agentic can make mistakes. Check important information.</p>
+        <details class="developer-details">
+          <summary>Activity log</summary>
+          <pre id="events">Waiting for a connection…</pre>
+        </details>
+      </footer>
+    </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/realtime/app.js"></script>
+    <script src="/playground/app.js"></script>
   </body>
 </html>`;
 
 export const REALTIME_APP = `(() => {
   const socket = io('/v1/chat', { transports: ['websocket'] });
   const elements = {
-    cancel: document.querySelector('#cancel'),
-    clear: document.querySelector('#clear'),
+    connection: document.querySelector('#connection'),
+    conversation: document.querySelector('#conversation'),
+    empty: document.querySelector('#empty-state'),
     events: document.querySelector('#events'),
     message: document.querySelector('#message'),
-    requestId: document.querySelector('#request-id'),
-    response: document.querySelector('#response'),
-    runtime: document.querySelector('#runtime'),
+    messages: document.querySelector('#messages'),
+    newChat: document.querySelector('#new-chat'),
     send: document.querySelector('#send'),
-    status: document.querySelector('#status'),
-    theme: document.querySelector('#theme'),
+    stop: document.querySelector('#stop'),
   };
 
   let active = false;
+  let assistantMessage;
 
-  function setActive(value) {
-    active = value;
-    elements.send.disabled = value || !socket.connected;
-    elements.cancel.disabled = !value;
+  function scrollToLatest() {
+    requestAnimationFrame(() => {
+      elements.conversation.scrollTop = elements.conversation.scrollHeight;
+    });
   }
 
   function log(event, data = {}) {
@@ -82,152 +86,266 @@ export const REALTIME_APP = `(() => {
       : line + '\\n' + elements.events.textContent;
   }
 
+  function setActive(value) {
+    active = value;
+    elements.send.disabled = value || !socket.connected;
+    elements.stop.hidden = !value;
+    elements.send.hidden = value;
+    elements.newChat.disabled = value;
+  }
+
+  function createMessage(role, text = '') {
+    elements.empty.hidden = true;
+    const article = document.createElement('article');
+    article.className = 'message ' + role;
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar';
+    avatar.textContent = role === 'user' ? 'Y' : '✦';
+    avatar.setAttribute('aria-hidden', 'true');
+    const body = document.createElement('div');
+    body.className = 'message-body';
+    const label = document.createElement('div');
+    label.className = 'message-label';
+    label.textContent = role === 'user' ? 'You' : 'Agentic';
+    const content = document.createElement('div');
+    content.className = 'message-content';
+    content.textContent = text;
+    body.append(label, content);
+    article.append(avatar, body);
+    elements.messages.append(article);
+    scrollToLatest();
+    return { article, body, content };
+  }
+
+  function createAssistant() {
+    const message = createMessage('assistant');
+    const status = document.createElement('div');
+    status.className = 'agent-status';
+    status.innerHTML = '<span class="status-spark" aria-hidden="true">✦</span><span class="status-label">Thinking</span><span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span>';
+    message.body.insertBefore(status, message.content);
+    assistantMessage = { ...message, status, statusLabel: status.querySelector('.status-label') };
+    return assistantMessage;
+  }
+
+  function ensureAssistant() {
+    return assistantMessage ?? createAssistant();
+  }
+
+  function updateStatus(data) {
+    const message = ensureAssistant();
+    message.status.hidden = false;
+    message.status.dataset.phase = data.phase ?? 'thinking';
+    message.statusLabel.textContent = data.message ?? 'Thinking';
+    scrollToLatest();
+  }
+
+  function addRuntime(runtime = {}) {
+    const message = ensureAssistant();
+    const metadata = document.createElement('div');
+    metadata.className = 'runtime-chips';
+    const values = [
+      runtime.tokens ? runtime.tokens.total + ' tokens' : undefined,
+      runtime.cost ? '$' + Number(runtime.cost.estimatedUsd ?? 0).toFixed(6) : undefined,
+      runtime.models?.[0]?.name,
+      runtime.tools?.length ? runtime.tools.map((tool) => tool.name).join(', ') : undefined,
+    ].filter(Boolean);
+    for (const value of values) {
+      const chip = document.createElement('span');
+      chip.textContent = value;
+      metadata.append(chip);
+    }
+    message.body.append(metadata);
+  }
+
   function send() {
     const message = elements.message.value.trim();
     if (!message || active || !socket.connected) return;
+    createMessage('user', message);
+    assistantMessage = undefined;
+    createAssistant();
+    elements.message.value = '';
+    elements.message.style.height = 'auto';
+    setActive(true);
     socket.emit('chat.send', { message });
     log('chat.send', { message });
   }
 
+  function resetConversation() {
+    elements.messages.replaceChildren();
+    elements.empty.hidden = false;
+    elements.events.textContent = 'Waiting for a connection…';
+    elements.message.value = '';
+    assistantMessage = undefined;
+    socket.disconnect();
+    socket.connect();
+  }
+
   socket.on('connect', () => {
-    elements.status.textContent = 'Connected';
-    elements.status.dataset.state = 'connected';
+    elements.connection.lastChild.textContent = ' Online';
+    elements.connection.dataset.state = 'online';
     setActive(false);
-    log('connect', { socketId: socket.id });
+    log('connect');
   });
 
   socket.on('disconnect', (reason) => {
-    elements.status.textContent = 'Disconnected';
-    elements.status.dataset.state = 'disconnected';
+    elements.connection.lastChild.textContent = ' Offline';
+    elements.connection.dataset.state = 'offline';
     setActive(false);
     log('disconnect', { reason });
   });
 
   socket.on('connect_error', (error) => {
-    elements.status.textContent = 'Connection failed';
-    elements.status.dataset.state = 'disconnected';
+    elements.connection.lastChild.textContent = ' Connection failed';
+    elements.connection.dataset.state = 'offline';
+    setActive(false);
     log('connect_error', { message: error.message });
   });
 
   socket.on('chat.started', (data) => {
     setActive(true);
-    elements.response.textContent = '';
-    elements.runtime.textContent = 'Waiting for completion…';
-    elements.requestId.textContent = data.requestId;
+    updateStatus({ phase: 'thinking', message: 'Thinking' });
     log('chat.started', data);
   });
 
+  socket.on('chat.status', (data) => {
+    updateStatus(data);
+    log('chat.status', data);
+  });
+
   socket.on('chat.delta', (data) => {
-    elements.response.textContent += data.delta;
-    log('chat.delta', data);
+    const message = ensureAssistant();
+    message.status.hidden = true;
+    message.content.textContent += data.delta;
+    scrollToLatest();
   });
 
   socket.on('chat.completed', (data) => {
+    const message = ensureAssistant();
     setActive(false);
-    elements.response.textContent = data.response?.message ?? elements.response.textContent;
-    elements.runtime.textContent = JSON.stringify(data.response?.runtime ?? {}, null, 2);
+    message.status.hidden = true;
+    message.content.textContent = data.response?.message ?? message.content.textContent;
+    addRuntime(data.response?.runtime);
+    assistantMessage = undefined;
     log('chat.completed', data);
+    scrollToLatest();
   });
 
-  socket.on('chat.cancelling', (data) => log('chat.cancelling', data));
+  socket.on('chat.cancelling', (data) => {
+    updateStatus({ phase: 'thinking', message: 'Stopping' });
+    log('chat.cancelling', data);
+  });
+
   socket.on('chat.cancelled', (data) => {
+    const message = ensureAssistant();
     setActive(false);
+    message.status.hidden = true;
+    if (!message.content.textContent) message.content.textContent = 'Response stopped.';
+    assistantMessage = undefined;
     log('chat.cancelled', data);
   });
+
   socket.on('chat.error', (data) => {
+    const message = ensureAssistant();
     setActive(false);
+    message.status.hidden = true;
+    message.content.textContent = data.message ?? 'The response could not be completed.';
+    message.article.classList.add('error');
+    assistantMessage = undefined;
     log('chat.error', data);
   });
 
   elements.send.addEventListener('click', send);
+  elements.stop.addEventListener('click', () => socket.emit('chat.cancel', {}));
+  elements.newChat.addEventListener('click', resetConversation);
   elements.message.addEventListener('keydown', (event) => {
-    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') send();
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      send();
+    }
   });
-  elements.cancel.addEventListener('click', () => socket.emit('chat.cancel', {}));
-  elements.clear.addEventListener('click', () => {
-    elements.response.textContent = 'No response yet.';
-    elements.runtime.textContent = 'Tokens, cost, models, and tools appear here.';
-    elements.events.textContent = '';
-    elements.requestId.textContent = 'No active request';
-  });
-  elements.theme.addEventListener('click', () => {
-    const current = document.documentElement.dataset.theme;
-    const isDark = current
-      ? current === 'dark'
-      : window.matchMedia('(prefers-color-scheme: dark)').matches;
-    document.documentElement.dataset.theme = isDark ? 'light' : 'dark';
+  elements.message.addEventListener('input', () => {
+    elements.message.style.height = 'auto';
+    elements.message.style.height = Math.min(elements.message.scrollHeight, 180) + 'px';
   });
 })();`;
 
 export const REALTIME_STYLES = `:root {
-  color-scheme: light dark;
-  --background: #f5f7fb;
-  --panel: #ffffff;
-  --text: #172033;
-  --muted: #667085;
-  --border: #d8dee9;
-  --primary: #1668e3;
-  --primary-hover: #0f56bf;
-  --success: #087f5b;
-  --danger: #c92a2a;
+  color-scheme: light;
+  --background: #ffffff;
+  --surface: #ffffff;
+  --surface-subtle: #f7f7f8;
+  --text: #18181b;
+  --muted: #71717a;
+  --border: #e4e4e7;
+  --accent: #18181b;
+  --success: #16a34a;
+  --danger: #dc2626;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-:root[data-theme='dark'] {
-  --background: #0d1117;
-  --panel: #161b22;
-  --text: #e6edf3;
-  --muted: #8b949e;
-  --border: #30363d;
-  --primary: #58a6ff;
-  --primary-hover: #79b8ff;
-  --success: #3fb950;
-  --danger: #ff7b72;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --background: #0d1117;
-    --panel: #161b22;
-    --text: #e6edf3;
-    --muted: #8b949e;
-    --border: #30363d;
-    --primary: #58a6ff;
-    --primary-hover: #79b8ff;
-    --success: #3fb950;
-    --danger: #ff7b72;
-  }
-}
-
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--background); color: var(--text); }
-main { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 40px 0; }
-header, .section-heading, .actions, .header-actions { display: flex; align-items: center; gap: 12px; }
-header { justify-content: space-between; margin-bottom: 24px; }
-h1, h2, h3, p { margin-top: 0; }
-h1 { margin-bottom: 8px; font-size: clamp(1.75rem, 4vw, 2.5rem); }
-h2 { font-size: 1.05rem; }
-h3 { margin: 24px 0 10px; font-size: .85rem; color: var(--muted); text-transform: uppercase; }
-.eyebrow { color: var(--primary); font-size: .78rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.panel { padding: 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel); }
-.composer { margin-bottom: 18px; }
-.results { display: grid; grid-template-columns: 1.35fr 1fr; gap: 18px; }
-label { display: block; margin-bottom: 8px; font-weight: 650; }
-textarea { width: 100%; resize: vertical; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--background); color: var(--text); font: inherit; }
-textarea:focus { outline: 2px solid var(--primary); outline-offset: 2px; }
-.actions { margin-top: 12px; }
-button { padding: 9px 15px; border: 1px solid var(--primary); border-radius: 8px; background: var(--primary); color: #fff; cursor: pointer; font: inherit; font-weight: 650; }
-button:hover:not(:disabled) { background: var(--primary-hover); }
-button:disabled { cursor: not-allowed; opacity: .5; }
-button.secondary, button.ghost { background: transparent; color: var(--text); border-color: var(--border); }
-.status { padding: 6px 10px; border-radius: 999px; background: color-mix(in srgb, var(--muted) 14%, transparent); color: var(--muted); font-size: .82rem; font-weight: 700; }
-.status[data-state='connected'] { color: var(--success); }
-.status[data-state='disconnected'] { color: var(--danger); }
-.section-heading { justify-content: space-between; }
-.muted { color: var(--muted); font-size: .78rem; overflow-wrap: anywhere; }
-pre { min-height: 150px; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: .85rem/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
-#runtime { min-height: 80px; color: var(--muted); }
-#events { max-height: 520px; overflow: auto; color: var(--muted); }
-code { color: var(--primary); }
-@media (max-width: 760px) { header { align-items: flex-start; } .results { grid-template-columns: 1fr; } .header-actions { flex-direction: column; align-items: flex-end; } }
+html, body { height: 100%; }
+body { margin: 0; overflow: hidden; background: var(--background); color: var(--text); }
+button, textarea { font: inherit; }
+button { color: inherit; }
+.app-shell { display: grid; grid-template-rows: 64px minmax(0, 1fr) auto; height: 100%; }
+.topbar { display: flex; align-items: center; justify-content: space-between; padding: 0 24px; border-bottom: 1px solid var(--border); background: rgba(255, 255, 255, .92); }
+.brand { display: inline-flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; font-weight: 700; letter-spacing: -.02em; }
+.brand-mark, .agent-orb { display: grid; place-items: center; color: #fff; background: var(--accent); }
+.brand-mark { width: 30px; height: 30px; border-radius: 9px; font-size: .85rem; }
+.topbar-actions { display: flex; align-items: center; gap: 14px; }
+.connection { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: .78rem; }
+.connection-dot { width: 7px; height: 7px; border-radius: 999px; background: #a1a1aa; }
+.connection[data-state='online'] .connection-dot { background: var(--success); box-shadow: 0 0 0 3px #dcfce7; }
+.connection[data-state='offline'] .connection-dot { background: var(--danger); }
+.quiet-button { padding: 8px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); cursor: pointer; font-size: .82rem; font-weight: 600; }
+.quiet-button:hover { background: var(--surface-subtle); }
+.quiet-button:disabled { cursor: not-allowed; opacity: .5; }
+.conversation { overflow-y: auto; scroll-behavior: smooth; }
+.empty-state { display: flex; min-height: 100%; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px 100px; text-align: center; }
+.empty-state[hidden] { display: none; }
+.agent-orb { width: 52px; height: 52px; margin-bottom: 22px; border-radius: 16px; font-size: 1.3rem; box-shadow: 0 10px 30px rgba(0, 0, 0, .12); }
+.empty-state h1 { margin: 0 0 10px; font-size: clamp(1.7rem, 4vw, 2.25rem); letter-spacing: -.045em; }
+.empty-state p { margin: 0; color: var(--muted); }
+.messages { width: min(780px, calc(100% - 32px)); margin: 0 auto; padding: 46px 0 160px; }
+.message { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 14px; margin-bottom: 34px; }
+.avatar { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); font-size: .75rem; font-weight: 700; }
+.assistant .avatar { color: #fff; border-color: var(--accent); background: var(--accent); }
+.message-body { min-width: 0; padding-top: 4px; }
+.message-label { margin-bottom: 8px; font-size: .82rem; font-weight: 700; }
+.message-content { max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .98rem; line-height: 1.72; }
+.user .message-content { display: inline-block; padding: 11px 15px; border-radius: 18px 18px 4px 18px; background: var(--surface-subtle); }
+.message.error .message-content { color: var(--danger); }
+.agent-status { display: flex; align-items: center; gap: 8px; min-height: 28px; color: var(--muted); font-size: .9rem; }
+.agent-status[hidden] { display: none; }
+.status-spark { color: var(--text); animation: pulse 1.3s ease-in-out infinite; }
+.thinking-dots { display: inline-flex; gap: 3px; margin-left: -3px; }
+.thinking-dots i { width: 3px; height: 3px; border-radius: 50%; background: currentColor; animation: bounce 1.2s infinite; }
+.thinking-dots i:nth-child(2) { animation-delay: .15s; }
+.thinking-dots i:nth-child(3) { animation-delay: .3s; }
+.runtime-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
+.runtime-chips span { padding: 4px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); background: var(--surface); font: 600 .7rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.composer-wrap { position: relative; width: min(780px, calc(100% - 32px)); margin: 0 auto; padding: 0 0 14px; background: linear-gradient(to top, #fff 78%, rgba(255, 255, 255, 0)); }
+.composer { padding: 13px 14px 10px; border: 1px solid #d4d4d8; border-radius: 18px; background: #fff; box-shadow: 0 10px 34px rgba(0, 0, 0, .08); }
+textarea { display: block; width: 100%; max-height: 180px; resize: none; padding: 3px 4px 12px; border: 0; outline: 0; background: transparent; color: var(--text); line-height: 1.5; }
+textarea::placeholder { color: #a1a1aa; }
+.composer-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.composer-hint { color: #a1a1aa; font-size: .7rem; }
+.composer-buttons { display: flex; gap: 8px; }
+.send-button, .stop-button { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 10px; cursor: pointer; }
+.send-button[hidden], .stop-button[hidden] { display: none; }
+.send-button { color: #fff; background: var(--accent); font-size: 1.25rem; }
+.send-button:hover { background: #3f3f46; }
+.send-button:disabled { cursor: not-allowed; opacity: .35; }
+.stop-button { color: #fff; background: var(--danger); font-size: .66rem; }
+.disclaimer { margin: 8px 0 0; color: #a1a1aa; text-align: center; font-size: .68rem; }
+.developer-details { position: absolute; right: 0; bottom: 12px; transform: translateX(calc(100% + 14px)); width: 230px; color: var(--muted); font-size: .72rem; }
+.developer-details summary { cursor: pointer; user-select: none; }
+.developer-details pre { max-height: 180px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-subtle); font: .65rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@keyframes pulse { 50% { opacity: .35; transform: scale(.86); } }
+@keyframes bounce { 0%, 60%, 100% { transform: translateY(0); opacity: .35; } 30% { transform: translateY(-3px); opacity: 1; } }
+@media (max-width: 1120px) { .developer-details { position: static; transform: none; width: 100%; margin-top: 7px; } }
+@media (max-width: 640px) { .topbar { padding: 0 16px; } .connection { font-size: 0; } .connection-dot { margin-right: 2px; } .messages { padding-top: 28px; } .composer-hint { display: none; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
 `;

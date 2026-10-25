@@ -248,25 +248,31 @@ describe('AppController (e2e)', () => {
 
   it('serves a same-origin Socket.IO playground and local assets', async () => {
     const page = await request(app.getHttpServer())
-      .get('/realtime')
+      .get('/playground')
       .expect('Content-Type', /text\/html/)
       .expect(200);
     const script = await request(app.getHttpServer())
-      .get('/realtime/app.js')
+      .get('/playground/app.js')
       .expect('Content-Type', /javascript/)
       .expect(200);
     const styles = await request(app.getHttpServer())
-      .get('/realtime/styles.css')
+      .get('/playground/styles.css')
       .expect('Content-Type', /text\/css/)
       .expect(200);
 
-    expect(page.text).toContain('Socket.IO Realtime Chat');
+    expect(page.text).toContain('<title>Agentic</title>');
     expect(page.text).toContain('/socket.io/socket.io.js');
-    expect(page.text).toContain('/realtime/app.js');
+    expect(page.text).toContain('/playground/app.js');
     expect(page.text).not.toContain('https://hoppscotch.io');
+    expect(page.text).not.toContain('/v1/chat');
+    expect(page.text).toContain('How can I help you today?');
     expect(script.text).toContain("io('/v1/chat'");
-    expect(script.text).toContain("matchMedia('(prefers-color-scheme: dark)')");
-    expect(styles.text).toContain('color-scheme: light dark');
+    expect(script.text).toContain("socket.on('chat.status'");
+    expect(styles.text).toContain('color-scheme: light');
+    expect(styles.text).toContain('.stop-button[hidden]');
+    expect(styles.text).not.toContain('prefers-color-scheme: dark');
+
+    await request(app.getHttpServer()).get('/realtime').expect(404);
   });
 
   it.each(['/v1', '/v2'])('%s (GET)', async (path) => {

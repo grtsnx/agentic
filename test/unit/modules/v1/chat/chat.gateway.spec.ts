@@ -9,6 +9,11 @@ describe('ChatV1Gateway', () => {
     const openaiService = {
       createSession: vi.fn(() => session),
       streamReply: vi.fn(async function* () {
+        yield {
+          type: 'status',
+          phase: 'thinking',
+          message: 'Thinking',
+        } as const;
         yield { type: 'delta', delta: 'Hello' } as const;
         yield {
           type: 'completed',
@@ -26,10 +31,14 @@ describe('ChatV1Gateway', () => {
 
     expect(events.map((event) => event.event)).toEqual([
       'chat.started',
+      'chat.status',
       'chat.delta',
       'chat.completed',
     ]);
     expect(events[1]?.data).toEqual(
+      expect.objectContaining({ phase: 'thinking', message: 'Thinking' }),
+    );
+    expect(events[2]?.data).toEqual(
       expect.objectContaining({ delta: 'Hello' }),
     );
     expect(openaiService.streamReply).toHaveBeenCalledWith(

@@ -16,7 +16,7 @@ bun install --frozen-lockfile
 bun run start:dev
 ```
 
-Swagger UI runs at `http://localhost:3000/api`, Scalar runs at `http://localhost:3000/docs`, and the embedded Socket.IO playground runs at `http://localhost:3000/realtime`. The application prints every enabled documentation URL when it starts.
+Swagger UI runs at `http://localhost:3000/api`, Scalar runs at `http://localhost:3000/docs`, and the embedded Socket.IO playground runs at `http://localhost:3000/playground`. The application prints every enabled documentation URL when it starts.
 
 Start the interactive streaming CLI in another terminal:
 
@@ -28,18 +28,19 @@ The REST endpoint remains `POST /v1/chat`. Socket.IO streams on the `/v1/chat` n
 
 ## Socket.IO chat
 
-Open `http://localhost:3000/realtime`, wait for **Connected**, enter a message, and select **Send**. The page displays streaming text, lifecycle events, tokens, estimated cost, models, and tools. Use **Cancel** to stop the active turn. The page uses the Socket.IO v4 client served by this application and connects to the `/v1/chat` namespace with the WebSocket transport.
+Open `http://localhost:3000/playground`, wait for **Online**, enter a message, and send it. The conversation shows safe live activity such as thinking, tool use, handoffs, and approvals, then hides that activity when response text begins. It never exposes private chain-of-thought. Runtime chips show tokens, estimated cost, models, and tools after completion. Use the stop button to cancel the active turn.
 
-| Direction       | Event             | Data                                                         |
-| --------------- | ----------------- | ------------------------------------------------------------ |
-| Client → server | `chat.send`       | `{ "message": "Explain the Roman Republic" }`                |
-| Client → server | `chat.cancel`     | `{}`                                                         |
-| Server → client | `chat.started`    | `{ "requestId": "..." }`                                     |
-| Server → client | `chat.delta`      | `{ "requestId": "...", "delta": "partial text" }`            |
-| Server → client | `chat.completed`  | Final message plus tokens, estimated cost, models and tools. |
-| Server → client | `chat.cancelling` | Confirms that cancellation was requested.                    |
-| Server → client | `chat.cancelled`  | Confirms that the active model turn stopped.                 |
-| Server → client | `chat.error`      | A stable error code and safe message.                        |
+| Direction       | Event             | Data                                                           |
+| --------------- | ----------------- | -------------------------------------------------------------- |
+| Client → server | `chat.send`       | `{ "message": "Explain the Roman Republic" }`                  |
+| Client → server | `chat.cancel`     | `{}`                                                           |
+| Server → client | `chat.started`    | `{ "requestId": "..." }`                                       |
+| Server → client | `chat.status`     | Safe activity phase and label; never private chain-of-thought. |
+| Server → client | `chat.delta`      | `{ "requestId": "...", "delta": "partial text" }`              |
+| Server → client | `chat.completed`  | Final message plus tokens, estimated cost, models and tools.   |
+| Server → client | `chat.cancelling` | Confirms that cancellation was requested.                      |
+| Server → client | `chat.cancelled`  | Confirms that the active model turn stopped.                   |
+| Server → client | `chat.error`      | A stable error code and safe message.                          |
 
 The embedded playground is same-origin, so it works without adding a public website to `CORS_ORIGINS`. The Socket.IO adapter allows the API's own browser origin by default and rejects other browser origins unless they are explicitly configured. For optional external testing in [Hoppscotch](https://hoppscotch.com/), add its exact origin to `CORS_ORIGINS`; do not use `*`.
 

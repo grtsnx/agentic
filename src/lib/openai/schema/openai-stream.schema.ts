@@ -11,6 +11,14 @@ export const openaiStreamResponseSchema = z
 export const openaiStreamEventSchema = z.discriminatedUnion('type', [
   z
     .object({
+      type: z.literal('status'),
+      phase: z.enum(['thinking', 'tool', 'handoff', 'responding', 'approval']),
+      message: z.string().min(1).max(120),
+      detail: z.string().min(1).max(120).optional(),
+    })
+    .strict(),
+  z
+    .object({
       type: z.literal('delta'),
       delta: z.string(),
     })

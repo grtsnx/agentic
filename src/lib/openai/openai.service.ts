@@ -1,5 +1,5 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
-import { Agent, MemorySession, run } from '@openai/agents';
+import { Agent, MemorySession, run, type RunStreamEvent } from '@openai/agents';
 import {
   openaiOutputSchema,
   openaiResponseSchema,
@@ -82,6 +82,15 @@ export class OpenaiService {
     message: string,
     options: OpenaiStreamOptions = {},
   ): AsyncGenerator<OpenaiStreamEvent> {
+    let lastStatus = '';
+    const thinking = {
+      type: 'status',
+      phase: 'thinking',
+      message: 'Thinking',
+    } as const;
+    yield thinking;
+    lastStatus = this.statusKey(thinking);
+
     const stream = await run(this.streamingAgent, message, {
       stream: true,
       session: options.session,
@@ -89,10 +98,25 @@ export class OpenaiService {
     });
 
     for await (const event of stream) {
+      const status = this.describeStreamEvent(event);
+      if (status && this.statusKey(status) !== lastStatus) {
+        yield status;
+        lastStatus = this.statusKey(status);
+      }
+
       if (
         event.type === 'raw_model_stream_event' &&
         event.data.type === 'output_text_delta'
       ) {
+        const responding = {
+          type: 'status',
+          phase: 'responding',
+          message: 'Responding',
+        } as const;
+        if (this.statusKey(responding) !== lastStatus) {
+          yield responding;
+          lastStatus = this.statusKey(responding);
+        }
         yield { type: 'delta', delta: event.data.delta };
       }
     }
@@ -111,6 +135,111 @@ export class OpenaiService {
         runtime: this.buildRuntime(stream),
       }),
     };
+  }
+
+  private describeStreamEvent(
+    event: RunStreamEvent,
+  ): Extract<OpenaiStreamEvent, { type: 'status' }> | undefined {
+    if (event.type === 'agent_updated_stream_event') {
+      return {
+        type: 'status',
+        phase: 'handoff',
+        message: `Working with ${event.agent.name}`,
+        detail: event.agent.name,
+      };
+    }
+
+    if (event.type !== 'run_item_stream_event') return undefined;
+
+    if (event.name === 'tool_called' || event.name === 'tool_search_called') {
+      const toolName =
+        'toolName' in event.item && typeof event.item.toolName === 'string'
+          ? event.item.toolName
+          : 'tool';
+      return {
+        type: 'status',
+        phase: 'tool',
+        message: `Using ${this.readableName(toolName)}`,
+        detail: toolName,
+      };
+    }
+
+    if (
+      event.name === 'tool_output' ||
+      event.name === 'tool_search_output_created'
+    ) {
+      return {
+        type: 'status',
+        phase: 'thinking',
+        message: 'Reviewing tool result',
+      };
+    }
+
+    if (event.name === 'handoff_requested') {
+      return {
+        type: 'status',
+        phase: 'handoff',
+        message: 'Preparing handoff',
+      };
+    }
+
+    if (event.name === 'handoff_occurred') {
+      const agentName =
+        'targetAgent' in event.item &&
+        typeof event.item.targetAgent?.name === 'string'
+          ? event.item.targetAgent.name
+          : undefined;
+      return {
+        type: 'status',
+        phase: 'handoff',
+        message: agentName ? `Handed off to ${agentName}` : 'Handoff complete',
+        ...(agentName ? { detail: agentName } : {}),
+      };
+    }
+
+    if (event.name === 'tool_approval_requested') {
+      return {
+        type: 'status',
+        phase: 'approval',
+        message: 'Waiting for approval',
+      };
+    }
+
+    if (event.name === 'compaction_item_created') {
+      return {
+        type: 'status',
+        phase: 'thinking',
+        message: 'Organizing context',
+      };
+    }
+
+    if (event.name === 'reasoning_item_created') {
+      return {
+        type: 'status',
+        phase: 'thinking',
+        message: 'Thinking',
+      };
+    }
+
+    if (event.name === 'message_output_created') {
+      return {
+        type: 'status',
+        phase: 'responding',
+        message: 'Responding',
+      };
+    }
+
+    return undefined;
+  }
+
+  private readableName(value: string): string {
+    return value.replaceAll(/[_-]+/g, ' ').trim();
+  }
+
+  private statusKey(
+    status: Extract<OpenaiStreamEvent, { type: 'status' }>,
+  ): string {
+    return `${status.phase}:${status.message}:${status.detail ?? ''}`;
   }
 
   private buildRuntime(result: RuntimeSource): OpenaiRuntime {

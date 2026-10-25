@@ -15,6 +15,11 @@ describe('ChatGateway (e2e)', () => {
     const openaiService = {
       createSession: vi.fn(() => ({ id: 'session' })),
       streamReply: vi.fn(async function* () {
+        yield {
+          type: 'status',
+          phase: 'thinking',
+          message: 'Thinking',
+        } as const;
         yield { type: 'delta', delta: 'Hello' } as const;
         yield {
           type: 'completed',
@@ -69,6 +74,7 @@ describe('ChatGateway (e2e)', () => {
           socket.emit('chat.send', { message: 'Hello' });
         });
         socket.on('chat.started', () => received.push('chat.started'));
+        socket.on('chat.status', () => received.push('chat.status'));
         socket.on('chat.delta', () => received.push('chat.delta'));
         socket.on('chat.completed', (data) => {
           received.push('chat.completed');
@@ -82,7 +88,12 @@ describe('ChatGateway (e2e)', () => {
     await expect(completed).resolves.toMatchObject({
       response: { message: 'Hello' },
     });
-    expect(received).toEqual(['chat.started', 'chat.delta', 'chat.completed']);
+    expect(received).toEqual([
+      'chat.started',
+      'chat.status',
+      'chat.delta',
+      'chat.completed',
+    ]);
   });
 
   it('rejects browser connections from untrusted origins', async () => {
