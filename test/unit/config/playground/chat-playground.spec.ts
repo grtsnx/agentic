@@ -42,7 +42,11 @@ class Element extends EventEmitter {
   }
 }
 
-function setup() {
+function setup(deferFrames = false) {
+  const frames: Array<() => void> = [];
+  const flushFrames = () => {
+    while (frames.length) frames.shift()!();
+  };
   const nodes = new Map<string, Element>();
   const query = (selector: string) => {
     if (!nodes.has(selector)) nodes.set(selector, new Element());
@@ -62,19 +66,25 @@ function setup() {
     },
     URL,
     performance,
-    requestAnimationFrame: (callback: () => void) => callback(),
+    requestAnimationFrame: (callback: () => void) =>
+      deferFrames ? frames.push(callback) : callback(),
     setInterval: vi.fn(),
     clearInterval: vi.fn(),
   });
   query('#message').value = 'Hello';
   query('#send').emit('click');
   socket.emit('chat.delta', { delta: 'An answer in progress.' });
+  flushFrames();
   const article = query('#messages').children[1]!;
   const body = article.children[1]!;
   const content = body.children.find(
     (node) => node.className === 'message-content',
   )!;
-  return { query, socket, body, content };
+  return { query, socket, body, content, flushFrames };
+}
+
+function descendants(element: Element): Element[] {
+  return element.children.flatMap((child) => [child, ...descendants(child)]);
 }
 
 describe('chat interruption handling', () => {
@@ -116,6 +126,41 @@ describe('chat interruption handling', () => {
 });
 
 describe('live progress and citations', () => {
+  it('does not let a queued streaming render overwrite the completed response', () => {
+    const ui = setup(true);
+    ui.socket.emit('chat.delta', { delta: ' A pending chunk.' });
+    ui.socket.emit('chat.completed', {
+      response: { message: '**Final answer**' },
+    });
+    ui.flushFrames();
+    expect(ui.content.textContent).toBe('Final answer');
+    expect(
+      descendants(ui.content).some((node) => node.tagName === 'strong'),
+    ).toBe(true);
+  });
+
+  it('uses one source number for tracking variants of the same URL', () => {
+    const ui = setup();
+    ui.socket.emit('chat.completed', {
+      response: {
+        message:
+          'First ([example.com](https://example.com/?utm_source=openai)). Again ([example.com](https://example.com/)).',
+        sources: [{ title: 'Example source', url: 'https://example.com/' }],
+      },
+    });
+    expect(
+      descendants(ui.content)
+        .filter((node) => node.className === 'citation-badge')
+        .map((node) => node.textContent),
+    ).toEqual(['1 example.com', '1 example.com']);
+    const sources = ui.body.children.find(
+      (node) => node.className === 'message-sources',
+    )!;
+    expect(
+      sources.children.filter((node) => node.tagName === 'a'),
+    ).toHaveLength(1);
+  });
+
   it('shows new tool activity after a preliminary text chunk and hides it on the next answer chunk', () => {
     const ui = setup();
     const status = ui.body.children.find(
@@ -151,9 +196,9 @@ describe('live progress and citations', () => {
         ],
       },
     });
-    expect(ui.content.children.find((node) => node.tagName === 'a')?.href).toBe(
-      'https://docs.nestjs.com/',
-    );
+    expect(
+      descendants(ui.content).find((node) => node.tagName === 'a')?.href,
+    ).toBe('https://docs.nestjs.com/');
     expect(ui.content.innerHTML).toBe('');
     expect(ui.content.textContent).toContain('<img src=x onerror=alert(1)>');
     const sources = ui.body.children.find(
@@ -164,5 +209,76 @@ describe('live progress and citations', () => {
         .filter((node) => node.tagName === 'a')
         .map((node) => node.href),
     ).toEqual(['https://docs.nestjs.com/']);
+  });
+
+  it('replaces citation parentheses with compact source badges and formats the answer', () => {
+    const ui = setup();
+    ui.socket.emit('chat.completed', {
+      response: {
+        message:
+          '## Background\n\n- **Engineer** in Lagos. ([gravatar.com](https://gravatar.com/thegrtnx?utm_source=openai))\n- Peacebuilding. ([peacecatalyst.org](https://www.peacecatalyst.org/moses-abolade?utm_source=openai))',
+        sources: [
+          {
+            title: 'Professional profile',
+            url: 'https://gravatar.com/thegrtnx?utm_source=openai',
+          },
+        ],
+      },
+    });
+    const nodes = descendants(ui.content);
+    expect(
+      nodes
+        .filter((node) => node.className === 'citation-badge')
+        .map((node) => node.textContent),
+    ).toEqual(['1 gravatar.com', '2 peacecatalyst.org']);
+    expect(
+      nodes.some(
+        (node) => node.tagName === 'h3' && node.textContent === 'Background',
+      ),
+    ).toBe(true);
+    expect(nodes.filter((node) => node.tagName === 'li')).toHaveLength(2);
+    expect(
+      nodes.some(
+        (node) => node.tagName === 'strong' && node.textContent === 'Engineer',
+      ),
+    ).toBe(true);
+    expect(ui.content.textContent).not.toMatch(/https:|\]\(|\(1 gravatar/);
+  });
+
+  it('renders citations across streaming chunk boundaries and preserves the raw buffer', () => {
+    const ui = setup();
+    ui.socket.emit('chat.delta', {
+      delta: ' ([gravatar.com](https://gravatar.com/',
+    });
+    expect(ui.content.textContent).not.toContain('https://');
+    ui.socket.emit('chat.delta', { delta: 'thegrtnx)) Next.' });
+    expect(
+      descendants(ui.content).find(
+        (node) => node.className === 'citation-badge',
+      )?.href,
+    ).toBe('https://gravatar.com/thegrtnx');
+    ui.socket.emit('chat.completed', { response: {} });
+    expect(ui.content.textContent).toContain('Next.');
+    expect(
+      descendants(ui.content).filter(
+        (node) => node.className === 'citation-badge',
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('leaves code literal and never turns model HTML or unsafe links into active content', () => {
+    const ui = setup();
+    ui.socket.emit('chat.completed', {
+      response: {
+        message:
+          '```html\n<img src=x onerror=alert(1)>\n```\n\n`[example](https://example.com)` [bad](data:text/html,hello) [credentials](https://user:pass@example.com) [valid](https://example.com/a_(b))',
+      },
+    });
+    const nodes = descendants(ui.content);
+    expect(
+      nodes.filter((node) => node.tagName === 'a').map((node) => node.href),
+    ).toEqual(['https://example.com/a_(b)']);
+    expect(nodes.some((node) => node.tagName === 'img')).toBe(false);
+    expect(nodes.filter((node) => node.tagName === 'code')).toHaveLength(2);
   });
 });

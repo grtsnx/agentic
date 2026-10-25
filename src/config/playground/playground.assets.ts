@@ -1,3 +1,4 @@
+import { ANSWER_RENDERER } from './answer-renderer.asset.js';
 import { AGENTIC_FAVICON, AGENTIC_SYMBOL } from './brand.asset.js';
 import {
   VOICE_PLAYGROUND_VIEW,
@@ -57,7 +58,7 @@ export const PLAYGROUND_PAGE = `<!doctype html>
             </button>
           </div>
         </section>
-        <div id="messages" class="messages" aria-live="polite"></div>
+        <div id="messages" class="messages scroll-fade" aria-live="polite"></div>
       </main>
 
       <footer class="composer-wrap">
@@ -142,16 +143,9 @@ export const PLAYGROUND_APP = `(() => {
     if (elements.connection) elements.connection.textContent = label;
   }
 
-  function syncScrollFade() {
-    elements.conversation.classList?.toggle?.(
-      'scroll-fade',
-      Boolean(elements.empty.hidden),
-    );
-  }
-
   function scrollToLatest() {
     requestAnimationFrame(() => {
-      elements.conversation.scrollTop = elements.conversation.scrollHeight;
+      elements.messages.scrollTop = elements.messages.scrollHeight;
     });
   }
 
@@ -189,7 +183,6 @@ export const PLAYGROUND_APP = `(() => {
 
   function createMessage(role, text = '') {
     elements.empty.hidden = true;
-    syncScrollFade();
     const article = document.createElement('article');
     article.className = 'message ' + role;
     const avatar = document.createElement('div');
@@ -228,6 +221,9 @@ export const PLAYGROUND_APP = `(() => {
     message.body.insertBefore(status, message.content);
     assistantMessage = {
       ...message,
+      rawText: '',
+      finished: false,
+      renderPending: false,
       status,
       statusLabel: status.querySelector('.status-label'),
       statusDetail: status.querySelector('.status-detail'),
@@ -269,37 +265,7 @@ export const PLAYGROUND_APP = `(() => {
     message.body.append(metadata);
   }
 
-  function sourceUrl(value) {
-    try {
-      const url = new URL(value);
-      return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url : undefined;
-    } catch { return undefined; }
-  }
-
-  function sourceLink(label, url) {
-    const link = document.createElement('a');
-    link.href = url.href;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    link.textContent = label;
-    return link;
-  }
-
-  function renderAnswer(content, text) {
-    // Only create safe text nodes and citation links; model HTML is never executed.
-    const nodes = [];
-    const citations = /\\[([^\\]\\n]+)\\]\\(([^\\s)]+)\\)/g;
-    let offset = 0;
-    for (const match of text.matchAll(citations)) {
-      const url = sourceUrl(match[2]);
-      if (!url) continue;
-      nodes.push(document.createTextNode(text.slice(offset, match.index)));
-      nodes.push(sourceLink(match[1], url));
-      offset = match.index + match[0].length;
-    }
-    nodes.push(document.createTextNode(text.slice(offset)));
-    content.replaceChildren(...nodes);
-  }
+  ${ANSWER_RENDERER}
 
   function addSources(sources = []) {
     if (!assistantMessage?.body || !sources.length) return;
@@ -313,8 +279,15 @@ export const PLAYGROUND_APP = `(() => {
       const url = sourceUrl(source?.url);
       if (!url || !source?.title || seen.has(url.href)) continue;
       seen.add(url.href);
-      const link = sourceLink(source.title, url);
-      link.title = url.hostname;
+      const link = sourceLink('', url);
+      link.className = 'source-card';
+      const title = document.createElement('span');
+      title.className = 'source-title';
+      title.textContent = source.number + '. ' + source.title;
+      const domain = document.createElement('small');
+      domain.textContent = source.domain;
+      link.append(title, domain);
+      link.title = source.title + ' (' + source.domain + ')';
       list.append(link);
     }
     if (seen.size) assistantMessage.body.append(list);
@@ -325,6 +298,8 @@ export const PLAYGROUND_APP = `(() => {
     stopElapsed();
     setActive(false);
     message.status.hidden = true;
+    message.finished = true;
+    renderAnswer(message.content, message.rawText);
     // Keep received text visible: a transport failure must not erase the answer.
     const notice = document.createElement('div');
     notice.className = 'response-notice';
@@ -353,7 +328,6 @@ export const PLAYGROUND_APP = `(() => {
     stopElapsed();
     elements.messages.replaceChildren();
     elements.empty.hidden = false;
-    syncScrollFade();
     elements.message.value = '';
     elements.message.focus?.({ preventScroll: true });
     assistantMessage = undefined;
@@ -393,8 +367,15 @@ export const PLAYGROUND_APP = `(() => {
   socket.on('chat.delta', (data) => {
     const message = ensureAssistant();
     message.status.hidden = true;
-    message.content.textContent += data.delta;
-    scrollToLatest();
+    message.rawText += data.delta;
+    if (message.renderPending) return;
+    message.renderPending = true;
+    requestAnimationFrame(() => {
+      message.renderPending = false;
+      if (message.finished) return;
+      renderAnswer(message.content, message.rawText, [], true);
+      scrollToLatest();
+    });
   });
 
   socket.on('chat.completed', (data) => {
@@ -402,8 +383,9 @@ export const PLAYGROUND_APP = `(() => {
     stopElapsed();
     setActive(false);
     message.status.hidden = true;
-    renderAnswer(message.content, data.response?.message ?? message.content.textContent);
-    addSources(data.response?.sources);
+    message.finished = true;
+    const sources = renderAnswer(message.content, data.response?.message ?? message.rawText, data.response?.sources);
+    addSources(sources);
     addRuntime(data.response?.runtime);
     assistantMessage = undefined;
     startedAt = undefined;
@@ -419,7 +401,8 @@ export const PLAYGROUND_APP = `(() => {
     stopElapsed();
     setActive(false);
     message.status.hidden = true;
-    if (!message.content.textContent) message.content.textContent = 'Response stopped.';
+    message.finished = true;
+    renderAnswer(message.content, message.rawText || 'Response stopped.');
     assistantMessage = undefined;
     startedAt = undefined;
   });
@@ -532,8 +515,8 @@ html[data-theme='dark'] .theme-icon-moon { display: none; }
 .quiet-button { display: inline-flex; align-items: center; gap: 7px; padding: 9px 13px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); cursor: pointer; font-size: .73rem; font-weight: 500; }
 .quiet-button:hover { background: var(--surface-subtle); }
 .quiet-button:disabled { cursor: not-allowed; opacity: .5; }
-@property --scroll-fade-t { syntax: "<length>"; inherits: false; initial-value: 0px; }
-@property --scroll-fade-b { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --scroll-fade-t { syntax: "<length-percentage>"; inherits: false; initial-value: 0px; }
+@property --scroll-fade-b { syntax: "<length-percentage>"; inherits: false; initial-value: 0px; }
 @keyframes scroll-fade-reveal-t { from { --scroll-fade-t: 0px; } to { --scroll-fade-t: var(--_scroll-fade-size-t); } }
 @keyframes scroll-fade-reveal-b { from { --scroll-fade-b: var(--_scroll-fade-size-b); } to { --scroll-fade-b: 0px; } }
 .scroll-fade {
@@ -542,6 +525,8 @@ html[data-theme='dark'] .theme-icon-moon { display: none; }
   --scroll-fade-block: linear-gradient(to bottom, transparent 0, #000 var(--scroll-fade-t, 0px), #000 calc(100% - var(--scroll-fade-b, 0px)), transparent 100%);
   -webkit-mask-image: var(--scroll-fade-block);
   mask-image: var(--scroll-fade-block);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
 }
@@ -549,7 +534,7 @@ html[data-theme='dark'] .theme-icon-moon { display: none; }
   .scroll-fade {
     animation: scroll-fade-reveal-t 1ms ease-in-out, scroll-fade-reveal-b 1ms ease-in-out;
     animation-timeline: scroll(self y), scroll(self y);
-    animation-range: 0 calc(var(--spacing) * 24), calc(100% - calc(var(--spacing) * 24)) 100%;
+    animation-range: 0 var(--scroll-fade-reveal, calc(var(--spacing) * 24)), calc(100% - var(--scroll-fade-reveal, calc(var(--spacing) * 24))) 100%;
     animation-fill-mode: both;
   }
 }
@@ -557,14 +542,13 @@ html[data-theme='dark'] .theme-icon-moon { display: none; }
   .scroll-fade { --scroll-fade-t: var(--_scroll-fade-size-t); --scroll-fade-b: var(--_scroll-fade-size-b); }
 }
 .conversation { display: flex; min-height: 0; flex-direction: column; overflow: hidden; }
-.conversation.scroll-fade { display: block; overflow-y: auto; scroll-behavior: smooth; }
 .empty-state { display: flex; flex: 1; min-height: 0; height: 100%; flex-direction: column; align-items: center; justify-content: center; padding: 24px 24px 8px; overflow: hidden; text-align: center; }
 .empty-state[hidden] { display: none; }
 .empty-state h1 { margin: 0 0 15px; font-size: clamp(2rem, 4vw, 3rem); font-weight: 480; line-height: 1.12; letter-spacing: -.055em; }
 .empty-state p { margin: 0; color: #7a8292; font-size: .88rem; line-height: 1.7; }
-.messages { width: min(800px, calc(100% - 48px)); margin: 0 auto; padding: 44px 0 32px; }
-.messages:empty { display: none; }
-.message { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 13px; margin-bottom: 36px; }
+.messages { display: none; width: 100%; min-height: 0; margin: 0; padding: 28px 0 16px; }
+.messages:not(:empty) { display: block; flex: 1; overflow-y: auto; scroll-behavior: smooth; }
+.message { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 13px; width: min(800px, calc(100% - 48px)); margin: 0 auto 36px; }
 .avatar { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface); font-size: .8rem; font-weight: 500; }
 .assistant .avatar { color: #7b86c3; border-color: #e7eaf7; background: linear-gradient(135deg, #f3f6ff, #f1f0fa); }
 .message-body { min-width: 0; padding-top: 4px; }
@@ -574,6 +558,18 @@ html[data-theme='dark'] .theme-icon-moon { display: none; }
 .user .avatar, .user .message-label { display: none; }
 .user .message-body { display: flex; width: min(78%, 620px); flex-direction: column; align-items: flex-end; justify-self: end; }
 .user .message-content { display: inline-block; padding: 13px 18px; border: 1px solid #e9edf6; border-radius: 20px 20px 5px 20px; color: #454e60; background: #f2f4fa; }
+.assistant .message-content { white-space: normal; }
+.message-content p { margin: 0 0 16px; white-space: pre-wrap; }
+.message-content p:last-child { margin-bottom: 0; }
+.message-content h2, .message-content h3, .message-content h4, .message-content h5, .message-content h6 { margin: 24px 0 10px; font-size: 1.08rem; line-height: 1.4; font-weight: 650; letter-spacing: -.025em; }
+.message-content > :first-child { margin-top: 0; }
+.message-content ul, .message-content ol { margin: 12px 0 18px; padding-left: 24px; }
+.message-content li { margin: 8px 0; padding-left: 3px; white-space: pre-wrap; }
+.message-content li::marker { color: var(--muted); }
+.message-content strong { font-weight: 650; }
+.message-content code { padding: 2px 5px; border-radius: 5px; background: var(--surface-subtle); font: .83em/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.message-content pre { max-width: 100%; overflow-x: auto; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-subtle); white-space: pre; }
+.message-content pre code { padding: 0; background: none; }
 .message.error .message-content { color: var(--danger); }
 .response-notice { margin-top: 12px; color: var(--danger); font-size: .85rem; }
 .agent-status { display: flex; align-items: center; gap: 8px; min-height: 28px; color: var(--muted); font-size: .9rem; }
@@ -590,11 +586,16 @@ html[data-theme='dark'] .theme-icon-moon { display: none; }
 .status-elapsed { min-width: 34px; color: #a1a1aa; font: .72rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .runtime-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 17px; }
 .runtime-chips span { padding: 4px 7px; border: 1px solid #edf0f5; border-radius: 6px; color: #788294; background: #fbfcfe; font: 400 .62rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; }
-.message-sources { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; font-size: .78rem; }
-.message-sources strong { color: var(--muted); }
-.message-sources a { max-width: min(100%, 320px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 6px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); text-decoration: none; }
+.message-sources { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border); font-size: .78rem; }
+.message-sources strong { width: 100%; margin-bottom: 2px; color: var(--muted); font-size: .7rem; font-weight: 500; }
+.message-sources .source-card { display: flex; flex-direction: column; gap: 3px; flex: 0 1 220px; min-width: 0; max-width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); text-decoration: none; }
+.source-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.source-card small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: .68rem; }
 .message-content a { color: var(--text); text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
-.message-sources a:hover { text-decoration: underline; }
+.message-content .citation-badge { display: inline-block; vertical-align: baseline; max-width: min(100%, 200px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 7px; margin: 0 2px; border: 1px solid var(--border); border-radius: 99px; background: var(--surface-subtle); color: var(--muted); font-family: inherit; font-size: .65rem; line-height: 1.6; font-weight: 500; text-decoration: none; }
+.message-content .citation-badge:hover, .message-sources .source-card:hover { color: var(--text); border-color: var(--muted); background: var(--surface-subtle); }
+.message-content a:focus-visible, .source-card:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+@media (max-width: 480px) { .message-sources .source-card { flex-basis: 100%; } .message-content .citation-badge { max-width: 160px; } }
 .composer-wrap { position: relative; width: min(800px, calc(100% - 48px)); margin: 0 auto; padding: 0 0 22px; background: linear-gradient(to top, #fff 78%, #ffffff00); }
 .composer { padding: 17px 18px 12px; border: 1px solid #e0e5ef; border-radius: 23px; background: #fff; box-shadow: 0 4px 8px #30405b03, 0 16px 45px -22px #46577938; transition: border-color .2s, box-shadow .2s; }
 textarea { display: block; width: 100%; max-height: 180px; min-height: 55px; resize: none; padding: 2px 1px 14px; border: 0; outline: 0; background: transparent; color: var(--text); font-size: .88rem; line-height: 1.65; }
@@ -619,7 +620,7 @@ textarea::placeholder { color: #8a93a5; }
 @keyframes voice-think { 50% { height: 10px; transform: translateY(-2px); } }
 @keyframes voice-wave { 50% { height: 13px; } }
 @keyframes voice-session-enter { from { opacity: 0; transform: scale(.985); } }
-@media (max-width: 640px) { .app-shell { grid-template-rows: 62px minmax(0, 1fr) auto; } .empty-state { padding: 30px 20px; } .welcome-aura { width: 62px; height: 62px; margin-bottom: 18px; } .prompt-starters { gap: 8px; margin-top: 26px; } .prompt-starter { padding: 12px; border-radius: 13px; } .prompt-starter strong { font-size: .66rem; } .prompt-starter > span:not(.starter-icon):not(.starter-arrow), .starter-arrow { display: none; } .empty-state p { font-size: .8rem; max-width: 270px; } .composer-wrap, .messages { width: calc(100% - 28px); } .composer-wrap { padding-bottom: 12px; } .composer { padding: 14px 13px 10px; border-radius: 20px; } .topbar { padding: 0 18px; } .voice-status { font-size: 0; } .messages { padding-top: 28px; } .composer-hint { display: none; } }
+@media (max-width: 640px) { .app-shell { grid-template-rows: 62px minmax(0, 1fr) auto; } .empty-state { padding: 30px 20px; } .welcome-aura { width: 62px; height: 62px; margin-bottom: 18px; } .prompt-starters { gap: 8px; margin-top: 26px; } .prompt-starter { padding: 12px; border-radius: 13px; } .prompt-starter strong { font-size: .66rem; } .prompt-starter > span:not(.starter-icon):not(.starter-arrow), .starter-arrow { display: none; } .empty-state p { font-size: .8rem; max-width: 270px; } .composer-wrap { width: calc(100% - 28px); } .composer-wrap { padding-bottom: 12px; } .composer { padding: 14px 13px 10px; border-radius: 20px; } .topbar { padding: 0 18px; } .voice-status { font-size: 0; } .messages { padding-top: 28px; } .composer-hint { display: none; } }
 
 @media (max-width: 640px) { textarea { font-size: 16px; } .send-button, .stop-button, .voice-button { width: 44px; height: 44px; } .quiet-button { min-height: 44px; } .composer-wrap { padding-bottom: max(12px, env(safe-area-inset-bottom)); } }
 @media (max-height: 500px) { .empty-state { justify-content: flex-start; padding-top: 24px; padding-bottom: 24px; } .welcome-aura { width: 48px; height: 48px; margin-bottom: 14px; } .prompt-starters { margin-top: 20px; } textarea { max-height: 100px; } }
