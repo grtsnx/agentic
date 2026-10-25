@@ -160,7 +160,29 @@ describe('AppController (e2e)', () => {
       statusType: 'OK',
       message: 'Success',
       data: {
+        status: 'completed',
         message: 'The Roman Republic ended after civil conflict.',
+        summary: 'Rome changed from a republic into an empire.',
+        keyPoints: ['Political violence weakened republican institutions.'],
+        suggestedActions: [],
+        followUpQuestions: ['Would you like a timeline of the civil wars?'],
+        runtime: {
+          tokens: {
+            input: 120,
+            output: 80,
+            total: 200,
+            cachedInput: 20,
+            reasoningOutput: 10,
+          },
+          cost: {
+            estimatedUsd: 0.00502,
+            currency: 'USD',
+            exact: false,
+            includesToolCosts: true,
+          },
+          models: [{ name: 'gpt-6-astra', calls: 1 }],
+          tools: [],
+        },
       },
     });
     expect(responses['429'].content['application/json'].example).toEqual({

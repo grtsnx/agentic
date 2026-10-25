@@ -4,7 +4,15 @@ import { ChatV1Service } from '@/modules';
 
 describe('ChatV1Service', () => {
   it('delegates a normalized message to OpenAI', async () => {
-    const generateReply = vi.fn().mockResolvedValue('Version 1 response');
+    const output = {
+      status: 'completed',
+      message: 'Version 1 response',
+      summary: 'A short summary.',
+      keyPoints: ['First point'],
+      suggestedActions: [],
+      followUpQuestions: ['What next?'],
+    };
+    const generateReply = vi.fn().mockResolvedValue(output);
     const module = await Test.createTestingModule({
       providers: [
         ChatV1Service,
@@ -14,7 +22,7 @@ describe('ChatV1Service', () => {
 
     await expect(
       module.get(ChatV1Service).sendMessage('  Ask this  '),
-    ).resolves.toEqual({ message: 'Version 1 response' });
+    ).resolves.toEqual(output);
     expect(generateReply).toHaveBeenCalledWith('Ask this');
   });
 });

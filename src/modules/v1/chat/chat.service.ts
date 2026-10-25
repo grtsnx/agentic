@@ -7,8 +7,6 @@ export class ChatV1Service {
   constructor(private readonly openaiService: OpenaiService) {}
 
   async sendMessage(message: string): Promise<ChatV1ResponseDto> {
-    return {
-      message: await this.openaiService.generateReply(message.trim()),
-    };
+    return this.openaiService.generateReply(message.trim());
   }
 }

@@ -44,7 +44,7 @@ src/                      # Application source.
 ├── config/               # Validated runtime configuration.
 ├── dto/                  # Versioned API input and output contracts.
 ├── lib/                  # Shared provider and infrastructure adapters.
-│   └── openai/          # OpenAI Agents SDK integration.
+│   └── openai/           # OpenAI integration with feature-owned Zod schemas.
 ├── middleware/           # Global HTTP behavior.
 │   ├── commons/         # Shared response and request utilities.
 │   ├── filters/         # Global exception handling.
@@ -78,6 +78,7 @@ Completion: a clean checkout passes every verification command and starts with i
 - ✅ Isolate v1 and v2 controllers, services, modules, and DTOs so either version can change safely.
 - ✅ Expose validated `POST /v1/chat` and `POST /v2/chat` endpoints.
 - ✅ Wrap the OpenAI Agents SDK behind a shared NestJS service.
+- ✅ Return token usage, model/tool calls, and clearly labelled cost estimates.
 - ✅ Document each API version in Swagger, Scalar, and OpenAPI JSON.
 - ⬜ Verify a real provider response with a documented local smoke-test command.
 - ⬜ Map provider authentication, timeout, rate-limit, and availability failures to stable application errors.
@@ -95,7 +96,7 @@ Completion: a user can start and cancel a streaming chat from the CLI or HTTP wi
 
 ### 4. Structured outputs and conversation sessions
 
-- ⬜ Define schema-validated structured outputs for tasks that need machine-readable results.
+- ✅ Define schema-validated structured outputs for tasks that need machine-readable results.
 - ⬜ Add in-memory conversation sessions for local development without claiming durability.
 - ⬜ Support session creation, continuation, expiration, and deletion.
 - ⬜ Enforce token and turn limits, and summarize context before it exceeds its budget.

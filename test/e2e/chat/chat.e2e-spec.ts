@@ -9,9 +9,17 @@ import { OpenaiService } from '@/lib';
 describe('ChatController (e2e)', () => {
   let app: INestApplication;
   const generateReply = vi.fn();
+  const structuredOutput = {
+    status: 'completed',
+    message: 'Test response',
+    summary: 'Test summary',
+    keyPoints: ['Test point'],
+    suggestedActions: [],
+    followUpQuestions: ['Test follow-up?'],
+  };
 
   beforeEach(async () => {
-    generateReply.mockReset().mockResolvedValue('Test response');
+    generateReply.mockReset().mockResolvedValue(structuredOutput);
     const module = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(OpenaiService)
       .useValue({ generateReply })
@@ -36,7 +44,7 @@ describe('ChatController (e2e)', () => {
       expect(generateReply).toHaveBeenCalledWith('Explain the Roman Republic');
       expect(response.body).toMatchObject({
         statusCode: 200,
-        data: { message: 'Test response' },
+        data: structuredOutput,
       });
     },
   );
