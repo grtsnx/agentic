@@ -14,6 +14,7 @@ import {
   PLAYGROUND_PAGE,
   PLAYGROUND_STYLES,
 } from './playground.assets.js';
+import { ORB_ENGINE_SCRIPT, ORB_ENGINE_CORE } from './orb-engine.asset.js';
 import { LIVEKIT_BROWSER_APP } from './voice-playground.asset.js';
 
 @ApiExcludeController()
@@ -47,6 +48,18 @@ export class PlaygroundController {
   @Header('Cache-Control', 'no-store')
   livekitApp(): StreamableFile {
     return this.file(LIVEKIT_BROWSER_APP, 'text/javascript; charset=utf-8');
+  }
+
+  @Get('orb-engine.js')
+  @Header('Cache-Control', 'no-cache')
+  orbEngine(): StreamableFile {
+    return this.file(ORB_ENGINE_SCRIPT, 'text/javascript; charset=utf-8');
+  }
+
+  @Get('orb-core.js')
+  @Header('Cache-Control', 'no-cache')
+  orbCore(): StreamableFile {
+    return this.file(ORB_ENGINE_CORE, 'text/javascript; charset=utf-8');
   }
 
   @Get('styles.css')

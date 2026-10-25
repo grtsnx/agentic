@@ -282,6 +282,18 @@ describe('AppController (e2e)', () => {
       .get('/playground/livekit-app.js')
       .expect('Content-Type', /javascript/)
       .expect(200);
+    const orbEngine = await request(app.getHttpServer())
+      .get('/playground/orb-engine.js')
+      .expect('Content-Type', /javascript/)
+      .expect(200);
+    const orbCore = await request(app.getHttpServer())
+      .get('/playground/orb-core.js')
+      .expect('Content-Type', /javascript/)
+      .expect(200);
+    expect(orbEngine.text).toContain('/playground/orb-core.js');
+    expect(orbEngine.text).toContain('resolvePreset');
+    expect(orbCore.text).toContain('Copyright (c) 2026 Jakub Antalik');
+    expect(orbCore.text).not.toMatch(/from ["']react["']/);
 
     expect(page.text).toContain('<title>Agentic</title>');
     expect(page.text).toContain('/socket.io/socket.io.js');
@@ -328,7 +340,8 @@ describe('AppController (e2e)', () => {
     expect(script.text).toContain("socket.on('chat.status'");
     expect(script.text).toContain('formatDuration');
     expect(styles.text).toContain('color-scheme: light');
-    expect(styles.text).toContain('.thinking-orb');
+    expect(styles.text).toContain('.activity-canvas');
+    expect(script.text).toContain("import('/playground/orb-engine.js')");
     expect(styles.text).toContain(".voice-status[data-state='thinking']");
     expect(styles.text).toContain('.voice-session:not([hidden])');
     expect(styles.text).toContain('.voice-transcript-panel');

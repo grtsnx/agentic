@@ -237,11 +237,13 @@ export const PLAYGROUND_APP = `(() => {
       finished: false,
       renderPending: false,
       status,
+      orb: createActivityOrb(status.querySelector('.activity-canvas')),
       activitySymbol: status.querySelector('.activity-symbol'),
       statusLabel: status.querySelector('.status-label'),
       statusDetail: status.querySelector('.status-detail'),
       elapsed: status.querySelector('.status-elapsed'),
     };
+    assistantMessage.orb.setVisible(true);
     return assistantMessage;
   }
 
@@ -250,6 +252,7 @@ export const PLAYGROUND_APP = `(() => {
   }
 
   ${ACTIVITY_INDICATOR_APP}
+  globalThis.addEventListener?.('pagehide', () => assistantMessage?.orb.dispose());
 
   function updateStatus(data) {
     const message = ensureAssistant();
@@ -290,7 +293,9 @@ export const PLAYGROUND_APP = `(() => {
     stopElapsed();
     setActive(false);
     message.status.hidden = true;
+    message.orb.setVisible(false);
     message.finished = true;
+    message.orb.dispose();
     renderAnswer(message.content, message.rawText);
     // Keep received text visible: a transport failure must not erase the answer.
     const notice = document.createElement('div');
@@ -317,6 +322,7 @@ export const PLAYGROUND_APP = `(() => {
   }
 
   function resetConversation() {
+    assistantMessage?.orb.dispose();
     closeSources();
     stopElapsed();
     elements.messages.replaceChildren();
@@ -360,6 +366,7 @@ export const PLAYGROUND_APP = `(() => {
   socket.on('chat.delta', (data) => {
     const message = ensureAssistant();
     message.status.hidden = true;
+    message.orb.setVisible(false);
     message.rawText += data.delta;
     if (message.renderPending) return;
     message.renderPending = true;
@@ -376,7 +383,9 @@ export const PLAYGROUND_APP = `(() => {
     stopElapsed();
     setActive(false);
     message.status.hidden = true;
+    message.orb.setVisible(false);
     message.finished = true;
+    message.orb.dispose();
     const sources = renderAnswer(message.content, data.response?.message ?? message.rawText, data.response?.sources);
     addRuntime(data.response?.runtime);
     addAnswerActions(message, data.response?.message ?? message.rawText, sources);
@@ -394,7 +403,9 @@ export const PLAYGROUND_APP = `(() => {
     stopElapsed();
     setActive(false);
     message.status.hidden = true;
+    message.orb.setVisible(false);
     message.finished = true;
+    message.orb.dispose();
     renderAnswer(message.content, message.rawText || 'Response stopped.');
     assistantMessage = undefined;
     startedAt = undefined;
