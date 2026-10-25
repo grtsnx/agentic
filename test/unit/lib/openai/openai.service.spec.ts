@@ -372,6 +372,74 @@ describe('OpenaiService', () => {
     ]);
   });
 
+  it('streams real search states without forwarding private reasoning or tool arguments', async () => {
+    const raw = (type: string, extra: Record<string, unknown> = {}) => ({
+      type: 'raw_model_stream_event',
+      data: { type: 'model', event: { type, ...extra } },
+    });
+    agents.run.mockResolvedValue({
+      finalOutput: 'Answer',
+      completed: Promise.resolve(),
+      state: {
+        usage: {
+          requests: 1,
+          inputTokens: 1,
+          outputTokens: 1,
+          totalTokens: 2,
+          inputTokensDetails: [],
+          outputTokensDetails: [],
+        },
+      },
+      newItems: [],
+      rawResponses: [],
+      async *[Symbol.asyncIterator]() {
+        yield { type: 'agent_updated_stream_event', agent: {} };
+        yield raw('response.web_search_call.in_progress');
+        yield raw('response.web_search_call.searching');
+        yield raw('response.web_search_call.completed');
+        yield raw('response.reasoning_text.delta', {
+          delta: 'PRIVATE_REASONING',
+        });
+        yield {
+          type: 'run_item_stream_event',
+          name: 'tool_called',
+          item: {
+            rawItem: {
+              name: 'firecrawl_read_page',
+              arguments: 'PRIVATE_ARGUMENTS',
+            },
+          },
+        };
+        yield { type: 'run_item_stream_event', name: 'tool_output', item: {} };
+        yield {
+          type: 'raw_model_stream_event',
+          data: { type: 'output_text_delta', delta: 'Answer' },
+        };
+      },
+    });
+    const events = [];
+    for await (const event of new OpenaiService().streamReply('Question'))
+      events.push(event);
+    const statuses = events.filter((event) => event.type === 'status');
+    expect(statuses.map((event) => event.message)).toEqual([
+      'Thinking',
+      'Searching the web',
+      'Reviewing sources',
+      'Reading a page',
+      'Reviewing information',
+      'Responding',
+    ]);
+    expect(JSON.stringify(events)).not.toMatch(/PRIVATE_|firecrawl_read_page/);
+    expect(agents.captureConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modelSettings: { reasoning: { effort: 'low' } },
+      }),
+    );
+    expect(agents.webSearchTool).toHaveBeenCalledWith(
+      expect.objectContaining({ searchContextSize: 'low' }),
+    );
+  });
+
   it('streams text deltas and finishes with runtime metadata', async () => {
     vi.spyOn(performance, 'now')
       .mockReturnValueOnce(100)
@@ -419,7 +487,7 @@ describe('OpenaiService', () => {
       {
         type: 'status',
         phase: 'tool',
-        message: 'Checking sources',
+        message: 'Searching the web',
       },
       { type: 'status', phase: 'responding', message: 'Responding' },
       { type: 'delta', delta: 'Hello' },

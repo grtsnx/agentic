@@ -36,7 +36,8 @@
     "test:e2e": "NODE_ENV=test vitest run --config ./vitest.config.e2e.ts",
     "smoke:provider": "NODE_ENV=test RUN_PROVIDER_SMOKE=true node --env-file=.env node_modules/vitest/vitest.mjs run --config ./vitest.config.smoke.ts",
     "smoke:tools": "NODE_ENV=test RUN_EXTERNAL_TOOLS_SMOKE=true node --env-file=.env node_modules/vitest/vitest.mjs run --config ./vitest.config.smoke.ts",
-    "smoke:tool-selection": "NODE_ENV=test RUN_TOOL_SELECTION_SMOKE=true node --env-file=.env node_modules/vitest/vitest.mjs run --config ./vitest.config.smoke.ts"
+    "smoke:tool-selection": "NODE_ENV=test RUN_TOOL_SELECTION_SMOKE=true node --env-file=.env node_modules/vitest/vitest.mjs run --config ./vitest.config.smoke.ts",
+    "smoke:search": "NODE_ENV=test RUN_SEARCH_SMOKE=true node --env-file=.env node_modules/vitest/vitest.mjs run --config ./vitest.config.smoke.ts test/smoke/search.smoke-spec.ts"
   },
   "dependencies": {
     "@livekit/agents": "1.9.4",

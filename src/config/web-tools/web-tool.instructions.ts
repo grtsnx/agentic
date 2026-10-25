@@ -14,10 +14,7 @@ export const WEB_TOOL_INSTRUCTIONS = `Before any web call, classify the user's o
 3. A simple lookup, current fact, news, or discovering unknown documentation: prefer context_dev_search. Valyu is a suitable alternative or fallback. A page read cannot substitute for discovering current news or unknown sources.
 4. If both search providers are unavailable, use hosted web_search when available. If no suitable tool exists, explain the limitation.
 Examples: finding NestJS documentation is a lookup; comparing evidence on database performance is research; summarizing a supplied article URL is a page read.
-Tool capabilities:
-${Object.entries(WEB_TOOL_DESCRIPTIONS)
-  .map(([name, description]) => `${name}: ${description}`)
-  .join('\n')}
+For a simple lookup, use one focused query and answer as soon as the returned evidence is sufficient. Do not turn a quick factual question into a broad research task.
 Do not browse for greetings, arithmetic, rewriting supplied text, or questions answerable from the supplied context unless the user asks for verification.
 When the user explicitly requests a live check, online search, or verification, use an available search or page-reading tool. A remembered answer or URL is not evidence of a live check.
 For a specific page, prefer firecrawl_read_page. If it is unavailable, search the URL with an available search tool and clearly distinguish snippets from a full page read; never claim you read a page you did not retrieve.

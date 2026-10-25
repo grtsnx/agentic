@@ -1,3 +1,4 @@
+import type { ModelSettings } from '@openai/agents';
 import type { OpenaiModel } from '@/config';
 export const OPENAI_MODELS = {
   economical: 'gpt-5-nano',
@@ -26,4 +27,11 @@ export function routeOpenaiModel(message: string): OpenaiModel {
   if (instructionLines >= 3) score += 1;
 
   return score >= 2 ? OPENAI_MODELS.complex : OPENAI_MODELS.economical;
+}
+
+// Simple requests do not need the provider's default reasoning budget.
+export function openaiModelSettings(model: OpenaiModel): ModelSettings {
+  return model === OPENAI_MODELS.economical
+    ? { reasoning: { effort: 'low' } }
+    : {};
 }

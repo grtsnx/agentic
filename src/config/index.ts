@@ -10,6 +10,7 @@ export {
 export {
   OPENAI_MODELS,
   routeOpenaiModel,
+  openaiModelSettings,
 } from './openai/openai-model-router.js';
 export { mapProviderError } from './openai/provider-error.js';
 export { WebToolsService } from './web-tools/web-tools.service.js';

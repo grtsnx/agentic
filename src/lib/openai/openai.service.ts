@@ -26,6 +26,7 @@ import {
   AGENT_NAME,
   OPENAI_MODELS,
   routeOpenaiModel,
+  openaiModelSettings,
   mapProviderError,
   type OpenaiModel,
   WebToolsService,
@@ -62,8 +63,9 @@ export class OpenaiService {
       name: AGENT_NAME,
       instructions: AGENT_INSTRUCTIONS,
       model,
+      modelSettings: openaiModelSettings(model),
       outputType: openaiOutputSchema,
-      tools: this.createTools(searchEnabled, signal, sources),
+      tools: this.createTools(model, searchEnabled, signal, sources),
     });
 
     try {
@@ -118,7 +120,8 @@ export class OpenaiService {
       name: AGENT_NAME,
       instructions: AGENT_INSTRUCTIONS,
       model,
-      tools: this.createTools(searchEnabled, signal, sources),
+      modelSettings: openaiModelSettings(model),
+      tools: this.createTools(model, searchEnabled, signal, sources),
     });
     let stream;
     try {
@@ -184,6 +187,7 @@ export class OpenaiService {
   }
 
   private createTools(
+    model: OpenaiModel,
     searchEnabled: boolean,
     signal: AbortSignal,
     sources: WebSource[],
@@ -203,7 +207,8 @@ export class OpenaiService {
     return searchEnabled
       ? [
           webSearchTool({
-            searchContextSize: 'medium',
+            searchContextSize:
+              model === OPENAI_MODELS.economical ? 'low' : 'medium',
             ...(domains.length > 0
               ? { filters: { allowedDomains: domains } }
               : {}),
@@ -276,22 +281,53 @@ export class OpenaiService {
   private describeStreamEvent(
     event: RunStreamEvent,
   ): Extract<OpenaiStreamEvent, { type: 'status' }> | undefined {
-    if (event.type === 'agent_updated_stream_event') {
-      return {
-        type: 'status',
-        phase: 'handoff',
-        message: 'Working on your request',
-      };
+    // Forward only allowlisted activity labels, never raw reasoning or tool input.
+    if (
+      event.type === 'raw_model_stream_event' &&
+      event.data.type === 'model'
+    ) {
+      const raw = event.data.event as Record<string, unknown>;
+      if (!raw || typeof raw !== 'object') return undefined;
+      if (
+        raw.type === 'response.web_search_call.in_progress' ||
+        raw.type === 'response.web_search_call.searching'
+      ) {
+        return { type: 'status', phase: 'tool', message: 'Searching the web' };
+      }
+      if (raw.type === 'response.web_search_call.completed') {
+        return {
+          type: 'status',
+          phase: 'thinking',
+          message: 'Reviewing sources',
+        };
+      }
+      if (
+        raw.type === 'response.output_item.added' &&
+        (raw.item as { type?: string } | undefined)?.type === 'reasoning'
+      ) {
+        return { type: 'status', phase: 'thinking', message: 'Thinking' };
+      }
     }
 
     if (event.type !== 'run_item_stream_event') return undefined;
 
     if (event.name === 'tool_called' || event.name === 'tool_search_called') {
-      return {
-        type: 'status',
-        phase: 'tool',
-        message: 'Checking sources',
+      const item = event.item as {
+        toolName?: string;
+        rawItem?: { name?: string; type?: string; status?: string };
       };
+      // Hosted calls are reported again after they finish; don't show them as active.
+      if (item.rawItem?.type === 'hosted_tool_call') return undefined;
+      const name = item.toolName ?? item.rawItem?.name;
+      const message =
+        name === 'firecrawl_read_page'
+          ? 'Reading a page'
+          : ['web_search', 'context_dev_search', 'valyu_search'].includes(
+                name ?? '',
+              )
+            ? 'Searching the web'
+            : 'Using a tool';
+      return { type: 'status', phase: 'tool', message };
     }
 
     if (
@@ -334,22 +370,6 @@ export class OpenaiService {
         type: 'status',
         phase: 'thinking',
         message: 'Organizing context',
-      };
-    }
-
-    if (event.name === 'reasoning_item_created') {
-      return {
-        type: 'status',
-        phase: 'thinking',
-        message: 'Thinking',
-      };
-    }
-
-    if (event.name === 'message_output_created') {
-      return {
-        type: 'status',
-        phase: 'responding',
-        message: 'Responding',
       };
     }
 

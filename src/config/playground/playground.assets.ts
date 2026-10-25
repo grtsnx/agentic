@@ -63,7 +63,7 @@ export const PLAYGROUND_PAGE = `<!doctype html>
       <footer class="composer-wrap">
         <div class="composer">
           <label class="sr-only" for="message">Message Agentic</label>
-          <textarea id="message" rows="1" maxlength="8000" placeholder="Ask anything, or think out loud…"></textarea>
+          <textarea id="message" rows="1" maxlength="8000" placeholder="Ask anything, or think out loud…" autofocus></textarea>
           <div class="composer-actions">
             <div class="composer-status">
               <span class="composer-hint">Enter to send · Shift + Enter for a new line</span>
@@ -113,7 +113,6 @@ export const PLAYGROUND_APP = `(() => {
   let active = false;
   let assistantMessage;
   let elapsedTimer;
-  let responseStarted = false;
   let startedAt;
 
   const themeRoot = document.documentElement;
@@ -223,12 +222,15 @@ export const PLAYGROUND_APP = `(() => {
     const message = createMessage('assistant');
     const status = document.createElement('div');
     status.className = 'agent-status';
-    status.innerHTML = '<span class="thinking-orb" aria-hidden="true"><i></i><i></i><i></i></span><span class="status-label">Thinking</span><span class="status-elapsed">0ms</span>';
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+    status.innerHTML = '<span class="thinking-orb" aria-hidden="true"><i></i><i></i><i></i></span><span class="status-copy"><span class="status-label">Thinking</span><small class="status-detail" hidden></small></span><span class="status-elapsed">0ms</span>';
     message.body.insertBefore(status, message.content);
     assistantMessage = {
       ...message,
       status,
       statusLabel: status.querySelector('.status-label'),
+      statusDetail: status.querySelector('.status-detail'),
       elapsed: status.querySelector('.status-elapsed'),
     };
     return assistantMessage;
@@ -239,11 +241,13 @@ export const PLAYGROUND_APP = `(() => {
   }
 
   function updateStatus(data) {
-    if (responseStarted) return;
     const message = ensureAssistant();
     message.status.hidden = false;
     message.status.dataset.phase = data.phase ?? 'thinking';
     message.statusLabel.textContent = data.message ?? 'Thinking';
+    const detail = data.detail ?? ({ 'Searching the web': 'Looking up relevant sources', 'Reading a page': 'Retrieving page content', 'Reviewing sources': 'Checking the returned information' }[data.message] ?? '');
+    message.statusDetail.textContent = detail;
+    message.statusDetail.hidden = !detail;
     scrollToLatest();
   }
 
@@ -265,6 +269,38 @@ export const PLAYGROUND_APP = `(() => {
     message.body.append(metadata);
   }
 
+  function sourceUrl(value) {
+    try {
+      const url = new URL(value);
+      return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url : undefined;
+    } catch { return undefined; }
+  }
+
+  function sourceLink(label, url) {
+    const link = document.createElement('a');
+    link.href = url.href;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = label;
+    return link;
+  }
+
+  function renderAnswer(content, text) {
+    // Only create safe text nodes and citation links; model HTML is never executed.
+    const nodes = [];
+    const citations = /\\[([^\\]\\n]+)\\]\\(([^\\s)]+)\\)/g;
+    let offset = 0;
+    for (const match of text.matchAll(citations)) {
+      const url = sourceUrl(match[2]);
+      if (!url) continue;
+      nodes.push(document.createTextNode(text.slice(offset, match.index)));
+      nodes.push(sourceLink(match[1], url));
+      offset = match.index + match[0].length;
+    }
+    nodes.push(document.createTextNode(text.slice(offset)));
+    content.replaceChildren(...nodes);
+  }
+
   function addSources(sources = []) {
     if (!assistantMessage?.body || !sources.length) return;
     const list = document.createElement('div');
@@ -272,16 +308,16 @@ export const PLAYGROUND_APP = `(() => {
     const label = document.createElement('strong');
     label.textContent = 'Sources';
     list.append(label);
+    const seen = new Set();
     for (const source of sources) {
-      if (!source?.url || !source?.title) continue;
-      const link = document.createElement('a');
-      link.href = source.url;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      link.textContent = source.title;
+      const url = sourceUrl(source?.url);
+      if (!url || !source?.title || seen.has(url.href)) continue;
+      seen.add(url.href);
+      const link = sourceLink(source.title, url);
+      link.title = url.hostname;
       list.append(link);
     }
-    assistantMessage.body.append(list);
+    if (seen.size) assistantMessage.body.append(list);
   }
 
   function interruptResponse(detail) {
@@ -297,7 +333,6 @@ export const PLAYGROUND_APP = `(() => {
     message.body.append(notice);
     assistantMessage = undefined;
     startedAt = undefined;
-    responseStarted = false;
     scrollToLatest();
   }
 
@@ -307,7 +342,6 @@ export const PLAYGROUND_APP = `(() => {
     createMessage('user', message);
     assistantMessage = undefined;
     createAssistant();
-    responseStarted = false;
     startElapsed();
     elements.message.value = '';
     elements.message.style.height = 'auto';
@@ -321,8 +355,8 @@ export const PLAYGROUND_APP = `(() => {
     elements.empty.hidden = false;
     syncScrollFade();
     elements.message.value = '';
+    elements.message.focus?.({ preventScroll: true });
     assistantMessage = undefined;
-    responseStarted = false;
     startedAt = undefined;
     socket.disconnect();
     socket.connect();
@@ -358,7 +392,6 @@ export const PLAYGROUND_APP = `(() => {
 
   socket.on('chat.delta', (data) => {
     const message = ensureAssistant();
-    responseStarted = true;
     message.status.hidden = true;
     message.content.textContent += data.delta;
     scrollToLatest();
@@ -369,7 +402,7 @@ export const PLAYGROUND_APP = `(() => {
     stopElapsed();
     setActive(false);
     message.status.hidden = true;
-    message.content.textContent = data.response?.message ?? message.content.textContent;
+    renderAnswer(message.content, data.response?.message ?? message.content.textContent);
     addSources(data.response?.sources);
     addRuntime(data.response?.runtime);
     assistantMessage = undefined;
@@ -416,6 +449,7 @@ export const PLAYGROUND_APP = `(() => {
     elements.message.style.height = 'auto';
     elements.message.style.height = Math.min(elements.message.scrollHeight, 180) + 'px';
   });
+  elements.message.focus?.({ preventScroll: true });
 })();`;
 
 export const PLAYGROUND_STYLES = `:root {
@@ -522,12 +556,14 @@ html[data-theme='dark'] .theme-icon-moon { display: none; }
 @supports not (animation-timeline: scroll()) {
   .scroll-fade { --scroll-fade-t: var(--_scroll-fade-size-t); --scroll-fade-b: var(--_scroll-fade-size-b); }
 }
-.conversation { overflow-y: auto; scroll-behavior: smooth; }
-.empty-state { display: flex; min-height: 100%; flex-direction: column; align-items: center; justify-content: center; padding: 34px 24px 42px; text-align: center; }
+.conversation { display: flex; min-height: 0; flex-direction: column; overflow: hidden; }
+.conversation.scroll-fade { display: block; overflow-y: auto; scroll-behavior: smooth; }
+.empty-state { display: flex; flex: 1; min-height: 0; height: 100%; flex-direction: column; align-items: center; justify-content: center; padding: 24px 24px 8px; overflow: hidden; text-align: center; }
 .empty-state[hidden] { display: none; }
 .empty-state h1 { margin: 0 0 15px; font-size: clamp(2rem, 4vw, 3rem); font-weight: 480; line-height: 1.12; letter-spacing: -.055em; }
 .empty-state p { margin: 0; color: #7a8292; font-size: .88rem; line-height: 1.7; }
 .messages { width: min(800px, calc(100% - 48px)); margin: 0 auto; padding: 44px 0 32px; }
+.messages:empty { display: none; }
 .message { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 13px; margin-bottom: 36px; }
 .avatar { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface); font-size: .8rem; font-weight: 500; }
 .assistant .avatar { color: #7b86c3; border-color: #e7eaf7; background: linear-gradient(135deg, #f3f6ff, #f1f0fa); }
@@ -548,12 +584,17 @@ html[data-theme='dark'] .theme-icon-moon { display: none; }
 .thinking-orb i:nth-child(2) { right: 1px; bottom: 3px; animation: orb-breathe 1.1s ease-in-out infinite .15s; }
 .thinking-orb i:nth-child(3) { left: 1px; bottom: 3px; animation: orb-breathe 1.1s ease-in-out infinite .3s; }
 .status-label { color: transparent; background: linear-gradient(100deg, #71717a 20%, #18181b 45%, #a1a1aa 70%); background-size: 220% 100%; background-clip: text; -webkit-background-clip: text; animation: shimmer 1.8s linear infinite; }
+.status-copy { min-width: 0; }
+.status-detail { display: block; color: var(--muted); font-size: .78rem; line-height: 1.5; }
+.status-detail[hidden] { display: none; }
 .status-elapsed { min-width: 34px; color: #a1a1aa; font: .72rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .runtime-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 17px; }
 .runtime-chips span { padding: 4px 7px; border: 1px solid #edf0f5; border-radius: 6px; color: #788294; background: #fbfcfe; font: 400 .62rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .message-sources { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; font-size: .78rem; }
 .message-sources strong { color: var(--muted); }
-.message-sources a { color: #2563eb; text-underline-offset: 3px; }
+.message-sources a { max-width: min(100%, 320px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 6px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); text-decoration: none; }
+.message-content a { color: var(--text); text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.message-sources a:hover { text-decoration: underline; }
 .composer-wrap { position: relative; width: min(800px, calc(100% - 48px)); margin: 0 auto; padding: 0 0 22px; background: linear-gradient(to top, #fff 78%, #ffffff00); }
 .composer { padding: 17px 18px 12px; border: 1px solid #e0e5ef; border-radius: 23px; background: #fff; box-shadow: 0 4px 8px #30405b03, 0 16px 45px -22px #46577938; transition: border-color .2s, box-shadow .2s; }
 textarea { display: block; width: 100%; max-height: 180px; min-height: 55px; resize: none; padding: 2px 1px 14px; border: 0; outline: 0; background: transparent; color: var(--text); font-size: .88rem; line-height: 1.65; }

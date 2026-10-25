@@ -3,6 +3,7 @@ import {
   AGENT_INSTRUCTIONS,
   AGENT_NAME,
   OPENAI_MODELS,
+  openaiModelSettings,
   mapProviderError,
   validateEnvironment,
   WebToolsService,
@@ -105,7 +106,8 @@ describe('live model tool selection', () => {
         instructions: AGENT_INSTRUCTIONS,
         model: OPENAI_MODELS.economical,
         modelSettings: {
-          // Match the application's default reasoning instead of weakening the eval.
+          ...openaiModelSettings(OPENAI_MODELS.economical),
+          // Match the application while bounding this provider-selection check.
           // Leave room for reasoning and a complete tool call, bounded by the run deadline.
           maxTokens: 4_000,
           parallelToolCalls: false,
