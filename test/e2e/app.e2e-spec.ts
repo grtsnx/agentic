@@ -124,6 +124,10 @@ describe('AppController (e2e)', () => {
       .expect(200);
 
     expect(v1.body.info.version).toBe('v1');
+    expect(v1.body.tags).toContainEqual({
+      name: 'Server',
+      description: 'Core server status, health, and connectivity endpoints.',
+    });
     expect(v1.body.paths).toHaveProperty('/v1');
     expect(v1.body.paths).not.toHaveProperty('/v2');
     expect(v2.body.info.version).toBe('v2');
@@ -131,12 +135,46 @@ describe('AppController (e2e)', () => {
     expect(v2.body.paths).not.toHaveProperty('/v1');
   });
 
-  it('serves a non-blocking light Swagger UI', async () => {
+  it('serves Swagger with consistent themes and a compact version picker', async () => {
     const response = await request(app.getHttpServer()).get('/api').expect(200);
+    const initializer = await request(app.getHttpServer())
+      .get('/api/swagger-ui-init.js')
+      .expect(200);
 
     expect(response.text).toContain('swagger-ui-bundle.js');
     expect(response.text).not.toContain('MutationObserver');
     expect(response.text).not.toContain("classList.remove('dark-mode')");
+    expect(response.text).toContain(
+      '.swagger-ui .topbar .download-url-wrapper { display: none; }',
+    );
+    expect(response.text).toContain('.swagger-ui .topbar { display: none; }');
+    expect(response.text).toContain('api-version-picker');
+    expect(response.text).toContain('max-width: 220px');
+    expect(response.text).toContain(
+      '.swagger-ui .topbar .dark-mode-toggle { display: none; }',
+    );
+    expect(response.text).toContain('api-theme-toggle');
+    expect(initializer.text).toContain(
+      'setAttribute("aria-label", "API version")',
+    );
+    expect(initializer.text).toContain('setAttribute("aria-label", label)');
+    expect(response.text).toContain('html.dark-mode body');
+  });
+
+  it('serves Scalar with both versioned OpenAPI documents', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/docs')
+      .expect(200);
+
+    expect(response.text).toContain('Scalar.createApiReference');
+    expect(response.text).toContain(
+      'https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.76.0',
+    );
+    expect(response.text).toContain('/api/v1-json');
+    expect(response.text).toContain('/api/v2-json');
+    expect(response.headers['content-security-policy']).toContain(
+      'https://cdn.jsdelivr.net',
+    );
   });
 
   it.each(['/v1', '/v2'])('%s (GET)', async (path) => {

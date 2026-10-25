@@ -16,20 +16,20 @@ bun install --frozen-lockfile
 bun run start:dev
 ```
 
-Swagger UI runs at `http://localhost:3000/api`. Version-specific OpenAPI documents run at `/api/v1-json` and `/api/v2-json`.
+Swagger UI runs at `http://localhost:3000/api`, and Scalar runs at `http://localhost:3000/docs`. Both use the version-specific OpenAPI documents at `/api/v1-json` and `/api/v2-json`. The application prints every enabled documentation URL when it starts.
 
 ## Configuration
 
 The application validates configuration before it starts. Invalid ports, booleans, and CORS origins stop startup.
 
-| Variable          | Default               | Purpose                                                               |
-| ----------------- | --------------------- | --------------------------------------------------------------------- |
-| `NODE_ENV`        | `development`         | Selects development, test, or production behavior.                    |
-| `PORT`            | `3000`                | Sets the HTTP port.                                                   |
-| `PLATFORM_NAME`   | `Agentic`             | Names the API and OpenAPI document.                                   |
-| `CORS_ORIGINS`    | empty                 | Lists exact, comma-separated browser origins. Empty disables CORS.    |
-| `SWAGGER_ENABLED` | on outside production | Enables Swagger UI and OpenAPI JSON. Set it explicitly in production. |
-| `OBSERVE_ENABLED` | `false`               | Enables NestJS Observe when valid credentials are present.            |
+| Variable          | Default               | Purpose                                                                     |
+| ----------------- | --------------------- | --------------------------------------------------------------------------- |
+| `NODE_ENV`        | `development`         | Selects development, test, or production behavior.                          |
+| `PORT`            | `3000`                | Sets the HTTP port.                                                         |
+| `PLATFORM_NAME`   | `Agentic`             | Names the API and OpenAPI document.                                         |
+| `CORS_ORIGINS`    | empty                 | Lists exact, comma-separated browser origins. Empty disables CORS.          |
+| `SWAGGER_ENABLED` | on outside production | Enables Swagger, Scalar, and OpenAPI JSON. Set it explicitly in production. |
+| `OBSERVE_ENABLED` | `false`               | Enables NestJS Observe when valid credentials are present.                  |
 
 Never use `*` in `CORS_ORIGINS`. The server accepts only complete HTTP or HTTPS origins without paths.
 
