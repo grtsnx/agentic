@@ -8,7 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
-import { getLiveKitClientScript } from '@/lib';
+import { getLiveKitClientScript, getPdfPreviewScript } from '@/lib';
 import {
   PLAYGROUND_APP,
   PLAYGROUND_PAGE,
@@ -61,6 +61,14 @@ export class PlaygroundController {
   orbCore(): StreamableFile {
     return this.file(ORB_ENGINE_CORE, 'text/javascript; charset=utf-8');
   }
+
+  @Get('pdf.js')
+  @Header('Cache-Control','no-cache')
+  pdfScript():StreamableFile {return this.file(getPdfPreviewScript(),'text/javascript; charset=utf-8');}
+
+  @Get('pdf.worker.js')
+  @Header('Cache-Control','no-cache')
+  pdfWorker():StreamableFile {return this.file(getPdfPreviewScript(true),'text/javascript; charset=utf-8');}
 
   @Get('styles.css')
   @Header('Cache-Control', 'no-store')

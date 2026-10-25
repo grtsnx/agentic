@@ -22,6 +22,8 @@ export function configureApplication(
     contentSecurityPolicy: {
       directives: {
         connectSrc: liveKitConnectSources(environment),
+        imgSrc: ["'self'", 'data:', 'blob:'],
+        workerSrc: ["'self'"],
         ...(environment.NODE_ENV === 'production'
           ? {}
           : { upgradeInsecureRequests: null }),

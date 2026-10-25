@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import { readFileSync } from 'node:fs';
 import { Worker } from 'node:worker_threads';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
@@ -34,4 +35,8 @@ export class DocumentsService {
       });
     } finally {if(worker)await worker.terminate();this.active--;}
   }
+}
+
+export function getPdfPreviewScript(worker = false): string {
+  return readFileSync(require.resolve(worker ? 'pdfjs-dist/build/pdf.worker.mjs' : 'pdfjs-dist/build/pdf.mjs'),'utf8');
 }

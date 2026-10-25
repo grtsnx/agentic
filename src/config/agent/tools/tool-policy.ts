@@ -10,6 +10,7 @@ export const TOOL_PERMISSIONS: Readonly<Record<string, PermissionTier>> =
     firecrawl_read_page: 'safe_read',
     valyu_search: 'safe_read',
     retrieve_files: 'sensitive_read',
+    inspect_image: 'sensitive_read',
     execute_code: 'write',
     delete_file: 'destructive',
     delegate_task: 'safe_read',
@@ -31,7 +32,7 @@ export function auditSnapshot(value: unknown): unknown {
   const json = JSON.stringify(value ?? null, (key, item: unknown) =>
     /token|secret|password|authorization|api.?key/i.test(key)
       ? '[redacted]'
-      : item,
+      : typeof item === 'string' && item.startsWith('data:image/') ? '[image omitted]' : item,
   ).replace(/\b(?:sk-|lk_)[A-Za-z0-9_-]{12,}\b/g, '[redacted]');
   return json.length > 4_000
     ? { preview: json.slice(0, 4_000), truncated: true }
