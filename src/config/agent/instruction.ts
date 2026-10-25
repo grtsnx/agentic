@@ -1,4 +1,4 @@
-import { WEB_TOOL_INSTRUCTIONS } from '../web-tools/web-tool.instructions.js';
+import { WEB_TOOL_INSTRUCTIONS } from './tools/web/web-tool.instructions.js';
 
 export const AGENT_NAME = 'Agentic';
 

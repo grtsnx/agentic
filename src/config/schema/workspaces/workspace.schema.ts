@@ -12,3 +12,6 @@ export const specialistOutputSchema = z.object({
   uncertainties: z.array(z.string().max(1_000)).max(8),
 }).strict();
 export const delegationSchema = z.object({task: z.string().min(1).max(4_000)}).strict();
+
+export const codeToolSchema = z.object({code:z.string().min(1).max(16_000)}).strict();
+export const deleteFileToolSchema = z.object({fileId:z.uuid()}).strict();

@@ -1,17 +1,17 @@
 import type { WebSource, WebToolOptions, ToolAudit } from '@/config';
-import { auditedTool } from '../agent-tools/tool-policy.js';
+import { auditedTool } from '../tool-policy.js';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 // These leaf imports prevent config → lib → OpenAI → config initialization cycles.
-import { ContextDevService } from '../../lib/context-dev/context-dev.service.js';
-import { FirecrawlService } from '../../lib/firecrawl/firecrawl.service.js';
-import { ValyuService } from '../../lib/valyu/valyu.service.js';
+import { ContextDevService } from '../../../../lib/context-dev/context-dev.service.js';
+import { FirecrawlService } from '../../../../lib/firecrawl/firecrawl.service.js';
+import { ValyuService } from '../../../../lib/valyu/valyu.service.js';
 
 import { WEB_TOOL_DESCRIPTIONS } from './web-tool.instructions.js';
 import {
   webPagesSchema,
   webToolInputSchema,
-} from '../schema/web-tools/web-tool.schema.js';
+} from '../../../schema/web-tools/web-tool.schema.js';
 import {
   publicPageUrl,
   WebToolError,

@@ -29,7 +29,7 @@ export class WorkspaceStore implements OnModuleDestroy {
     return scope;
   }
 
-  propose(scope: WorkspaceScope, input: WorkspaceAction, traceId = randomUUID()): ActionApproval {
+  propose(scope: WorkspaceScope, input: WorkspaceAction, traceId: string = randomUUID()): ActionApproval {
     scope.abort.signal.throwIfAborted();
     const action = workspaceActionSchema.parse(input);
     const digest = this.hash(JSON.stringify(action)).toString('hex');

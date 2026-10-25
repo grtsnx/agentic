@@ -1,4 +1,4 @@
-import type { PermissionTier, ToolAudit } from '../schema/types/workspaces/workspace.types.js';
+import type { PermissionTier, ToolAudit } from '../../schema/types/workspaces/workspace.types.js';
 import { randomUUID } from 'node:crypto';
 
 export const TOOL_PERMISSIONS: Readonly<Record<string, PermissionTier>> = Object.freeze({

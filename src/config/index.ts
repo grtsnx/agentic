@@ -13,14 +13,14 @@ export {
   openaiModelSettings,
 } from './openai/openai-model-router.js';
 export { mapProviderError } from './openai/provider-error.js';
-export { WebToolsService } from './web-tools/web-tools.service.js';
-export { WebToolsModule } from './web-tools/web-tools.module.js';
+export { WebToolsService } from './agent/tools/web/web-tools.service.js';
+export { WebToolsModule } from './agent/tools/web/web-tools.module.js';
 export {
   WebToolError,
   publicPageUrl,
   webToolFailure,
   withinToolDeadline,
-} from './web-tools/web-tool.policy.js';
+} from './agent/tools/web/web-tool.policy.js';
 export { PlaygroundModule } from './playground/playground.module.js';
-export { TOOL_PERMISSIONS, permissionFor, requiresApproval, auditSnapshot, auditedTool } from './agent-tools/tool-policy.js';
+export { TOOL_PERMISSIONS, permissionFor, requiresApproval, auditSnapshot, auditedTool } from './agent/tools/tool-policy.js';
 export { BoundedAgentModel } from './openai/bounded-agent-model.js';

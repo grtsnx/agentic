@@ -28,6 +28,7 @@ Write and review code with the judgment of a senior software engineer: prioritiz
 
 - No database or Redis yet. Keep their future work in the roadmap until explicitly requested.
 - All external integrations belong in `src/lib/`, with their own Nest `*.module.ts` and `*.service.ts` files. Expose application functionality through feature services/controllers/modules in `src/modules/`.
+- Keep tool policies, registration, and web-tool setup under `src/config/agent/tools/`. Provider SDK adapters stay in `src/lib/`; schemas stay in `src/config/schema/`.
 - Keep OpenAI SDK calls in `src/lib/openai/`; put its model router and provider error mapper in `src/config/openai/`.
 - All named application type aliases and interfaces belong in `src/config/schema/types/`, categorized by feature when useful (OpenAI, LiveKit, web tools, chat, CLI, HTTP). Keep runtime Zod schemas in their schema files and infer associated types with `z.infer` using type-only imports; do not duplicate schema shapes. Re-export types through the types barrel and `@/config`, and use `import type` (or inline `type`) so types do not create runtime dependencies. DTO classes remain in `src/dto/`; test-only fixtures can stay in `test/`.
 - Runtime configuration belongs in `src/config/`. All Zod schemas belong under `src/config/schema/`, grouped by feature. DTOs, including OpenAI runtime DTOs, belong in `src/dto/`.

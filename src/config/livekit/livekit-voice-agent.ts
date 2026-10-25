@@ -2,7 +2,7 @@ import { defineAgent, type JobContext, voice, llm } from '@livekit/agents';
 import { validateEnvironment } from '../environment.js';
 import type { Environment } from '@/config';
 import { createLiveKitVoiceModel } from '@/lib';
-import { WebToolsService } from '../web-tools/web-tools.service.js';
+import { WebToolsService } from '../agent/tools/web/web-tools.service.js';
 import {
   VOICE_AGENT_INSTRUCTIONS,
   VOICE_GREETING_INSTRUCTIONS,

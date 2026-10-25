@@ -1,9 +1,8 @@
 import { Injectable, ConflictException, BadRequestException } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { tool } from '@openai/agents';
-import { z } from 'zod';
 import { OpenaiService, SandboxService, DelegationService } from '@/lib';
-import { WebToolsService, auditedTool, retrievalSchema, delegationSchema, type WorkspaceScope, type OpenaiStreamEvent } from '@/config';
+import { codeToolSchema, deleteFileToolSchema, WebToolsService, auditedTool, retrievalSchema, delegationSchema, type WorkspaceScope, type OpenaiStreamEvent } from '@/config';
 import { WorkspaceStore } from './workspace-store.service.js';
 import { WorkspaceFilesService } from './workspace-files.service.js';
 
@@ -82,9 +81,9 @@ export class WorkspaceService {
   }
   private actionTools(scope:WorkspaceScope, traceId:string) {
     return [tool({name:'execute_code',description:'Request human approval for exact JavaScript code in a network-disabled, temporary Docker sandbox. This tool only proposes; it cannot approve or execute.',
-      parameters:z.object({code:z.string().min(1).max(16_000)}).strict(),
+      parameters:codeToolSchema,
       execute:({code})=>this.store.propose(scope,{tool:'execute_code',code},traceId)}),
-      tool({name:'delete_file',description:'Request explicit human approval to remove a workspace file.',parameters:z.object({fileId:z.uuid()}).strict(),
+      tool({name:'delete_file',description:'Request explicit human approval to remove a workspace file.',parameters:deleteFileToolSchema,
         execute:({fileId})=>this.store.propose(scope,{tool:'delete_file',fileId},traceId)})];
   }
   private async delegateWithin(scope: WorkspaceScope,task:string,signal:AbortSignal,traceId:string) {
