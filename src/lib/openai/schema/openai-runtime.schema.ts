@@ -9,6 +9,7 @@ const callSchema = z
 
 export const openaiRuntimeSchema = z
   .object({
+    durationMs: z.number().int().nonnegative(),
     tokens: z
       .object({
         input: z.number().int().nonnegative(),

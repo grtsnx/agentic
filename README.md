@@ -28,19 +28,19 @@ The REST endpoint remains `POST /v1/chat`. Socket.IO streams on the `/v1/chat` n
 
 ## Socket.IO chat
 
-Open `http://localhost:3000/playground`, wait for **Online**, enter a message, and send it. The conversation shows safe live activity such as thinking, tool use, handoffs, and approvals, then hides that activity when response text begins. It never exposes private chain-of-thought. Runtime chips show tokens, estimated cost, models, and tools after completion. Use the stop button to cancel the active turn.
+Open `http://localhost:3000/playground`, wait for **Online**, enter a message, and send it. The conversation shows a thinking orb, shimmering activity, elapsed time, and safe phases such as tool use, handoffs, and approvals, then hides that activity when response text begins. It never exposes private chain-of-thought. Runtime chips show total time, tokens, estimated cost, models, and tools after completion. Use the stop button to cancel the active turn.
 
-| Direction       | Event             | Data                                                           |
-| --------------- | ----------------- | -------------------------------------------------------------- |
-| Client → server | `chat.send`       | `{ "message": "Explain the Roman Republic" }`                  |
-| Client → server | `chat.cancel`     | `{}`                                                           |
-| Server → client | `chat.started`    | `{ "requestId": "..." }`                                       |
-| Server → client | `chat.status`     | Safe activity phase and label; never private chain-of-thought. |
-| Server → client | `chat.delta`      | `{ "requestId": "...", "delta": "partial text" }`              |
-| Server → client | `chat.completed`  | Final message plus tokens, estimated cost, models and tools.   |
-| Server → client | `chat.cancelling` | Confirms that cancellation was requested.                      |
-| Server → client | `chat.cancelled`  | Confirms that the active model turn stopped.                   |
-| Server → client | `chat.error`      | A stable error code and safe message.                          |
+| Direction       | Event             | Data                                                               |
+| --------------- | ----------------- | ------------------------------------------------------------------ |
+| Client → server | `chat.send`       | `{ "message": "Explain the Roman Republic" }`                      |
+| Client → server | `chat.cancel`     | `{}`                                                               |
+| Server → client | `chat.started`    | `{ "requestId": "..." }`                                           |
+| Server → client | `chat.status`     | Safe activity phase and label; never private chain-of-thought.     |
+| Server → client | `chat.delta`      | `{ "requestId": "...", "delta": "partial text" }`                  |
+| Server → client | `chat.completed`  | Final message plus time, tokens, estimated cost, models and tools. |
+| Server → client | `chat.cancelling` | Confirms that cancellation was requested.                          |
+| Server → client | `chat.cancelled`  | Confirms that the active model turn stopped.                       |
+| Server → client | `chat.error`      | A stable error code and safe message.                              |
 
 The embedded playground is same-origin, so it works without adding a public website to `CORS_ORIGINS`. The Socket.IO adapter allows the API's own browser origin by default and rejects other browser origins unless they are explicitly configured. For optional external testing in [Hoppscotch](https://hoppscotch.com/), add its exact origin to `CORS_ORIGINS`; do not use `*`.
 

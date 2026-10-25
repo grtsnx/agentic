@@ -26,6 +26,7 @@ describe('ChatGateway (e2e)', () => {
           response: {
             message: 'Hello',
             runtime: {
+              durationMs: 250,
               tokens: {
                 input: 10,
                 output: 2,

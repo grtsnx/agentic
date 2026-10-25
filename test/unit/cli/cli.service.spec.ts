@@ -17,6 +17,7 @@ describe('CliService', () => {
           response: {
             message: 'Hello',
             runtime: {
+              durationMs: 250,
               tokens: { input: 10, output: 2, total: 12 },
               cost: { estimatedUsd: 0.0002 },
               models: [{ name: 'gpt-6-astra', calls: 1 }],
@@ -40,6 +41,7 @@ describe('CliService', () => {
     expect(output).toContain('Hello');
     expect(output).toContain('Thinking');
     expect(output).toContain('Agent: Hello');
+    expect(output).toContain('Time: 0.25s');
     expect(output).toContain('Tokens: 10 in / 2 out / 12 total');
     expect(output).toContain('Estimated cost: $0.00020000 USD');
     expect(output).toContain('Models: gpt-6-astra (1)');

@@ -136,6 +136,7 @@ export class CliService {
       .join(', ');
 
     return [
+      `Time: ${(runtime.durationMs / 1000).toFixed(2)}s`,
       `Tokens: ${runtime.tokens.input} in / ${runtime.tokens.output} out / ${runtime.tokens.total} total`,
       `Estimated cost: $${runtime.cost.estimatedUsd.toFixed(8)} USD`,
       `Models: ${models || 'none'}`,

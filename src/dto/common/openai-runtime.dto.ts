@@ -40,6 +40,12 @@ class RuntimeCallDto {
 }
 
 export class OpenaiRuntimeDto {
+  @ApiProperty({
+    example: 1840,
+    description: 'Total agent run time in milliseconds.',
+  })
+  durationMs!: number;
+
   @ApiProperty({ type: RuntimeTokenUsageDto })
   tokens!: RuntimeTokenUsageDto;
 

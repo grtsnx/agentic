@@ -31,7 +31,14 @@ describe('OpenaiService', () => {
     agents.run.mockReset();
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('uses a Zod output type and returns validated structured output', async () => {
+    vi.spyOn(performance, 'now')
+      .mockReturnValueOnce(100)
+      .mockReturnValueOnce(350);
     agents.run.mockResolvedValue({
       finalOutput: output,
       state: {
@@ -61,6 +68,7 @@ describe('OpenaiService', () => {
     await expect(service.generateReply('Question')).resolves.toEqual({
       ...output,
       runtime: {
+        durationMs: 250,
         tokens: {
           input: 100,
           output: 50,
@@ -89,6 +97,9 @@ describe('OpenaiService', () => {
   });
 
   it('streams text deltas and finishes with runtime metadata', async () => {
+    vi.spyOn(performance, 'now')
+      .mockReturnValueOnce(100)
+      .mockReturnValueOnce(350);
     const stream = {
       async *[Symbol.asyncIterator]() {
         yield {
@@ -143,6 +154,7 @@ describe('OpenaiService', () => {
         response: {
           message: 'Hello world',
           runtime: {
+            durationMs: 250,
             tokens: {
               input: 10,
               output: 2,

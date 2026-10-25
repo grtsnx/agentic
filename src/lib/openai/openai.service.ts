@@ -62,6 +62,7 @@ export class OpenaiService {
   }
 
   async generateReply(message: string): Promise<OpenaiResponse> {
+    const startedAt = performance.now();
     const result = await run(this.agent, message);
     if (!result.finalOutput) {
       throw new ServiceUnavailableException(
@@ -74,7 +75,7 @@ export class OpenaiService {
 
     return openaiResponseSchema.parse({
       ...output,
-      runtime: this.buildRuntime(result),
+      runtime: this.buildRuntime(result, performance.now() - startedAt),
     });
   }
 
@@ -82,6 +83,7 @@ export class OpenaiService {
     message: string,
     options: OpenaiStreamOptions = {},
   ): AsyncGenerator<OpenaiStreamEvent> {
+    const startedAt = performance.now();
     let lastStatus = '';
     const thinking = {
       type: 'status',
@@ -132,7 +134,7 @@ export class OpenaiService {
       type: 'completed',
       response: openaiStreamResponseSchema.parse({
         message: stream.finalOutput,
-        runtime: this.buildRuntime(stream),
+        runtime: this.buildRuntime(stream, performance.now() - startedAt),
       }),
     };
   }
@@ -242,7 +244,10 @@ export class OpenaiService {
     return `${status.phase}:${status.message}:${status.detail ?? ''}`;
   }
 
-  private buildRuntime(result: RuntimeSource): OpenaiRuntime {
+  private buildRuntime(
+    result: RuntimeSource,
+    durationMs: number,
+  ): OpenaiRuntime {
     const usage = result.state.usage;
     const tools = this.countCalls(
       result.newItems
@@ -260,6 +265,7 @@ export class OpenaiService {
     );
 
     return {
+      durationMs: Math.max(0, Math.round(durationMs)),
       tokens: {
         input: usage.inputTokens,
         output: usage.outputTokens,

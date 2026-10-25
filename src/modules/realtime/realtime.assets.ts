@@ -72,11 +72,38 @@ export const REALTIME_APP = `(() => {
 
   let active = false;
   let assistantMessage;
+  let elapsedTimer;
+  let responseStarted = false;
+  let startedAt;
 
   function scrollToLatest() {
     requestAnimationFrame(() => {
       elements.conversation.scrollTop = elements.conversation.scrollHeight;
     });
+  }
+
+  function formatDuration(durationMs) {
+    if (!Number.isFinite(durationMs)) return undefined;
+    if (durationMs < 1000) return Math.max(0, Math.round(durationMs)) + 'ms';
+    const seconds = durationMs / 1000;
+    return seconds.toFixed(seconds < 10 ? 1 : 0) + 's';
+  }
+
+  function updateElapsed() {
+    if (!assistantMessage?.elapsed || startedAt === undefined) return;
+    assistantMessage.elapsed.textContent = formatDuration(performance.now() - startedAt);
+  }
+
+  function startElapsed() {
+    if (elapsedTimer) clearInterval(elapsedTimer);
+    startedAt = performance.now();
+    updateElapsed();
+    elapsedTimer = setInterval(updateElapsed, 100);
+  }
+
+  function stopElapsed() {
+    if (elapsedTimer) clearInterval(elapsedTimer);
+    elapsedTimer = undefined;
   }
 
   function log(event, data = {}) {
@@ -121,9 +148,14 @@ export const REALTIME_APP = `(() => {
     const message = createMessage('assistant');
     const status = document.createElement('div');
     status.className = 'agent-status';
-    status.innerHTML = '<span class="status-spark" aria-hidden="true">✦</span><span class="status-label">Thinking</span><span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span>';
+    status.innerHTML = '<span class="thinking-orb" aria-hidden="true"><i></i><i></i><i></i></span><span class="status-label">Thinking</span><span class="status-elapsed">0ms</span>';
     message.body.insertBefore(status, message.content);
-    assistantMessage = { ...message, status, statusLabel: status.querySelector('.status-label') };
+    assistantMessage = {
+      ...message,
+      status,
+      statusLabel: status.querySelector('.status-label'),
+      elapsed: status.querySelector('.status-elapsed'),
+    };
     return assistantMessage;
   }
 
@@ -132,6 +164,7 @@ export const REALTIME_APP = `(() => {
   }
 
   function updateStatus(data) {
+    if (responseStarted) return;
     const message = ensureAssistant();
     message.status.hidden = false;
     message.status.dataset.phase = data.phase ?? 'thinking';
@@ -144,6 +177,7 @@ export const REALTIME_APP = `(() => {
     const metadata = document.createElement('div');
     metadata.className = 'runtime-chips';
     const values = [
+      formatDuration(runtime.durationMs),
       runtime.tokens ? runtime.tokens.total + ' tokens' : undefined,
       runtime.cost ? '$' + Number(runtime.cost.estimatedUsd ?? 0).toFixed(6) : undefined,
       runtime.models?.[0]?.name,
@@ -163,6 +197,8 @@ export const REALTIME_APP = `(() => {
     createMessage('user', message);
     assistantMessage = undefined;
     createAssistant();
+    responseStarted = false;
+    startElapsed();
     elements.message.value = '';
     elements.message.style.height = 'auto';
     setActive(true);
@@ -171,11 +207,14 @@ export const REALTIME_APP = `(() => {
   }
 
   function resetConversation() {
+    stopElapsed();
     elements.messages.replaceChildren();
     elements.empty.hidden = false;
     elements.events.textContent = 'Waiting for a connection…';
     elements.message.value = '';
     assistantMessage = undefined;
+    responseStarted = false;
+    startedAt = undefined;
     socket.disconnect();
     socket.connect();
   }
@@ -188,6 +227,7 @@ export const REALTIME_APP = `(() => {
   });
 
   socket.on('disconnect', (reason) => {
+    stopElapsed();
     elements.connection.lastChild.textContent = ' Offline';
     elements.connection.dataset.state = 'offline';
     setActive(false);
@@ -195,6 +235,7 @@ export const REALTIME_APP = `(() => {
   });
 
   socket.on('connect_error', (error) => {
+    stopElapsed();
     elements.connection.lastChild.textContent = ' Connection failed';
     elements.connection.dataset.state = 'offline';
     setActive(false);
@@ -203,6 +244,7 @@ export const REALTIME_APP = `(() => {
 
   socket.on('chat.started', (data) => {
     setActive(true);
+    if (startedAt === undefined) startElapsed();
     updateStatus({ phase: 'thinking', message: 'Thinking' });
     log('chat.started', data);
   });
@@ -214,6 +256,7 @@ export const REALTIME_APP = `(() => {
 
   socket.on('chat.delta', (data) => {
     const message = ensureAssistant();
+    responseStarted = true;
     message.status.hidden = true;
     message.content.textContent += data.delta;
     scrollToLatest();
@@ -221,11 +264,13 @@ export const REALTIME_APP = `(() => {
 
   socket.on('chat.completed', (data) => {
     const message = ensureAssistant();
+    stopElapsed();
     setActive(false);
     message.status.hidden = true;
     message.content.textContent = data.response?.message ?? message.content.textContent;
     addRuntime(data.response?.runtime);
     assistantMessage = undefined;
+    startedAt = undefined;
     log('chat.completed', data);
     scrollToLatest();
   });
@@ -237,20 +282,24 @@ export const REALTIME_APP = `(() => {
 
   socket.on('chat.cancelled', (data) => {
     const message = ensureAssistant();
+    stopElapsed();
     setActive(false);
     message.status.hidden = true;
     if (!message.content.textContent) message.content.textContent = 'Response stopped.';
     assistantMessage = undefined;
+    startedAt = undefined;
     log('chat.cancelled', data);
   });
 
   socket.on('chat.error', (data) => {
     const message = ensureAssistant();
+    stopElapsed();
     setActive(false);
     message.status.hidden = true;
     message.content.textContent = data.message ?? 'The response could not be completed.';
     message.article.classList.add('error');
     assistantMessage = undefined;
+    startedAt = undefined;
     log('chat.error', data);
   });
 
@@ -314,15 +363,20 @@ button { color: inherit; }
 .message-body { min-width: 0; padding-top: 4px; }
 .message-label { margin-bottom: 8px; font-size: .82rem; font-weight: 700; }
 .message-content { max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .98rem; line-height: 1.72; }
+.user { grid-template-columns: minmax(0, 1fr); }
+.user .avatar, .user .message-label { display: none; }
+.user .message-body { display: flex; width: min(78%, 620px); flex-direction: column; align-items: flex-end; justify-self: end; }
 .user .message-content { display: inline-block; padding: 11px 15px; border-radius: 18px 18px 4px 18px; background: var(--surface-subtle); }
 .message.error .message-content { color: var(--danger); }
 .agent-status { display: flex; align-items: center; gap: 8px; min-height: 28px; color: var(--muted); font-size: .9rem; }
 .agent-status[hidden] { display: none; }
-.status-spark { color: var(--text); animation: pulse 1.3s ease-in-out infinite; }
-.thinking-dots { display: inline-flex; gap: 3px; margin-left: -3px; }
-.thinking-dots i { width: 3px; height: 3px; border-radius: 50%; background: currentColor; animation: bounce 1.2s infinite; }
-.thinking-dots i:nth-child(2) { animation-delay: .15s; }
-.thinking-dots i:nth-child(3) { animation-delay: .3s; }
+.thinking-orb { position: relative; width: 20px; height: 20px; flex: 0 0 20px; animation: orb-spin 2.2s linear infinite; }
+.thinking-orb i { position: absolute; width: 5px; height: 5px; border-radius: 50%; background: var(--text); box-shadow: 0 0 8px rgba(24, 24, 27, .18); }
+.thinking-orb i:nth-child(1) { top: 1px; left: 8px; }
+.thinking-orb i:nth-child(2) { right: 1px; bottom: 3px; animation: orb-breathe 1.1s ease-in-out infinite .15s; }
+.thinking-orb i:nth-child(3) { left: 1px; bottom: 3px; animation: orb-breathe 1.1s ease-in-out infinite .3s; }
+.status-label { color: transparent; background: linear-gradient(100deg, #71717a 20%, #18181b 45%, #a1a1aa 70%); background-size: 220% 100%; background-clip: text; -webkit-background-clip: text; animation: shimmer 1.8s linear infinite; }
+.status-elapsed { min-width: 34px; color: #a1a1aa; font: .72rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .runtime-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
 .runtime-chips span { padding: 4px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); background: var(--surface); font: 600 .7rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .composer-wrap { position: relative; width: min(780px, calc(100% - 32px)); margin: 0 auto; padding: 0 0 14px; background: linear-gradient(to top, #fff 78%, rgba(255, 255, 255, 0)); }
@@ -343,8 +397,9 @@ textarea::placeholder { color: #a1a1aa; }
 .developer-details summary { cursor: pointer; user-select: none; }
 .developer-details pre { max-height: 180px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-subtle); font: .65rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-@keyframes pulse { 50% { opacity: .35; transform: scale(.86); } }
-@keyframes bounce { 0%, 60%, 100% { transform: translateY(0); opacity: .35; } 30% { transform: translateY(-3px); opacity: 1; } }
+@keyframes shimmer { to { background-position: -220% 0; } }
+@keyframes orb-spin { to { transform: rotate(360deg); } }
+@keyframes orb-breathe { 50% { opacity: .3; transform: scale(.65); } }
 @media (max-width: 1120px) { .developer-details { position: static; transform: none; width: 100%; margin-top: 7px; } }
 @media (max-width: 640px) { .topbar { padding: 0 16px; } .connection { font-size: 0; } .connection-dot { margin-right: 2px; } .messages { padding-top: 28px; } .composer-hint { display: none; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }

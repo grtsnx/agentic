@@ -175,6 +175,7 @@ describe('AppController (e2e)', () => {
         suggestedActions: [],
         followUpQuestions: ['Would you like a timeline of the civil wars?'],
         runtime: {
+          durationMs: 1840,
           tokens: {
             input: 120,
             output: 80,
@@ -268,7 +269,12 @@ describe('AppController (e2e)', () => {
     expect(page.text).toContain('How can I help you today?');
     expect(script.text).toContain("io('/v1/chat'");
     expect(script.text).toContain("socket.on('chat.status'");
+    expect(script.text).toContain('formatDuration');
     expect(styles.text).toContain('color-scheme: light');
+    expect(styles.text).toContain('.thinking-orb');
+    expect(styles.text).toContain('@keyframes shimmer');
+    expect(styles.text).toContain('.user .message-body');
+    expect(styles.text).toContain('justify-self: end');
     expect(styles.text).toContain('.stop-button[hidden]');
     expect(styles.text).not.toContain('prefers-color-scheme: dark');
 
