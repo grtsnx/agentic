@@ -23,6 +23,7 @@ export function configureApplication(
       directives: {
         connectSrc: liveKitConnectSources(environment),
         imgSrc: ["'self'", 'data:', 'blob:'],
+        fontSrc: ["'self'", 'data:', 'blob:'],
         workerSrc: ["'self'"],
         ...(environment.NODE_ENV === 'production'
           ? {}

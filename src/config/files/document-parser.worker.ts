@@ -44,7 +44,8 @@ const {parentPort,workerData}=require('node:worker_threads');
     if(!archive['word/document.xml']||!archive['[Content_Types].xml'])throw Error('Invalid DOCX package');
     const xml=new TextDecoder('utf-8',{fatal:true}).decode(archive['word/document.xml']);
     if(xml.length>2_000_000||/<!DOCTYPE|<!ENTITY/i.test(xml))throw Error('Unsafe DOCX XML');
-    const {XMLParser,XMLValidator}=await import(paths.xml);
+    const xmlModule=await import(paths.xml);
+    const {XMLParser,XMLValidator}=xmlModule.default??xmlModule;
     if(XMLValidator.validate(xml)!==true)throw Error('Invalid document XML');
     const nodes=new XMLParser({preserveOrder:true,ignoreAttributes:true,trimValues:false,parseTagValue:false}).parse(xml);
     function visit(nodes,depth=0) {

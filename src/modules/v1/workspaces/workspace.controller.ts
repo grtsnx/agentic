@@ -84,7 +84,10 @@ export class WorkspaceController {
       limits: { fileSize: 1_048_576, files: 1, fields: 0, parts: 1 },
     }),
   )
-  async upload(@Req() req: WorkspaceRequest, @UploadedFile() file: UploadedDocument) {
+  async upload(
+    @Req() req: WorkspaceRequest,
+    @UploadedFile() file: UploadedDocument,
+  ) {
     const result = await this.service.files.upload(req.workspace, file);
     this.service.store.audit(req.workspace, {
       tool: 'upload_file',
@@ -97,26 +100,51 @@ export class WorkspaceController {
     return result;
   }
   @Get(':id/files/:fileId/preview')
-  @Header('Cache-Control','no-store')
-  @ApiOperation({summary:'Preview a file in this workspace'})
-  preview(@Req() req: WorkspaceRequest,@Param('fileId',new ParseUUIDPipe()) fileId:string) {
-    return this.service.files.preview(req.workspace,fileId);
+  @Header('Cache-Control', 'no-store')
+  @ApiOperation({ summary: 'Preview a file in this workspace' })
+  preview(
+    @Req() req: WorkspaceRequest,
+    @Param('fileId', new ParseUUIDPipe()) fileId: string,
+  ) {
+    return this.service.files.preview(req.workspace, fileId);
   }
   @Get(':id/files/:fileId/content')
-  @Header('Cache-Control','no-store')
-  @Header('X-Content-Type-Options','nosniff')
-  @ApiOperation({summary:'Read the authenticated file bytes for preview'})
-  content(@Req() req: WorkspaceRequest,@Param('fileId',new ParseUUIDPipe()) fileId:string) {
-    const file=this.service.files.get(req.workspace,fileId);
-    return new StreamableFile(file.content,{type:file.mime,disposition:'attachment'});
+  @Header('Cache-Control', 'no-store')
+  @Header('X-Content-Type-Options', 'nosniff')
+  @ApiOperation({ summary: 'Read the authenticated file bytes for preview' })
+  content(
+    @Req() req: WorkspaceRequest,
+    @Param('fileId', new ParseUUIDPipe()) fileId: string,
+  ) {
+    const file = this.service.files.get(req.workspace, fileId);
+    return new StreamableFile(file.content, {
+      type: file.mime,
+      disposition: 'attachment',
+    });
   }
   @Delete(':id/files/:fileId')
   @HttpCode(200)
-  @ApiOperation({summary:'Remove an attachment explicitly as its owner; not available to the model'})
-  removeFile(@Req() req: WorkspaceRequest,@Param('fileId',new ParseUUIDPipe()) fileId:string) {
-    if(req.workspace.active)throw new ConflictException('Stop the active response before removing a file.');
-    const result=this.service.files.delete(req.workspace,fileId);
-    this.service.store.audit(req.workspace,{tool:'delete_file',tier:'destructive',traceId:req.workspace.id,input:{fileId,initiator:'human'},output:result,status:'succeeded'});
+  @ApiOperation({
+    summary:
+      'Remove an attachment explicitly as its owner; not available to the model',
+  })
+  removeFile(
+    @Req() req: WorkspaceRequest,
+    @Param('fileId', new ParseUUIDPipe()) fileId: string,
+  ) {
+    if (req.workspace.active)
+      throw new ConflictException(
+        'Stop the active response before removing a file.',
+      );
+    const result = this.service.files.delete(req.workspace, fileId);
+    this.service.store.audit(req.workspace, {
+      tool: 'delete_file',
+      tier: 'destructive',
+      traceId: req.workspace.id,
+      input: { fileId, initiator: 'human' },
+      output: result,
+      status: 'succeeded',
+    });
     return result;
   }
   @Post(':id/retrieve')

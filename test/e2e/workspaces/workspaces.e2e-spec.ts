@@ -1,6 +1,8 @@
 import { type INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
+import { docxFixture, pdfFixture } from '../../fixtures/files/documents.js';
+import sharp from 'sharp';
 import { AppModule } from '@/app';
 import { configureApplication } from '@/bootstrap';
 import { validateEnvironment } from '@/config';
@@ -63,6 +65,68 @@ describe('workspaces API security', () => {
       .attach('file', Buffer.alloc(1_048_577), 'large.txt')
       .expect(413);
   });
+  it('previews PDF, DOCX, and images with scoped access, then removes them', async () => {
+    const a = await create(),
+      b = await create();
+    const png = await sharp({
+      create: { width: 24, height: 24, channels: 3, background: '#16a34a' },
+    })
+      .png()
+      .toBuffer();
+    for (const [filename, buffer, mime] of [
+      ['report.pdf', pdfFixture(), 'application/pdf'],
+      [
+        'notes.docx',
+        docxFixture(),
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      ],
+      ['image.png', png, 'image/png'],
+    ] as const) {
+      const uploaded = await request(app.getHttpServer())
+        .post(`/v1/workspaces/${a.id}/files`)
+        .set('Authorization', `Bearer ${a.token}`)
+        .attach('file', buffer, { filename, contentType: mime })
+        .expect(201);
+      const id = uploaded.body.data.id;
+      const list = await request(app.getHttpServer())
+        .get(`/v1/workspaces/${a.id}`)
+        .set('Authorization', `Bearer ${a.token}`)
+        .expect(200);
+      expect(list.body.data.files[0]).not.toHaveProperty('content');
+      expect(list.body.data.files[0]).not.toHaveProperty('text');
+      const preview = await request(app.getHttpServer())
+        .get(`/v1/workspaces/${a.id}/files/${id}/preview`)
+        .set('Authorization', `Bearer ${a.token}`)
+        .expect(200);
+      if (mime !== 'image/png')
+        expect(preview.body.data.text).toContain('PINE-742');
+      await request(app.getHttpServer())
+        .get(`/v1/workspaces/${a.id}/files/${id}/content`)
+        .expect(401);
+      await request(app.getHttpServer())
+        .get(`/v1/workspaces/${a.id}/files/${id}/content`)
+        .set('Authorization', `Bearer ${b.token}`)
+        .expect(401);
+      const content = await request(app.getHttpServer())
+        .get(`/v1/workspaces/${a.id}/files/${id}/content`)
+        .set('Authorization', `Bearer ${a.token}`)
+        .expect(200);
+      expect(content.headers['content-type']).toContain(mime);
+      expect(content.headers['cache-control']).toBe('no-store');
+      await request(app.getHttpServer())
+        .delete(`/v1/workspaces/${a.id}/files/${id}`)
+        .set('Authorization', `Bearer ${b.token}`)
+        .expect(401);
+      await request(app.getHttpServer())
+        .delete(`/v1/workspaces/${a.id}/files/${id}`)
+        .set('Authorization', `Bearer ${a.token}`)
+        .expect(200);
+      await request(app.getHttpServer())
+        .get(`/v1/workspaces/${a.id}/files/${id}/content`)
+        .set('Authorization', `Bearer ${a.token}`)
+        .expect(404);
+    }
+  }, 20_000);
   it('requires an immutable single-use approval before execution', async () => {
     execute.mockClear();
     const a = await create();

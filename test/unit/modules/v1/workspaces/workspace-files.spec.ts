@@ -35,11 +35,14 @@ describe('scoped file extraction', () => {
     ['script.exe', 'text/plain', Buffer.from('hello')],
     ['notes.txt', 'image/png', Buffer.from('hello')],
     ['large.txt', 'text/plain', Buffer.alloc(1_048_577, 65)],
-  ])('rejects invalid upload %s before storing it', async (name, mime, buffer) => {
-    const { files, a } = setup();
-    await expect(
-      files.upload(a, { originalname: name, mimetype: mime, buffer }),
-    ).rejects.toThrow();
-    expect(a.files.size).toBe(0);
-  });
+  ])(
+    'rejects invalid upload %s before storing it',
+    async (name, mime, buffer) => {
+      const { files, a } = setup();
+      await expect(
+        files.upload(a, { originalname: name, mimetype: mime, buffer }),
+      ).rejects.toThrow();
+      expect(a.files.size).toBe(0);
+    },
+  );
 });

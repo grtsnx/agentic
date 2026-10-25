@@ -32,7 +32,9 @@ export function auditSnapshot(value: unknown): unknown {
   const json = JSON.stringify(value ?? null, (key, item: unknown) =>
     /token|secret|password|authorization|api.?key/i.test(key)
       ? '[redacted]'
-      : typeof item === 'string' && item.startsWith('data:image/') ? '[image omitted]' : item,
+      : typeof item === 'string' && item.startsWith('data:image/')
+        ? '[image omitted]'
+        : item,
   ).replace(/\b(?:sk-|lk_)[A-Za-z0-9_-]{12,}\b/g, '[redacted]');
   return json.length > 4_000
     ? { preview: json.slice(0, 4_000), truncated: true }

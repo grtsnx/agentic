@@ -86,4 +86,9 @@ export interface WorkspaceRequest extends Request {
   workspace: WorkspaceScope;
 }
 
-export interface ParsedDocument { text: string; kind: 'text' | 'image' | 'pdf'; content?: Uint8Array; pages?: number; }
+export interface ParsedDocument {
+  text: string;
+  kind: 'text' | 'image' | 'pdf';
+  content?: Uint8Array;
+  pages?: number;
+}

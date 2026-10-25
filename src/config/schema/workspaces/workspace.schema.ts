@@ -39,4 +39,4 @@ export const codeToolSchema = z
   .strict();
 export const deleteFileToolSchema = z.object({ fileId: z.uuid() }).strict();
 
-export const workspaceImageSchema = z.object({fileId:z.uuid()}).strict();
+export const workspaceImageSchema = z.object({ fileId: z.uuid() }).strict();

@@ -133,7 +133,7 @@ The playground displays streamed answers, citations, sources, and usage. For ext
 
 ## Files, actions, and specialists
 
-Click the **+ attach icon** inside the playground message box to upload UTF-8 TXT, Markdown, CSV, or JSON files. Attached files appear as cards above the input; ask about them in chat. Use **Files & actions** to review approvals. Limits are five files, 1 MiB per file, and 2 MiB per workspace. Retrieval returns scoped chunks with filenames and chunk numbers; uploaded text is treated as untrusted evidence. PDF, Office documents, and embedding-based retrieval are not supported yet.
+Click the **+ attach icon** inside the playground message box to upload JPG, PNG, PDF, DOCX, or UTF-8 TXT, Markdown, CSV, and JSON files. Click an attachment card to preview it, or its **×** to remove it. PDFs show one rendered page at a time; DOCX previews show extracted text. Attached files appear above the input; ask about them in chat. Use **Files & actions** to review approvals. Limits are five files, 1 MiB per file, and 2 MiB per workspace. Retrieval returns scoped chunks with filenames and chunk numbers; uploaded text is treated as untrusted evidence. PDF and DOCX text is extracted locally; images can be inspected by the model. Scanned PDFs do not have OCR yet. Parsing is limited to 50 PDF pages, 200,000 extracted document characters, and 10 seconds. Encrypted or malformed documents are rejected. Removing an attachment stops future file access but does not erase quotes already present in chat history. Embedding-based retrieval is not supported yet.
 
 Workspaces expire after 30 minutes, allow one active operation and 50 chat turns, and use an independent bearer capability. The playground keeps that token in memory. REST clients create a workspace with `POST /v1/workspaces` and send its token as `Authorization: Bearer TOKEN` on subsequent workspace routes. Socket.IO clients send `workspaceId` and `workspaceToken` with `chat.send`. See Swagger for upload, retrieval, messages, delegation, approvals, cancellation, and audit endpoints.
 
@@ -208,6 +208,7 @@ src/
 ├── cli/                  # Terminal application context.
 ├── config/               # Runtime configuration and application setup.
 │   ├── agent/            # Shared instructions and tools/ policies, web setup, sandbox limits.
+│   ├── files/            # Bounded document/image parsing worker.
 │   ├── livekit/          # Voice agent, worker, and console setup.
 │   ├── openai/           # Model routing, delegation budgets, and provider errors.
 │   ├── schema/           # Zod schemas and categorized types/.

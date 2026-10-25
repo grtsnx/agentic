@@ -63,12 +63,19 @@ export class PlaygroundController {
   }
 
   @Get('pdf.js')
-  @Header('Cache-Control','no-cache')
-  pdfScript():StreamableFile {return this.file(getPdfPreviewScript(),'text/javascript; charset=utf-8');}
+  @Header('Cache-Control', 'no-cache')
+  pdfScript(): StreamableFile {
+    return this.file(getPdfPreviewScript(), 'text/javascript; charset=utf-8');
+  }
 
   @Get('pdf.worker.js')
-  @Header('Cache-Control','no-cache')
-  pdfWorker():StreamableFile {return this.file(getPdfPreviewScript(true),'text/javascript; charset=utf-8');}
+  @Header('Cache-Control', 'no-cache')
+  pdfWorker(): StreamableFile {
+    return this.file(
+      getPdfPreviewScript(true),
+      'text/javascript; charset=utf-8',
+    );
+  }
 
   @Get('styles.css')
   @Header('Cache-Control', 'no-store')

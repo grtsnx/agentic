@@ -155,7 +155,8 @@ export class CliService {
         const { bytesRead } = await file.read(buffer, 0, buffer.length, 0);
         const uploaded = await service.files.upload(scope, {
           originalname: basename(argument),
-          mimetype: FILE_MIME_TYPES[extname(argument).slice(1).toLowerCase()] ?? '',
+          mimetype:
+            FILE_MIME_TYPES[extname(argument).slice(1).toLowerCase()] ?? '',
           buffer: buffer.subarray(0, bytesRead),
         });
         output.write(`Attached ${uploaded.filename}\n`);
