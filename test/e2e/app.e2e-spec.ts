@@ -135,6 +135,44 @@ describe('AppController (e2e)', () => {
     expect(v2.body.paths).not.toHaveProperty('/v1');
   });
 
+  it('adds standard response examples to every documented operation', async () => {
+    const { body } = await request(app.getHttpServer())
+      .get('/api/v1-json')
+      .expect(200);
+    const responses = body.paths['/v1/chat'].post.responses;
+
+    expect(Object.keys(responses)).toEqual(
+      expect.arrayContaining([
+        '200',
+        '400',
+        '401',
+        '403',
+        '404',
+        '409',
+        '422',
+        '429',
+        '500',
+        '503',
+      ]),
+    );
+    expect(responses['200'].content['application/json'].example).toEqual({
+      statusCode: 200,
+      statusType: 'OK',
+      message: 'Success',
+      data: {
+        message: 'The Roman Republic ended after civil conflict.',
+      },
+    });
+    expect(responses['429'].content['application/json'].example).toEqual({
+      statusCode: 429,
+      statusType: 'TOO_MANY_REQUESTS',
+      message: 'Too many requests',
+      path: '/v1/chat',
+      requestId: 'example-request-id',
+      timestamp: '2026-01-01T00:00:00.000Z',
+    });
+  });
+
   it('serves Swagger with consistent themes and a compact version picker', async () => {
     const response = await request(app.getHttpServer()).get('/api').expect(200);
     const initializer = await request(app.getHttpServer())
@@ -158,6 +196,7 @@ describe('AppController (e2e)', () => {
       'setAttribute("aria-label", "API version")',
     );
     expect(initializer.text).toContain('setAttribute("aria-label", label)');
+    expect(initializer.text).toContain('"defaultModelsExpandDepth": -1');
     expect(response.text).toContain('html.dark-mode body');
   });
 

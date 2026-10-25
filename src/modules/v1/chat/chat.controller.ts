@@ -1,7 +1,7 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
-  ApiCreatedResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
@@ -14,8 +14,9 @@ export class ChatV1Controller {
   constructor(private readonly chatService: ChatV1Service) {}
 
   @Post()
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Send a message to the AI agent' })
-  @ApiCreatedResponse({ type: ChatV1ResponseDto })
+  @ApiOkResponse({ type: ChatV1ResponseDto })
   @ApiBadRequestResponse({ description: 'The message is invalid.' })
   sendMessage(@Body() request: ChatV1RequestDto): Promise<ChatV1ResponseDto> {
     return this.chatService.sendMessage(request.message);

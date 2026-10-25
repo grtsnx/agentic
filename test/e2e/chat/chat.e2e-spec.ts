@@ -31,11 +31,11 @@ describe('ChatController (e2e)', () => {
       const response = await request(app.getHttpServer())
         .post(path)
         .send({ message: '  Explain the Roman Republic  ' })
-        .expect(201);
+        .expect(200);
 
       expect(generateReply).toHaveBeenCalledWith('Explain the Roman Republic');
       expect(response.body).toMatchObject({
-        statusCode: 201,
+        statusCode: 200,
         data: { message: 'Test response' },
       });
     },

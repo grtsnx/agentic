@@ -1,10 +1,140 @@
-import type { INestApplication } from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { HttpStatus, type INestApplication } from '@nestjs/common';
+import {
+  DocumentBuilder,
+  SwaggerModule,
+  type OpenAPIObject,
+  type OperationObject,
+  type ReferenceObject,
+  type ResponseObject,
+  type SchemaObject,
+} from '@nestjs/swagger';
 import { apiReference } from '@scalar/nestjs-api-reference';
 import type { Environment } from '@/config';
 
 const apiVersions = ['1', '2'] as const;
 type ApiVersion = (typeof apiVersions)[number];
+
+const operationMethods = [
+  'get',
+  'put',
+  'post',
+  'delete',
+  'options',
+  'head',
+  'patch',
+  'trace',
+] as const;
+
+const standardErrors = {
+  400: 'Bad request',
+  401: 'Unauthorized',
+  403: 'Forbidden',
+  404: 'Not found',
+  409: 'Conflict',
+  422: 'Unprocessable entity',
+  429: 'Too many requests',
+  500: 'Internal server error',
+  503: 'Service unavailable',
+} as const;
+
+function isReferenceObject(
+  value: SchemaObject | ReferenceObject,
+): value is ReferenceObject {
+  return '$ref' in value;
+}
+
+function schemaExample(
+  document: OpenAPIObject,
+  schema: SchemaObject | ReferenceObject | undefined,
+): unknown {
+  if (!schema) return undefined;
+
+  if (isReferenceObject(schema)) {
+    const name = schema.$ref.split('/').at(-1);
+    const resolved = name ? document.components?.schemas?.[name] : undefined;
+    return resolved ? schemaExample(document, resolved) : undefined;
+  }
+
+  if (schema.example !== undefined) return schema.example;
+  if (schema.default !== undefined) return schema.default;
+  if (schema.enum?.length) return schema.enum[0];
+
+  if (schema.type === 'array') {
+    const item = schemaExample(document, schema.items);
+    return item === undefined ? [] : [item];
+  }
+
+  if (schema.type === 'object' || schema.properties) {
+    return Object.fromEntries(
+      Object.entries(schema.properties ?? {}).map(([name, property]) => [
+        name,
+        schemaExample(document, property),
+      ]),
+    );
+  }
+
+  if (schema.type === 'boolean') return false;
+  if (schema.type === 'integer' || schema.type === 'number') return 0;
+  if (schema.type === 'string') return 'string';
+
+  return undefined;
+}
+
+function addResponseExample(
+  document: OpenAPIObject,
+  response: ResponseObject,
+  statusCode: number,
+): void {
+  const mediaType = ((response.content ??= {})['application/json'] ??= {});
+  if (mediaType.example !== undefined || mediaType.examples) return;
+
+  const data = schemaExample(document, mediaType.schema);
+  mediaType.example = {
+    statusCode,
+    statusType: HttpStatus[statusCode],
+    message: 'Success',
+    ...(data === undefined ? {} : { data }),
+  };
+}
+
+function addStandardResponseExamples(document: OpenAPIObject): void {
+  for (const [path, pathItem] of Object.entries(document.paths)) {
+    for (const method of operationMethods) {
+      const operation: OperationObject | undefined = pathItem[method];
+      if (!operation) continue;
+
+      for (const [status, response] of Object.entries(operation.responses)) {
+        if (!response || '$ref' in response) continue;
+        const statusCode = Number(status);
+        if (statusCode >= 200 && statusCode < 300) {
+          addResponseExample(document, response, statusCode);
+        }
+      }
+
+      for (const [status, message] of Object.entries(standardErrors)) {
+        const statusCode = Number(status);
+        const current = operation.responses[status];
+        const response: ResponseObject =
+          current && !('$ref' in current) ? current : { description: message };
+        const mediaType = ((response.content ??= {})['application/json'] ??=
+          {});
+
+        if (mediaType.example === undefined && !mediaType.examples) {
+          mediaType.example = {
+            statusCode,
+            statusType: HttpStatus[statusCode],
+            message,
+            path,
+            requestId: 'example-request-id',
+            timestamp: '2026-01-01T00:00:00.000Z',
+          };
+        }
+
+        operation.responses[status] = response;
+      }
+    }
+  }
+}
 
 export function configureSwagger(
   app: INestApplication,
@@ -29,6 +159,7 @@ export function configureSwagger(
         ([path]) => path === prefix || path.startsWith(`${prefix}/`),
       ),
     );
+    addStandardResponseExamples(document);
     return document;
   };
 
@@ -74,6 +205,7 @@ export function configureSwagger(
       '.swagger-ui .info .title .api-theme-toggle:hover { opacity: .75; }',
     ].join('\n'),
     swaggerOptions: {
+      defaultModelsExpandDepth: -1,
       persistAuthorization: false,
       urls: apiVersions.map((version) => ({
         url: `/api/v${version}-json`,
