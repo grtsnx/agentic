@@ -59,9 +59,7 @@ describe('development process lifecycle', () => {
     expect(mocks.spawn).toHaveBeenCalledTimes(2);
     expect(mocks.spawn.mock.calls[1]![1]).toEqual([
       expect.stringMatching(/voice\.js$/),
-      'start',
-      '--log-level',
-      'info',
+      'local',
     ]);
     expect(mocks.spawn.mock.calls[1]![2]).toMatchObject({
       shell: false,

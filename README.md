@@ -19,7 +19,9 @@ bun run start:dev
 
 This starts the API and automatically starts the LiveKit worker when `VOICE_ENABLED=true` in `.env`. One Nest watcher rebuilds and restarts both on source changes. Ctrl+C stops both; an unexpected service exit stops its sibling and reports a failure. Use `bun run start:dev:api` for API-only development. Restart the command after changing `.env`. Do not also run `voice:dev` when the combined command owns the worker.
 
-The Nest supervisor runs the voice worker with the supported SDK `start` command. Nest owns reloads, so the deprecated SDK `dev` command and a second LiveKit file watcher are unnecessary. Both processes use the same `.env`. The standalone `voice:dev` command builds once; rerun it after source changes.
+The Nest supervisor runs a local [LiveKit AgentServer](https://docs.livekit.io/reference/agents-js/classes/agents.AgentServer.html) with readable logs, no idle worker pool, and a dynamically assigned loopback health port. Nest owns reloads, so there is no deprecated CLI command or second watcher. Both processes use the same `.env`. The standalone `voice:dev` command builds once; rerun it after source changes. Production `voice:start` retains the SDK's structured logs and standard health port.
+
+After `bun run build`, verify development worker registration and shutdown with `RUN_LIVEKIT_WORKER_SMOKE=true node --env-file=.env test/smoke/livekit-worker.smoke.mjs`. This requires valid LiveKit credentials and registers an isolated worker without opening a room or microphone.
 
 | Interface  | URL or command                   |
 | ---------- | -------------------------------- |

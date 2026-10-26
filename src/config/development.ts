@@ -89,13 +89,8 @@ export async function runDevelopment(): Promise<number> {
           : '[Development] Starting API only (VOICE_ENABLED=false).',
       );
       start('API', 'main.js');
-      // Nest already handles reloads; use the supported worker start command.
-      if (VOICE_ENABLED)
-        start('LiveKit voice worker', 'voice.js', [
-          'start',
-          '--log-level',
-          'info',
-        ]);
+      // Nest owns reloads; local mode keeps the worker's development settings.
+      if (VOICE_ENABLED) start('LiveKit voice worker', 'voice.js', ['local']);
     } catch {
       console.error('[Development] Could not start development services.');
       stop(1);

@@ -17,7 +17,7 @@
     "build": "nest build && tsc-alias -p tsconfig.build.json",
     "chat": "nest start --entryFile cli --env-file .env",
     "chat:prod": "node --env-file=.env dist/cli.js",
-    "voice:dev": "bun run build && node --env-file=.env dist/voice.js start",
+    "voice:dev": "bun run build && node --env-file=.env dist/voice.js local",
     "voice:start": "node --env-file=.env dist/voice.js start",
     "voice:console": "bun run build && node --env-file=.env dist/config/livekit/livekit-console.js",
     "voice:devices": "lk agent console --list-devices",
