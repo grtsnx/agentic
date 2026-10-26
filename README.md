@@ -19,6 +19,8 @@ bun run start:dev
 
 This starts the API and automatically starts the LiveKit worker when `VOICE_ENABLED=true` in `.env`. One Nest watcher rebuilds and restarts both on source changes. Ctrl+C stops both; an unexpected service exit stops its sibling and reports a failure. Use `bun run start:dev:api` for API-only development. Restart the command after changing `.env`. Do not also run `voice:dev` when the combined command owns the worker.
 
+The Nest supervisor runs the voice worker with the supported SDK `start` command. Nest owns reloads, so the deprecated SDK `dev` command and a second LiveKit file watcher are unnecessary. Both processes use the same `.env`. The standalone `voice:dev` command builds once; rerun it after source changes.
+
 | Interface  | URL or command                   |
 | ---------- | -------------------------------- |
 | Playground | http://localhost:3001/playground |
