@@ -183,7 +183,7 @@ Use the pencil below a sent text message, edit it inline, then choose **Update**
 
 ### Local browser and Mac apps
 
-The computer icon in the playground connects **one conversation at a time** to your Mac. Send a first message, open the icon, enter `COMPUTER_ACCESS_TOKEN` from your local `.env`, and choose **Browser on this Mac** or **Mac apps**. Keep the key out of chat. It is cleared from the form after connecting and is never added to model context.
+The computer icon in the playground connects **one conversation at a time** to your Mac. Send a first message, open the icon, and choose **Browser on this Mac** or **Mac apps**. No access key needs copying. Connections require a same-origin browser request over the actual loopback interface; remote callers, forwarded localhost headers, cross-site requests, and mismatched hosts are rejected. This is for a trusted single-user machine, not authorization against other local processes.
 
 ```bash
 # Optional native desktop adapter, installed only in this project:
@@ -193,7 +193,7 @@ uv pip install --python .computer-venv/bin/python macos-harness==0.2.1
 MACOS_HARNESS_HOME="$PWD/.computer-runtime/macos" DO_NOT_TRACK=1 .computer-venv/bin/macos-harness doctor --json
 ```
 
-Set `COMPUTER_ENABLED=true` and generate `COMPUTER_ACCESS_TOKEN` with `openssl rand -hex 32`. `COMPUTER_ALLOWED_APPS` contains exact macOS bundle IDs, initially `com.apple.TextEdit`. `COMPUTER_BROWSER_DOMAINS` contains permitted public websites; the default is `example.com`. Restart the API after editing `.env`. Native app access requires Accessibility and Screen Recording for the application launching Agentic under **System Settings → Privacy & Security**. Run the diagnostic from your own terminal: permissions granted to Codex or ChatGPT do not prove your terminal is authorized. The integration does not change OS permissions automatically.
+Set `COMPUTER_ENABLED=true`. `COMPUTER_ALLOWED_APPS=*` allows any Mac app by name or bundle ID. To restrict it later, replace `*` with a comma-separated list of bundle IDs. macOS protected authentication dialogs and the adapter’s own host remain protected. `COMPUTER_BROWSER_DOMAINS` contains permitted public websites; the default is `example.com`. Restart the API after editing `.env`. Native app access requires Accessibility and Screen Recording for the application launching Agentic under **System Settings → Privacy & Security**. Run the diagnostic from your own terminal: permissions granted to Codex or ChatGPT do not prove your terminal is authorized. The integration does not change OS permissions automatically.
 
 Browser mode uses installed Google Chrome in a temporary profile, without copying your existing cookies, extensions, or tabs. It supports reading pages, screenshots, navigation, indexed clicks and input, limited keys, and scrolling. Native Mac mode uses macOS Harness accessibility reads and indexed actions on allowed apps; open TextEdit with a scratch document to test. It does not provide a native desktop screenshot stream yet. Screen/page content sent to the model is untrusted evidence. Each action requires an **Approve once** card; observations are bound to a ten-minute connection and a single conversation. If the page or app changes, the action is rejected and must be proposed again. This check reduces stale actions but cannot make external UI changes transactional.
 
@@ -206,9 +206,13 @@ bun run build
 RUN_COMPUTER_SMOKE=true node test/smoke/computer.smoke.mjs
 # Also read an open TextEdit scratch document, without logging its contents:
 RUN_COMPUTER_SMOKE=true RUN_MACOS_READ_SMOKE=true node test/smoke/computer.smoke.mjs
+# Paid model contract check using a synthetic fixture, no actual screen data:
+RUN_COMPUTER_AGENT_SMOKE=true node --env-file=.env test/smoke/computer-agent.smoke.mjs
 ```
 
-REST/Socket.IO callers can connect their workspace using `POST /v1/workspaces/:id/computer` with `{ "accessToken": "LOCAL_OWNER_KEY", "target": "browser" }` and the workspace bearer token. Use `/computer/observe` with `{}` or `{ "app": "com.apple.TextEdit" }`, and `/computer/stop` to revoke. The model only proposes actions through the existing workspace approval flow. The playground uses equivalent owner-authenticated thread routes so history threads cannot share computer access.
+For the opt-in native write check, create an unsaved TextEdit document containing only `Agentic integration test scratch 7219`, then run `RUN_MACOS_WRITE_SMOKE=true node test/smoke/macos-write.smoke.mjs`. It replaces that test text after a single-use approval and verifies the result without sending screen data to a model. Discard the scratch document afterward.
+
+REST/Socket.IO callers can connect their workspace using `POST /v1/workspaces/:id/computer` with `{ "target": "browser" }` and the workspace bearer token. These routes also require an actual loopback connection, an exact local `Origin`/`Host` pair, and `Sec-Fetch-Site: same-origin`; they are intended for the local playground, not a remotely hosted API. Use `/computer/observe` with `{}` or `{ "app": "com.apple.TextEdit" }`, and `/computer/stop` to revoke. The model only proposes actions through the existing workspace approval flow. The playground uses equivalent owner-authenticated thread routes so history threads cannot share computer access.
 
 ### Local code sandbox
 
@@ -430,7 +434,8 @@ Ordered from foundations to advanced capabilities. ✅ Verified complete · ⬜ 
 
 - ✅ Verify local Chrome navigation, text/screenshot capture, single-use approval, blocked destinations, and Stop with a real browser smoke test.
 - ✅ Verify native TextEdit accessibility reads through the installed macOS adapter.
-- ⬜ Validate native Mac writes, broader app compatibility, and a live desktop screenshot view.
+- ✅ Verify an approved native TextEdit write in a disposable scratch document.
+- ⬜ Validate broader Mac app compatibility and add a live desktop screenshot view.
 
 - ⬜ Add browser navigation, page reading, screenshots, and accessible element inspection in an isolated browser session.
 - ⬜ Support clicking, typing, forms, uploads, and downloads through the existing permission tiers and human approvals.

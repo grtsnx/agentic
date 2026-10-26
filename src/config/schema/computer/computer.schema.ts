@@ -57,3 +57,52 @@ export const macosObservationSchema = z.object({
 });
 
 export const macosDoctorSchema = z.object({ ready: z.boolean() }).passthrough();
+
+// Describe conditional requirements in JSON Schema, not only a local refinement.
+// This keeps small models from filling irrelevant fields for a navigation action.
+export const computerToolActionSchema = z
+  .object({
+    observationId: z.uuid(),
+    action: z.discriminatedUnion('kind', [
+      z
+        .object({
+          kind: z.literal('navigate'),
+          url: z.string().max(2000).describe('Absolute public HTTP(S) URL'),
+        })
+        .strict(),
+      z
+        .object({
+          kind: z.literal('click'),
+          index: z.number().int().min(0).max(10000),
+        })
+        .strict(),
+      z
+        .object({
+          kind: z.literal('type'),
+          index: z.number().int().min(0).max(10000),
+          text: z.string().max(2000),
+        })
+        .strict(),
+      z
+        .object({
+          kind: z.literal('key'),
+          key: z.enum([
+            'Enter',
+            'Tab',
+            'Escape',
+            'ArrowDown',
+            'ArrowUp',
+            'Backspace',
+          ]),
+        })
+        .strict(),
+      z
+        .object({
+          kind: z.literal('scroll'),
+          index: z.number().int().min(0).max(10000),
+          direction: z.enum(['up', 'down']),
+        })
+        .strict(),
+    ]),
+  })
+  .strict();

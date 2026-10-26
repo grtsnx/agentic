@@ -1,9 +1,11 @@
 import { tool } from '@openai/agents';
 import {
-  computerActionSchema,
+  computerToolActionSchema,
   computerObserveSchema,
 } from '../../schema/computer/computer.schema.js';
 import type {
+  ComputerToolAction,
+  ComputerAction,
   WorkspaceScope,
   WorkspaceAction,
   ToolAudit,
@@ -60,18 +62,50 @@ export function createComputerTools(
     tool({
       name: 'computer_action',
       description:
-        'Propose one exact browser or Mac UI action for human approval. NEVER executes. Use the observationId and element index from the latest observation. navigate needs URL with null index; click needs index and null value; type replaces an indexed input with value; key uses Enter/Tab/Escape/ArrowDown/ArrowUp/Backspace with null index; scroll uses index and up/down value. Do not retry uncertain actions.',
-      parameters: computerActionSchema,
-      execute: (args) => propose(computer.proposal(scope.id, args)),
+        'Propose one exact browser or Mac UI action for human approval. NEVER executes. Use the observationId and element index from the latest observation. navigate needs url; click needs index; type replaces an indexed input with text; key needs key; scroll needs index and direction. Do not retry uncertain actions.',
+      parameters: computerToolActionSchema,
+      execute: (args) =>
+        propose(computer.proposal(scope.id, normalizeComputerAction(args))),
     }),
   ];
 }
 
-export function describeComputerAction(action: import('../../schema/types/computer/computer.types.js').ComputerApprovedAction):string {
-  const operation=action.kind==='navigate' ? 'Open '+action.value
-    : action.kind==='click' ? 'Click element '+action.index
-    : action.kind==='type' ? 'Replace text in element '+action.index+' with: '+JSON.stringify(action.value)
-    : action.kind==='key' ? 'Press '+action.value
-    : 'Scroll element '+action.index+' '+action.value;
-  return operation+'\n\nObserved target:\n'+action.context;
+export function describeComputerAction(
+  action: import('../../schema/types/computer/computer.types.js').ComputerApprovedAction,
+): string {
+  const operation =
+    action.kind === 'navigate'
+      ? 'Open ' + action.value
+      : action.kind === 'click'
+        ? 'Click element ' + action.index
+        : action.kind === 'type'
+          ? 'Replace text in element ' +
+            action.index +
+            ' with: ' +
+            JSON.stringify(action.value)
+          : action.kind === 'key'
+            ? 'Press ' + action.value
+            : 'Scroll element ' + action.index + ' ' + action.value;
+  return operation + '\n\nObserved target:\n' + action.context;
+}
+
+export function normalizeComputerAction(
+  input: ComputerToolAction,
+): ComputerAction {
+  const { action } = input;
+  return {
+    observationId: input.observationId,
+    kind: action.kind,
+    index: 'index' in action ? action.index : null,
+    value:
+      action.kind === 'navigate'
+        ? action.url
+        : action.kind === 'type'
+          ? action.text
+          : action.kind === 'key'
+            ? action.key
+            : action.kind === 'scroll'
+              ? action.direction
+              : null,
+  };
 }

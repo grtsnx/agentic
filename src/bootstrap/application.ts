@@ -104,9 +104,10 @@ export async function createApplication(): Promise<{
       'REALTIME_PLAYGROUND_ENABLED',
     ),
     COMPUTER_ENABLED: config.getOrThrow<boolean>('COMPUTER_ENABLED'),
-    COMPUTER_ACCESS_TOKEN: config.getOrThrow<string>('COMPUTER_ACCESS_TOKEN'),
     COMPUTER_ALLOWED_APPS: config.getOrThrow<string[]>('COMPUTER_ALLOWED_APPS'),
-    COMPUTER_BROWSER_DOMAINS: config.getOrThrow<string[]>('COMPUTER_BROWSER_DOMAINS'),
+    COMPUTER_BROWSER_DOMAINS: config.getOrThrow<string[]>(
+      'COMPUTER_BROWSER_DOMAINS',
+    ),
     COMPUTER_MACOS_BINARY: config.getOrThrow<string>('COMPUTER_MACOS_BINARY'),
     SANDBOX_ENABLED: config.getOrThrow<boolean>('SANDBOX_ENABLED'),
     CHATKIT_DOMAIN_KEY: config.getOrThrow<string>('CHATKIT_DOMAIN_KEY'),

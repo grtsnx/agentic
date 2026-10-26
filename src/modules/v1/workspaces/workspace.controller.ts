@@ -1,3 +1,4 @@
+import { LocalComputerGuard } from '@/middleware';
 import {
   Body,
   Controller,
@@ -155,20 +156,43 @@ export class WorkspaceController {
   retrieve(@Req() req: WorkspaceRequest, @Body() body: WorkspaceSearchDto) {
     return this.service.files.search(req.workspace, body.query, body.fileIds);
   }
+  @UseGuards(LocalComputerGuard)
   @Post(':id/computer')
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
-  @ApiOperation({summary:'Connect a local computer to this workspace with the owner key'})
-  connectComputer(@Req() req:WorkspaceRequest,@Body() body:ComputerConnectDto) { return this.service.computer.connect(req.workspace,body.accessToken,body.target); }
+  @ApiOperation({
+    summary: 'Connect a local computer to this workspace from this Mac',
+  })
+  connectComputer(
+    @Req() req: WorkspaceRequest,
+    @Body() body: ComputerConnectDto,
+  ) {
+    return this.service.computer.connect(req.workspace, body.target);
+  }
+  @UseGuards(LocalComputerGuard)
   @Post(':id/computer/observe')
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
-  @ApiOperation({summary:'Read the connected browser or an allowed Mac app'})
-  observeComputer(@Req() req:WorkspaceRequest,@Body() body:ComputerObserveDto) { return this.service.computer.observe(req.workspace.id,body.app??null,req.workspace.abort.signal); }
+  @ApiOperation({ summary: 'Read the connected browser or an allowed Mac app' })
+  observeComputer(
+    @Req() req: WorkspaceRequest,
+    @Body() body: ComputerObserveDto,
+  ) {
+    return this.service.computer.observe(
+      req.workspace.id,
+      body.app ?? null,
+      req.workspace.abort.signal,
+    );
+  }
+  @UseGuards(LocalComputerGuard)
   @Post(':id/computer/stop')
   @HttpCode(200)
-  @ApiOperation({summary:'Revoke local computer access'})
-  async stopComputer(@Req() req:WorkspaceRequest) { req.workspace.active?.abort();await this.service.computer.disconnect(req.workspace.id);return {stopped:true}; }
+  @ApiOperation({ summary: 'Revoke local computer access' })
+  async stopComputer(@Req() req: WorkspaceRequest) {
+    req.workspace.active?.abort();
+    await this.service.computer.disconnect(req.workspace.id);
+    return { stopped: true };
+  }
   @Post(':id/messages')
   @HttpCode(200)
   @ApiOperation({ summary: 'Chat with scoped files, tools, and approvals' })

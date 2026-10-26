@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import type {
   computerActionSchema,
+  computerToolActionSchema,
   computerApprovedActionSchema,
   computerTargetSchema,
 } from '../../computer/computer.schema.js';
@@ -29,3 +30,5 @@ export interface ComputerLease {
   observation?: ComputerObservation;
   busy: boolean;
 }
+
+export type ComputerToolAction = z.infer<typeof computerToolActionSchema>;

@@ -6,7 +6,7 @@ import {
   type OnModuleDestroy,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createHash, timingSafeEqual, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { BrowserService, MacosService } from '@/lib';
 import {
   computerActionSchema,
@@ -29,7 +29,6 @@ export class ComputerService implements OnModuleDestroy {
   ) {}
   async connect(
     scope: { id: string; abort: AbortController; active?: AbortController },
-    token: string,
     target: ComputerTarget,
   ) {
     if (
@@ -39,12 +38,11 @@ export class ComputerService implements OnModuleDestroy {
       throw new ServiceUnavailableException(
         'Local computer access is disabled.',
       );
-    const expected = this.config.get<string>('COMPUTER_ACCESS_TOKEN') ?? '';
-    const hash = (value: string) => createHash('sha256').update(value).digest();
-    if (expected.length < 32 || !timingSafeEqual(hash(expected), hash(token)))
-      throw new ForbiddenException('Invalid local computer access key.');
     scope.abort.signal.throwIfAborted();
-    if(scope.active)throw new ConflictException('Finish the active response before connecting the computer.');
+    if (scope.active)
+      throw new ConflictException(
+        'Finish the active response before connecting the computer.',
+      );
     if (this.lease || this.closing || this.cleanupFailed)
       throw new ConflictException('Stop the current computer session first.');
     const abort = new AbortController();
@@ -66,7 +64,7 @@ export class ComputerService implements OnModuleDestroy {
     try {
       if (target === 'browser') await this.browser.open(abort.signal);
       abort.signal.throwIfAborted();
-      lease.busy=false;
+      lease.busy = false;
       return this.status(scope.id);
     } catch (error) {
       await this.disconnect(scope.id);
@@ -104,8 +102,8 @@ export class ComputerService implements OnModuleDestroy {
     if (
       lease.target === 'desktop' &&
       (!app ||
-        !(this.config.get<string[]>('COMPUTER_ALLOWED_APPS') ?? []).includes(
-          app,
+        !(this.config.get<string[]>('COMPUTER_ALLOWED_APPS') ?? []).some(
+          (allowed) => allowed === '*' || allowed === app,
         ))
     )
       throw new ForbiddenException('App is not in COMPUTER_ALLOWED_APPS.');
@@ -144,13 +142,39 @@ export class ComputerService implements OnModuleDestroy {
       throw new ForbiddenException(
         'Navigation is only supported in the browser.',
       );
-    const lines=lease.observation.text.split('\n');
-    const context=lease.target==='browser' ? (()=>{
-      try { const state=JSON.parse(lease.observation!.text);return JSON.stringify({title:state.title,url:state.url,element:action.index===null?undefined:state.elements?.find((item:{index:number})=>item.index===action.index)}); }
-      catch { return lease.observation!.text; }
-    })() : lines.filter((line,index)=>index<8||(action.index!==null&&new RegExp('^\\s*(?:\\[)?'+action.index+'(?:\\]|\\s|:)').test(line))).join('\n');
+    const lines = lease.observation.text.split('\n');
+    const context =
+      lease.target === 'browser'
+        ? (() => {
+            try {
+              const state = JSON.parse(lease.observation!.text);
+              return JSON.stringify({
+                title: state.title,
+                url: state.url,
+                element:
+                  action.index === null
+                    ? undefined
+                    : state.elements?.find(
+                        (item: { index: number }) =>
+                          item.index === action.index,
+                      ),
+              });
+            } catch {
+              return lease.observation!.text;
+            }
+          })()
+        : lines
+            .filter(
+              (line, index) =>
+                index < 8 ||
+                (action.index !== null &&
+                  new RegExp(
+                    '^\\s*(?:\\[)?' + action.index + '(?:\\]|\\s|:)',
+                  ).test(line)),
+            )
+            .join('\n');
     return {
-      context: context.slice(0,4000),
+      context: context.slice(0, 4000),
       ...action,
       tool: 'computer_action',
       leaseId: lease.id,

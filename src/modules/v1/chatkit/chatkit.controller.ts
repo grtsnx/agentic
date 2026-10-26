@@ -1,6 +1,8 @@
+import { LocalComputerGuard } from '@/middleware';
 import { ComputerConnectDto, ComputerObserveDto } from '@/dto';
 import {
   Body,
+  UseGuards,
   Controller,
   Header,
   Get,
@@ -94,31 +96,69 @@ export class ChatkitController {
     );
   }
 
+  @UseGuards(LocalComputerGuard)
   @Post(':id/threads/:threadId/computer')
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
-  @ApiOperation({summary:'Connect this conversation to a local computer using its owner key'})
-  connectComputer(@Param('id',new ParseUUIDPipe()) id:string,@Param('threadId',new ParseUUIDPipe()) threadId:string,@Req() req:Request,@Body() body:ComputerConnectDto) {
+  @ApiOperation({
+    summary: 'Connect this conversation to a local computer from this Mac',
+  })
+  connectComputer(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('threadId', new ParseUUIDPipe()) threadId: string,
+    @Req() req: Request,
+    @Body() body: ComputerConnectDto,
+  ) {
     this.requireEnabled();
-    const scope=this.service.computerScope(this.service.authorize(id,req.headers.authorization),threadId);
-    return this.service.computer.connect(scope,body.accessToken,body.target);
+    const scope = this.service.computerScope(
+      this.service.authorize(id, req.headers.authorization),
+      threadId,
+    );
+    return this.service.computer.connect(scope, body.target);
   }
+  @UseGuards(LocalComputerGuard)
   @Post(':id/threads/:threadId/computer/observe')
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
-  @ApiOperation({summary:'Read the connected computer; screen contents are untrusted'})
-  observeComputer(@Param('id',new ParseUUIDPipe()) id:string,@Param('threadId',new ParseUUIDPipe()) threadId:string,@Req() req:Request,@Body() body:ComputerObserveDto) {
+  @ApiOperation({
+    summary: 'Read the connected computer; screen contents are untrusted',
+  })
+  observeComputer(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('threadId', new ParseUUIDPipe()) threadId: string,
+    @Req() req: Request,
+    @Body() body: ComputerObserveDto,
+  ) {
     this.requireEnabled();
-    const scope=this.service.computerScope(this.service.authorize(id,req.headers.authorization),threadId);
-    return this.service.computer.observe(scope.id,body.app??null,scope.abort.signal);
+    const scope = this.service.computerScope(
+      this.service.authorize(id, req.headers.authorization),
+      threadId,
+    );
+    return this.service.computer.observe(
+      scope.id,
+      body.app ?? null,
+      scope.abort.signal,
+    );
   }
+  @UseGuards(LocalComputerGuard)
   @Post(':id/threads/:threadId/computer/stop')
   @HttpCode(200)
-  @ApiOperation({summary:'Revoke computer access and stop the conversation operation'})
-  async stopComputer(@Param('id',new ParseUUIDPipe()) id:string,@Param('threadId',new ParseUUIDPipe()) threadId:string,@Req() req:Request) {
+  @ApiOperation({
+    summary: 'Revoke computer access and stop the conversation operation',
+  })
+  async stopComputer(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('threadId', new ParseUUIDPipe()) threadId: string,
+    @Req() req: Request,
+  ) {
     this.requireEnabled();
-    const scope=this.service.computerScope(this.service.authorize(id,req.headers.authorization),threadId);
-    scope.active?.abort();await this.service.computer.disconnect(scope.id);return {stopped:true};
+    const scope = this.service.computerScope(
+      this.service.authorize(id, req.headers.authorization),
+      threadId,
+    );
+    scope.active?.abort();
+    await this.service.computer.disconnect(scope.id);
+    return { stopped: true };
   }
   private requireEnabled() {
     if (!this.config.getOrThrow<boolean>('REALTIME_PLAYGROUND_ENABLED'))
