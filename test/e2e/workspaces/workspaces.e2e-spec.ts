@@ -1,5 +1,6 @@
 import { type INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import request from 'supertest';
 import { docxFixture, pdfFixture } from '../../fixtures/files/documents.js';
 import sharp from 'sharp';
@@ -21,6 +22,8 @@ describe('workspaces API security', () => {
       .overrideProvider(SandboxService)
       .useValue({ execute })
       .compile();
+    // Never launch the developer's computer adapter from an API security test.
+    module.get(ConfigService).set('COMPUTER_ENABLED', false);
     app = module.createNestApplication({ logger: false });
     configureApplication(app, validateEnvironment({ NODE_ENV: 'test' }));
     await app.init();
@@ -31,10 +34,21 @@ describe('workspaces API security', () => {
   const create = async () =>
     (await request(app.getHttpServer()).post('/v1/workspaces').expect(201)).body
       .data as { id: string; token: string };
-  it('requires local same-origin browser consent for computer access without an env key',async()=>{
-    const a=await create();
-    await request(app.getHttpServer()).post(`/v1/workspaces/${a.id}/computer`).set('Authorization',`Bearer ${a.token}`).send({target:'browser'}).expect(403);
-    await request(app.getHttpServer()).post(`/v1/workspaces/${a.id}/computer`).set('Authorization',`Bearer ${a.token}`).set('Host','localhost:3001').set('Origin','http://localhost:3001').set('Sec-Fetch-Site','same-origin').send({target:'browser'}).expect(503);
+  it('requires local same-origin browser consent for computer access without an env key', async () => {
+    const a = await create();
+    await request(app.getHttpServer())
+      .post(`/v1/workspaces/${a.id}/computer`)
+      .set('Authorization', `Bearer ${a.token}`)
+      .send({ target: 'browser' })
+      .expect(403);
+    await request(app.getHttpServer())
+      .post(`/v1/workspaces/${a.id}/computer`)
+      .set('Authorization', `Bearer ${a.token}`)
+      .set('Host', 'localhost:3001')
+      .set('Origin', 'http://localhost:3001')
+      .set('Sec-Fetch-Site', 'same-origin')
+      .send({ target: 'browser' })
+      .expect(503);
   });
   it('rejects unauthorized access and isolates uploads', async () => {
     const a = await create();
