@@ -6,6 +6,11 @@ import { randomUUID } from 'node:crypto';
 
 export const TOOL_PERMISSIONS: Readonly<Record<string, PermissionTier>> =
   Object.freeze({
+    mcp_list_tools: 'safe_read',
+    mcp_read_tool: 'safe_read',
+    mcp_call_tool: 'write',
+    skills_list: 'safe_read',
+    skill_read: 'safe_read',
     context_dev_search: 'safe_read',
     firecrawl_read_page: 'safe_read',
     valyu_search: 'safe_read',
@@ -31,13 +36,21 @@ export function requiresApproval(tier: PermissionTier): boolean {
 }
 // Bounded, redacted snapshots avoid recording secrets or retaining entire uploaded files.
 export function auditSnapshot(value: unknown): unknown {
-  const json = JSON.stringify(value ?? null, (key, item: unknown) =>
-    /token|secret|password|authorization|api.?key/i.test(key)
-      ? '[redacted]'
-      : typeof item === 'string' && item.startsWith('data:image/')
-        ? '[image omitted]'
-        : item,
-  ).replace(/\b(?:sk-|lk_)[A-Za-z0-9_-]{12,}\b/g, '[redacted]');
+  const json = JSON.stringify(value ?? null, (key, item: unknown) => {
+    if (/token|secret|password|authorization|api.?key/i.test(key))
+      return '[redacted]';
+    // MCP arguments arrive encoded as JSON. Decode before visiting sensitive keys.
+    if (key === 'argumentsJson' && typeof item === 'string') {
+      try {
+        return JSON.parse(item) as unknown;
+      } catch {
+        return '[invalid arguments omitted]';
+      }
+    }
+    return typeof item === 'string' && item.startsWith('data:image/')
+      ? '[image omitted]'
+      : item;
+  }).replace(/\b(?:sk-|lk_)[A-Za-z0-9_-]{12,}\b/g, '[redacted]');
   return json.length > 4_000
     ? { preview: json.slice(0, 4_000), truncated: true }
     : JSON.parse(json);
@@ -66,7 +79,10 @@ export async function auditedTool<T>(
   };
   try {
     const output = await execute();
-    event.output = tool==='computer_observe' ? {observed:true,content:'Screen content omitted from audit'} : auditSnapshot(output);
+    event.output =
+      tool === 'computer_observe'
+        ? { observed: true, content: 'Screen content omitted from audit' }
+        : auditSnapshot(output);
     if (
       output &&
       typeof output === 'object' &&
@@ -81,6 +97,8 @@ export async function auditedTool<T>(
         event.status = 'failed';
         event.errorCode = 'SANDBOX_EXIT_NONZERO';
       }
+      if ('status' in output && output.status === 'pending')
+        event.status = 'pending';
       if ('status' in output && output.status === 'partial') {
         event.status = 'failed';
         event.errorCode = 'PARTIAL_RESULT';

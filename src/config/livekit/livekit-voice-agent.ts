@@ -2,6 +2,7 @@ import { defineAgent, type JobContext, voice, llm } from '@livekit/agents';
 import { validateEnvironment } from '../environment.js';
 import type { Environment } from '@/config';
 import { createLiveKitVoiceModel } from '@/lib';
+import { AgentExtensionsService } from '../agent/tools/extensions.service.js';
 import { WebToolsService } from '../agent/tools/web/web-tools.service.js';
 import {
   VOICE_AGENT_INSTRUCTIONS,
@@ -24,8 +25,11 @@ export function createLiveKitVoiceAssistant(
   const definitions = environment
     ? WebToolsService.fromEnvironment({ ...environment }).createTools()
     : [];
-  const tools = Object.fromEntries(
-    definitions.map((definition) => [
+  const extensions = environment
+    ? AgentExtensionsService.fromEnvironment({ ...environment }).createTools()
+    : [];
+  const tools = Object.fromEntries([
+    ...definitions.map((definition) => [
       definition.name,
       llm.tool({
         description: definition.description,
@@ -34,7 +38,16 @@ export function createLiveKitVoiceAssistant(
           definition.execute(input, abortSignal),
       }),
     ]),
-  );
+    ...extensions.map((definition) => [
+      definition.name,
+      llm.tool({
+        description: definition.description,
+        parameters: definition.parameters,
+        execute: (input, { abortSignal }) =>
+          definition.execute(input, abortSignal),
+      }),
+    ]),
+  ]);
   return voice.Agent.create({ instructions: VOICE_AGENT_INSTRUCTIONS, tools });
 }
 

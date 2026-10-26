@@ -103,6 +103,10 @@ export async function createApplication(): Promise<{
     REALTIME_PLAYGROUND_ENABLED: config.getOrThrow<boolean>(
       'REALTIME_PLAYGROUND_ENABLED',
     ),
+    AGENT_EXTENSIONS_ENABLED: config.getOrThrow<boolean>(
+      'AGENT_EXTENSIONS_ENABLED',
+    ),
+    AGENT_EXTENSIONS_FILE: config.getOrThrow<string>('AGENT_EXTENSIONS_FILE'),
     COMPUTER_ENABLED: config.getOrThrow<boolean>('COMPUTER_ENABLED'),
     COMPUTER_ALLOWED_APPS: config.getOrThrow<string[]>('COMPUTER_ALLOWED_APPS'),
     COMPUTER_BROWSER_DOMAINS: config.getOrThrow<string[]>(

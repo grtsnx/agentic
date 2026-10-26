@@ -1,14 +1,14 @@
 import { ComputerModule } from '../computer/computer.module.js';
 import { Module } from '@nestjs/common';
 import { LibModule } from '@/lib';
-import { WebToolsModule } from '@/config';
+import { WebToolsModule, AgentExtensionsModule } from '@/config';
 import { WorkspaceGuard } from '../../../middleware/guards/workspace.guard.js';
 import { WorkspaceService } from './workspace.service.js';
 import { WorkspaceStore } from './workspace-store.service.js';
 import { WorkspaceFilesService } from './workspace-files.service.js';
 import { WorkspaceController } from './workspace.controller.js';
 @Module({
-  imports: [LibModule, WebToolsModule, ComputerModule],
+  imports: [LibModule, WebToolsModule, ComputerModule, AgentExtensionsModule],
   providers: [
     WorkspaceService,
     WorkspaceStore,

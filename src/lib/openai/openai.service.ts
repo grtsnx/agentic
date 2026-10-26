@@ -33,6 +33,7 @@ import {
   mapProviderError,
   type OpenaiModel,
   WebToolsService,
+  AgentExtensionsService,
 } from '@/config';
 
 import { ApplicationException } from '@/middleware';
@@ -49,6 +50,7 @@ export class OpenaiService {
     @Optional() private readonly config?: ConfigService,
     @Optional() private readonly webTools?: WebToolsService,
     @Optional() private readonly clef?: ClefService,
+    @Optional() private readonly extensions?: AgentExtensionsService,
   ) {
     // Keep structural traces without exporting prompts, answers, or tool payloads.
     // A per-call output cap bounds reasoning and visible output, not total run cost.
@@ -294,6 +296,21 @@ export class OpenaiService {
             execute: (input) => definition.execute(input, signal),
           }),
         ) ?? [];
+    const extensions =
+      this.extensions
+        ?.createTools({
+          scopeId: options.scopeId,
+          traceId: options.traceId,
+          audit: options.onToolAudit,
+        })
+        .map((definition) =>
+          tool({
+            name: definition.name,
+            description: definition.description,
+            parameters: definition.parameters,
+            execute: (input) => definition.execute(input, signal),
+          }),
+        ) ?? [];
     return searchEnabled
       ? [
           webSearchTool({
@@ -304,8 +321,9 @@ export class OpenaiService {
               : {}),
           }),
           ...external,
+          ...extensions,
         ]
-      : external;
+      : [...external, ...extensions];
   }
 
   private runSignal(external: AbortSignal | undefined): AbortSignal {
@@ -410,15 +428,17 @@ export class OpenaiService {
       if (item.rawItem?.type === 'hosted_tool_call') return undefined;
       const name = item.toolName ?? item.rawItem?.name;
       const message =
-        name === 'computer_observe' ? 'Reading the screen'
-          : name === 'computer_action' ? 'Preparing an action for approval'
-          : name === 'firecrawl_read_page'
-          ? 'Reading a page'
-          : ['web_search', 'context_dev_search', 'valyu_search'].includes(
-                name ?? '',
-              )
-            ? 'Searching the web'
-            : 'Using a tool';
+        name === 'computer_observe'
+          ? 'Reading the screen'
+          : name === 'computer_action'
+            ? 'Preparing an action for approval'
+            : name === 'firecrawl_read_page'
+              ? 'Reading a page'
+              : ['web_search', 'context_dev_search', 'valyu_search'].includes(
+                    name ?? '',
+                  )
+                ? 'Searching the web'
+                : 'Using a tool';
       return { type: 'status', phase: 'tool', message };
     }
 

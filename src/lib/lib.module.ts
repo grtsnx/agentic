@@ -1,3 +1,4 @@
+import { McpModule } from './mcp/mcp.module.js';
 import { BrowserModule } from './browser/browser.module.js';
 import { MacosModule } from './macos/macos.module.js';
 import { ClefModule } from './clef/clef.module.js';
@@ -13,6 +14,7 @@ import { ValyuModule } from './valyu/valyu.module.js';
 
 @Module({
   imports: [
+    McpModule,
     BrowserModule,
     MacosModule,
     ChatkitAdapterModule,
@@ -26,6 +28,7 @@ import { ValyuModule } from './valyu/valyu.module.js';
     ValyuModule,
   ],
   exports: [
+    McpModule,
     BrowserModule,
     MacosModule,
     ChatkitAdapterModule,

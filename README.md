@@ -1,247 +1,102 @@
 # Agentic
 
-An OpenAI-powered agent platform built with NestJS, with REST, streaming chat, CLI, and LiveKit voice. Sessions are stored in memory and disappear on restart. No database or Redis yet.
+An OpenAI-powered agent built with NestJS: streaming chat, REST, CLI, LiveKit voice, tools, and reusable skills. Sessions, files, and approvals are held in memory and disappear on restart. No database or Redis yet.
 
 ## Quick start
 
 Requires Node.js 24+ and Bun 1.3.14.
 
 ```bash
-cp .env.example .env
+cp .env.example .env # First setup only; preserve an existing .env.
 bun install --frozen-lockfile
 ```
 
-Add `OPENAI_API_KEY` to `.env`, then start the API:
+Add `OPENAI_API_KEY` to `.env`, then run:
 
 ```bash
 bun run start:dev
 ```
 
-This starts the API and automatically starts the LiveKit worker when `VOICE_ENABLED=true` in `.env`. One Nest watcher rebuilds and restarts both on source changes. Ctrl+C stops both; an unexpected service exit stops its sibling and reports a failure. Use `bun run start:dev:api` for API-only development. Restart the command after changing `.env`. Do not also run `voice:dev` when the combined command owns the worker.
+This starts the API and, when `VOICE_ENABLED=true`, the LiveKit worker. Ctrl+C stops both. Use `bun run start:dev:api` for API-only development. Restart after changing `.env`; do not start a second voice worker alongside the combined command.
 
-The Nest supervisor runs a local [LiveKit AgentServer](https://docs.livekit.io/reference/agents-js/classes/agents.AgentServer.html) with readable logs, no idle worker pool, and a dynamically assigned loopback health port. Nest owns reloads, so there is no deprecated CLI command or second watcher. Both processes use the same `.env`. The standalone `voice:dev` command builds once; rerun it after source changes. Production `voice:start` retains the SDK's structured logs and standard health port.
-
-After `bun run build`, verify development worker registration and shutdown with `RUN_LIVEKIT_WORKER_SMOKE=true node --env-file=.env test/smoke/livekit-worker.smoke.mjs`. This requires valid LiveKit credentials and registers an isolated worker without opening a room or microphone.
-
-| Interface  | URL or command                   |
-| ---------- | -------------------------------- |
-| Playground | http://localhost:3001/playground |
-| Swagger    | http://localhost:3001/api        |
-| Scalar     | http://localhost:3001/docs       |
-| Text CLI   | `bun run chat`                   |
-
-Chat uses a local heuristic router: simple requests go to `gpt-5-nano`; engineering tasks, attachment questions, and complex follow-ups go to `gpt-6-luna`. Follow-ups use bounded recent user context, and ordinary new topics can return to Nano. Optional Clef-flash classification can override this local fallback. Responses include input/output tokens, model usage, and estimated model cost.
+| Interface  | URL or command                                                |
+| ---------- | ------------------------------------------------------------- |
+| Playground | [localhost:3001/playground](http://localhost:3001/playground) |
+| Swagger    | [localhost:3001/api](http://localhost:3001/api)               |
+| Scalar     | [localhost:3001/docs](http://localhost:3001/docs)             |
+| Text CLI   | `bun run chat`                                                |
 
 ## Configuration
 
-See [.env.example](.env.example) for settings and defaults. Configuration is validated at startup. Keep credentials in your local `.env` and restart affected services after changes.
+Use one local `.env`. See [.env.example](.env.example) for validated settings, provider keys, timeouts, and session limits. Keep secrets out of version control. Set `CORS_ORIGINS` to exact browser origins, such as `http://localhost:3001`.
 
-- `CORS_ORIGINS`: exact, comma-separated browser origins. Use `http://localhost:3001` locally, never `*`.
-- `MODEL_TIMEOUT_MS`: total text-generation deadline, including optional routing and hosted search.
-- `SESSION_TTL_MS`, `SESSION_MAX_TURNS`, `SESSION_MAX_TOKENS`: conversation lifetime and context limits.
-- `WEB_SEARCH_ENABLED`, `WEB_SEARCH_ALLOWED_DOMAINS`: hosted search and optional domain restrictions.
-- `SWAGGER_ENABLED`, `REALTIME_PLAYGROUND_ENABLED`: documentation and playground availability.
+Chat routes simple requests to GPT-5 Nano and complex work to GPT-6 Luna. Clef routing is optional; keep `CLEF_ROUTING_ENABLED=false` until `bun run benchmark:routing` passes the latency and billing gates. Responses show input/output tokens and estimated model cost; external tool charges are separate.
 
-## ChatKit
+Optional web providers use their enable flag and API key: Context.dev for lookups, Firecrawl for page reading, and Valyu for research. Suitable alternatives are allowed. `WEB_SEARCH_ALLOWED_DOMAINS` restricts search domains.
 
-The main `/playground` keeps Agentic’s custom layout, composer, source drawer, attachments, and LiveKit voice view. Its browser client uses our [ChatKit protocol backend](https://developers.openai.com/api/docs/guides/custom-chatkit) for streamed replies, conversation history, and approval actions. It does not embed the default ChatKit web component. `/playground/chatkit` redirects to the same playground.
+## Using the agent
 
-- Attach multiple files with the plus button. Sent files appear above your message and remain previewable.
-- Open the history icon to continue or delete a conversation. History is available within the current page session; server memory expires after 30 minutes or a restart. No database or Redis is required.
-- Approvals remain explicit and bound to one action. Network failures never automatically retry them.
-- The microphone opens the existing LiveKit voice view. Voice transcripts appear in the visible conversation, but are not saved into ChatKit text history.
-- `CHATKIT_DOMAIN_KEY` is only relevant to clients embedding the official hosted component. This custom playground does not need it or load its CDN script. REST, Socket.IO, and CLI remain available.
-
-Run `bun run test:e2e -- test/e2e/chatkit/chatkit.e2e-spec.ts` for isolated protocol tests. For a live check, run the app, open `/playground`, attach a small text file, ask about its contents, then open history and continue the conversation. Normal provider usage charges apply.
-
-## Optional Clef routing
-
-[Cloudflare Clef-flash](https://developers.cloudflare.com/workers-ai/models/clef-flash/) classifies difficulty; OpenAI still generates answers. In Cloudflare, open **Workers AI → Use REST API** to create a Workers AI token and copy your Account ID ([credential guide](https://developers.cloudflare.com/workers-ai/get-started/rest-api/)). Add them to `.env`:
-
-```env
-CLOUDFLARE_ACCOUNT_ID=
-CLOUDFLARE_API_TOKEN=
-CLEF_ROUTING_ENABLED=false
-CLEF_ROUTING_TIMEOUT_MS=3000
-CLEF_ROUTING_CONFIDENCE=0.75
-```
-
-Run `bun run benchmark:routing` before enabling Clef. It makes 66 real classifier requests (22 labeled cases, three rounds), without generating answers or executing tools. Normal provider charges apply. `.tmp/clef-routing-benchmark.json` records accuracy against the local router, fallback reasons, p50/p95 latency, reported token usage, request IDs, and list-price estimates. Rollout gates require at least 95% accuracy without local regression or complex-task downgrades, at most 10% fallback, p95 routing latency at most 1 second, complete usage, and separately verified billing. The command writes the report and exits non-zero if any gate fails. Billing remains unverified in the report until actual account charges can be reconciled; a token estimate cannot pass that gate.
-
-Live check on October 25, 2026: effective accuracy **66/66**, local accuracy **63/66**, fallback **6/66** (uncertain classifications), routing p50 **759ms**, p95 **1,523ms**. Cloudflare reported **20,193 input tokens**, with a **$0.000767334** list-price estimate. These small synthetic fixtures are not proof of production accuracy. **Keep Clef disabled by default:** latency exceeded the gate and account usage access returned HTTP 403, so actual billed cost could not be verified. Free allocation and invoice adjustments can change the amount charged.
-
-For opt-in trials only, set `CLEF_ROUTING_ENABLED=true` and restart the API/CLI. The classifier sees the latest text (up to 8,000 characters), six recent user messages (up to 1,000 characters each), and whether attachments exist. File content, images, tool output, and credentials are not included in classifier state. Timeouts, uncertain probabilities, malformed replies, and provider failures fall back locally; cancellation stops the turn. No automatic classifier retries. At most eight classifier requests run concurrently per process.
-
-`runtime.routing` reports the selected model, source, reason, probability when available, duration, provider token usage, request ID, and estimated classifier cost. Estimates use Cloudflare's published input price, including uncertain responses with usage; missing usage remains `null`. Classifier usage/cost stays separate from generation totals. Voice keeps its configured realtime model. Approval decisions remain explicit human actions.
-
-Clear greetings, basic arithmetic, and short text transformations bypass remote classification and tools. Nano uses minimal reasoning for tool-free requests; tool-enabled requests retain low reasoning because hosted web search does not support minimal reasoning. Other tasks keep their existing tools and model settings.
-
-Run `bun run benchmark:latency` to compare first-text and completion latency for low versus minimal reasoning on four simple tasks over two rounds (16 paid OpenAI requests). Results go to `.tmp/response-latency-benchmark.json`. The October 25 check passed all eight answers per setting: median first text improved from **1,120ms to 892ms** (about 20%); p95 improved from **1,824ms to 1,435ms**. Network and provider load vary, and this does not predict latency or quality for complex tasks.
-
-## Optional web tools
-
-Enable each provider with its flag and API key in `.env`. Chat and voice share these tools.
-
-| Provider                                                | Preferred use           | Enable flag           | Credential            |
-| ------------------------------------------------------- | ----------------------- | --------------------- | --------------------- |
-| [Context.dev](https://docs.context.dev/sdks/typescript) | Quick web lookups       | `CONTEXT_DEV_ENABLED` | `CONTEXT_DEV_API_KEY` |
-| [Firecrawl](https://docs.firecrawl.dev/sdks/node)       | Read a specific page    | `FIRECRAWL_ENABLED`   | `FIRECRAWL_API_KEY`   |
-| [Valyu](https://docs.valyu.ai/)                         | Research across sources | `VALYU_ENABLED`       | `VALYU_API_KEY`       |
-
-The agent may choose a suitable alternative when its preferred provider is unavailable. `WEB_SEARCH_ALLOWED_DOMAINS` also applies to external tools. `EXTERNAL_TOOLS_*` settings bound time, calls, and result size. Tool-provider charges are separate from the displayed model-cost estimate. A timed-out provider request may continue remotely, particularly with Valyu's current SDK.
+- **Chat:** the playground uses Agentic's custom UI with a ChatKit backend. Use history to continue conversations and the pencil to edit a message. Editing replaces subsequent replies; completed actions are not undone.
+- **Files:** use **+** to attach multiple JPG, PNG, PDF, DOCX, or text files. Click to preview or **×** to remove. Limits: five files, 1 MiB each, 2 MiB per workspace. Scanned PDF OCR is not supported.
+- **Approvals:** review the exact action, scope, and risk, then choose **Approve once** or **Deny**. Approvals expire after five minutes. Do not replay an action automatically after a network failure.
+- **CLI:** use `/workspace`, `/attach PATH`, `/actions`, `/approve ID`, `/deny ID`, `/cancel ID`, and `/exit`.
+- **API:** Swagger and Scalar document chat, sessions, files, workspaces, and approvals. Socket.IO uses `/v1/chat`: send `chat.send` or `chat.cancel`; receive `chat.status`, `chat.delta`, `chat.completed`, and `chat.error`.
 
 ## Voice
 
-### LiveKit credentials
-
-1. Open [LiveKit Cloud](https://cloud.livekit.io/) and select or create a project.
-2. Select **Manage API keys** and copy the project URL, API key, and secret.
-3. Add these settings to `.env`:
+In [LiveKit Cloud](https://cloud.livekit.io/), select your project, open **Manage API keys**, and copy the project URL, key, and secret into `.env`:
 
 ```env
 VOICE_ENABLED=true
 VOICE_PROVIDER=livekit
 VOICE_MODEL=gpt-realtime-2.1-mini
-VOICE_NAME=marin
 LIVEKIT_URL=wss://your-project.livekit.cloud
 LIVEKIT_API_KEY=your-livekit-key
 LIVEKIT_API_SECRET=your-livekit-secret
 LIVEKIT_AGENT_NAME=agentic-voice
 ```
 
-If your [LiveKit CLI](https://docs.livekit.io/reference/developer-tools/livekit-cli/projects/) is already connected, you can write the credentials directly:
+Alternatively, after `lk cloud auth`, run `lk app env --write --destination .env --project YOUR_PROJECT`. Preserve existing settings; do not use `--overwrite`.
+
+Run `bun run start:dev`, click the composer microphone, and allow microphone access. Both the API and worker must run. Use `VOICE_PROVIDER=openai` for direct OpenAI inference through LiveKit, or `livekit` for LiveKit Cloud inference. Start a new conversation after changing voice settings.
+
+For terminal voice, install the [LiveKit CLI](https://docs.livekit.io/reference/developer-tools/livekit-cli/) and run `bun run voice:console`. Use `bun run voice:devices` to list devices. macOS microphone/playback is verified; Windows/Linux hardware validation remains pending.
+
+Cloud traces are available under **Sessions → Agent insights** when Agent Observability is enabled. Worker audio/transcript retention is disabled. Telephony still requires an approved number purchase and SIP setup; `LIVEKIT_PHONE_NUMBER` only prints an already-provisioned number.
+
+## MCP and skills
+
+Set `AGENT_EXTENSIONS_ENABLED=true`. Register trusted servers and skill folders in [agent-extensions.json](agent-extensions.json), then restart. The included configuration provides OpenAI documentation search and a [code-review skill](skills/code-review/SKILL.md).
+
+- MCP supports Streamable HTTP and stdio. `allowedTools` limits access; only configured `safeReadTools` run automatically. Other calls require workspace approval. Voice cannot approve privileged actions.
+- Reference credentials from `.env`, for example `"headersEnv": {"Authorization": "MY_MCP_AUTHORIZATION"}`. Stdio uses a trusted, preinstalled `command`, `args`, and optional environment references.
+- Skills use `SKILL.md` with YAML `name` and `description`. Relative Markdown/text references are allowed; script execution and automatic installation are not.
+- Calls have timeouts and budgets. MCP connection-local state is not retained between operations. OAuth, MCP resources/prompts, and remote skill installation are not supported.
+
+Try: **“Use the code-review skill to review this code.”**
+
+## Computer access and code execution
+
+**Local browser/Mac apps:** set `COMPUTER_ENABLED=true`, configure `COMPUTER_BROWSER_DOMAINS` and `COMPUTER_ALLOWED_APPS`, then connect through the playground's computer icon. Browser mode requires Google Chrome. Mac app access additionally requires the native adapter:
 
 ```bash
-lk project list
-lk app env --write --destination .env --project YOUR_PROJECT
-```
-
-Use `lk cloud auth` to connect first if needed. Keep all local settings in `.env`; always use `--destination .env` with the LiveKit CLI. Preserve existing settings and avoid `--overwrite`. `.env.example` is only a setup template.
-
-### Browser voice
-
-Set `VOICE_ENABLED=true` and run `bun run start:dev`; it starts both the API and voice worker. If you intentionally use `bun run start:dev:api`, start the worker separately with `bun run voice:dev`.
-
-Open the playground, select **Voice** in the composer, and allow microphone access. Both processes must run for voice replies. If playback is blocked, select **Tap to hear Agentic**. After changing voice settings, restart the worker and start a new conversation.
-
-`VOICE_PROVIDER=livekit` bills inference through LiveKit Cloud. Use `VOICE_PROVIDER=openai` with `OPENAI_API_KEY` for direct OpenAI inference through the same LiveKit transport.
-
-### Terminal voice
-
-Install the [LiveKit CLI](https://docs.livekit.io/reference/developer-tools/livekit-cli/), then run:
-
-```bash
-bun run voice:devices
-bun run voice:console
-bun run voice:console --text
-```
-
-Use `m` to mute, `Ctrl+T` to switch voice/text, and `q` to quit (`Ctrl+C` in text mode). Select devices with `--input-device "Microphone name" --output-device "Speaker name"`.
-
-Human microphone capture and playback have been confirmed on macOS. Windows and Linux hardware validation remains open. Use a glibc Linux distribution such as Ubuntu or Debian; Alpine/musl and Windows ARM64 lack bindings in the installed SDK. On each platform, verify a spoken reply, mute/unmute, mode switching, and microphone shutdown before marking support complete.
-
-### Observability and telephony
-
-Enable **Agent observability** in the Cloud project's settings. End a new voice conversation, then inspect **Sessions → Agent insights** for traces and logs. Cloud observability has been verified; audio and transcript retention are disabled in the worker. See [Agent insights](https://docs.livekit.io/testing/observability/insights/).
-
-Telephony remains pending an approved number purchase and SIP dispatch design. Once provisioned, `LIVEKIT_PHONE_NUMBER` prints the number at startup; it does not purchase or route calls. See [LiveKit phone numbers](https://docs.livekit.io/telephony/start/phone-numbers/).
-
-## API and streaming
-
-Use Swagger or Scalar for request schemas and response examples.
-
-| Route                                 | Purpose                 |
-| ------------------------------------- | ----------------------- |
-| `POST /v1/chat`                       | Stateless chat          |
-| `POST /v1/chat/sessions`              | Create a conversation   |
-| `POST /v1/chat/sessions/:id/messages` | Continue a conversation |
-| `DELETE /v1/chat/sessions/:id`        | Delete a conversation   |
-| `GET /v1/health/live`                 | Process liveness        |
-| `GET /v1/health/ready`                | Memory readiness        |
-
-Socket.IO uses the `/v1/chat` namespace:
-
-| Direction           | Events                                                             |
-| ------------------- | ------------------------------------------------------------------ |
-| Client → server     | `chat.send` with `{ "message": "Hello" }`; `chat.cancel` with `{}` |
-| Server → client     | `chat.started`, `chat.status`, `chat.delta`, `chat.completed`      |
-| Cancellation/errors | `chat.cancelling`, `chat.cancelled`, `chat.error`                  |
-
-The playground displays streamed answers, citations, sources, and usage. For external testing with [Hoppscotch](https://hoppscotch.com/), allow its exact origin in `CORS_ORIGINS`.
-
-## Files, actions, and specialists
-
-Click the **+ attach icon** inside the playground message box to upload JPG, PNG, PDF, DOCX, or UTF-8 TXT, Markdown, CSV, and JSON files. Select multiple files in the picker to attach them together. Use **×** to remove a draft attachment. After sending, attachments move above your message; choose the corresponding **Preview** button to inspect a file. PDFs use the browser PDF viewer; DOCX previews show extracted text. Ask about the attached files in chat. Approval requests appear directly in the conversation with the exact action, risk, scope, and **Approve once** or **Deny** controls. Limits are five files, 1 MiB per file, and 2 MiB per workspace. Retrieval returns scoped chunks with filenames and chunk numbers; uploaded text is treated as untrusted evidence. PDF and DOCX text is extracted locally; images can be inspected by the model. Scanned PDFs do not have OCR yet. Parsing is limited to 50 PDF pages, 200,000 extracted document characters, and 10 seconds. Encrypted or malformed documents are rejected. Removing an attachment stops future file access but does not erase quotes already present in chat history. Embedding-based retrieval is not supported yet.
-
-Workspaces expire after 30 minutes, allow one active operation and 50 chat turns, and use an independent bearer capability. The playground keeps its expiring owner token in tab session storage and creates a separate workspace for each thread. REST clients create a workspace with `POST /v1/workspaces` and send its token as `Authorization: Bearer TOKEN` on subsequent workspace routes. Socket.IO clients send `workspaceId` and `workspaceToken` with `chat.send`. See Swagger for upload, retrieval, messages, delegation, approvals, cancellation, and audit endpoints.
-
-In the text CLI, use `/workspace` or `/attach PATH`, `/actions`, and `/approve ID`, `/deny ID`, or `/cancel ID`. The playground and CLI show the exact proposed code or file deletion, target, risk, and expiration before approval. A decision applies once to that immutable action and expires after five minutes. Models cannot approve their own actions. Safe reads run automatically; uploaded-file reads require the workspace capability. Message and payment tiers are classified but have no execution adapters yet.
-
-Specialists use the OpenAI Agents SDK: a manager delegates to a researcher or coder, which may hand off to a reviewer. They share the workspace's tools, approval boundary, trace, and cancellation. Each workflow is limited to 45 seconds, eight model calls, three specialist contributions, two reviewer handoffs, and one model call at a time. Conservative token reservations cap the workflow at 40,000 tokens, with at most 1,200 output tokens per call and a $0.02 estimated model-cost ceiling. Results include provenance, uncertainties, and partial failures.
-
-Each workspace retains up to 300 redacted, size-limited audit events with tool inputs, outputs, latency, outcome, and cost metadata. Model costs are estimates; external tool costs remain unknown when the provider does not supply them. Workspace state and approvals disappear on restart. These are local capability-scoped features, not durable storage or multi-user account authentication. Voice retains its existing read-only web tools.
-
-### Edit a message
-
-Use the pencil below a sent text message, edit it inline, then choose **Update**. **Cancel** (or Escape) keeps the original message. Updates retain that message's attachments and replace subsequent replies and model context. Pending approvals are cancelled; completed actions and their audit records are not undone. The composer draft stays untouched. Editing is unavailable while a response or action is running.
-
-### Local browser and Mac apps
-
-The computer icon in the playground connects **one conversation at a time** to your Mac. Send a first message, open the icon, and choose **Browser on this Mac** or **Mac apps**. No access key needs copying. Connections require a same-origin browser request over the actual loopback interface; remote callers, forwarded localhost headers, cross-site requests, and mismatched hosts are rejected. This is for a trusted single-user machine, not authorization against other local processes.
-
-```bash
-# Optional native desktop adapter, installed only in this project:
 uv venv .computer-venv --python 3.12
 uv pip install --python .computer-venv/bin/python macos-harness==0.2.1
-# Permission diagnostic only; does not request permissions:
-MACOS_HARNESS_HOME="$PWD/.computer-runtime/macos" DO_NOT_TRACK=1 .computer-venv/bin/macos-harness doctor --json
 ```
 
-Set `COMPUTER_ENABLED=true`. `COMPUTER_ALLOWED_APPS=*` allows any Mac app by name or bundle ID. To restrict it later, replace `*` with a comma-separated list of bundle IDs. macOS protected authentication dialogs and the adapter’s own host remain protected. `COMPUTER_BROWSER_DOMAINS` contains permitted public websites; the default is `example.com`. Restart the API after editing `.env`. Native app access requires Accessibility and Screen Recording for the application launching Agentic under **System Settings → Privacy & Security**. Run the diagnostic from your own terminal: permissions granted to Codex or ChatGPT do not prove your terminal is authorized. The integration does not change OS permissions automatically.
+Grant Accessibility and Screen Recording to the application launching Agentic in macOS settings. Actions require approval and affect your real computer. Use **Stop & disconnect** to revoke access. This is localhost-only, disabled in production, and not a sandbox. Cloud VMs and Windows/Linux desktop control remain pending.
 
-Browser mode uses installed Google Chrome in a temporary profile, without copying your existing cookies, extensions, or tabs. It supports reading pages, screenshots, navigation, indexed clicks and input, limited keys, and scrolling. Native Mac mode uses macOS Harness accessibility reads and indexed actions on allowed apps; open TextEdit with a scratch document to test. It does not provide a native desktop screenshot stream yet. Screen/page content sent to the model is untrusted evidence. Each action requires an **Approve once** card; observations are bound to a ten-minute connection and a single conversation. If the page or app changes, the action is rejected and must be proposed again. This check reduces stale actions but cannot make external UI changes transactional.
-
-Try **“Read the connected browser and propose opening https://example.com.”** Approve the navigation, then ask **“Read the page and tell me its title.”** For TextEdit, ask **“Read TextEdit and propose replacing the scratch document text with Hello Agentic.”** Review the exact text before approval. Use **Refresh view** to inspect the current browser screenshot or app accessibility text. Use **Stop & disconnect** to revoke access; it closes only Agentic's dedicated browser. You can take over your Mac directly. The connection expires automatically, and pending actions cannot run after revocation. A lost network response is an uncertain outcome, never an instruction to replay the action.
-
-Local control is disabled in production and is **not a sandbox**: approved actions act on your real machine. Browser requests check permitted domains and reject private-IP destinations; downloads, popups, service workers, and WebSockets are blocked. These application checks are not a hardened network boundary against DNS rebinding or a browser exploit. Native app controls are app-scoped, not folder-scoped. Docker desktops, cloud VMs, existing browser-profile attachment, file transfer, and Windows/Linux desktop control remain roadmap work. No database or Redis is required; connections and approvals disappear on restart.
-
-```bash
-bun run build
-RUN_COMPUTER_SMOKE=true node test/smoke/computer.smoke.mjs
-# Also read an open TextEdit scratch document, without logging its contents:
-RUN_COMPUTER_SMOKE=true RUN_MACOS_READ_SMOKE=true node test/smoke/computer.smoke.mjs
-# Paid model contract check using a synthetic fixture, no actual screen data:
-RUN_COMPUTER_AGENT_SMOKE=true node --env-file=.env test/smoke/computer-agent.smoke.mjs
-```
-
-For the opt-in native write check, create an unsaved TextEdit document containing only `Agentic integration test scratch 7219`, then run `RUN_MACOS_WRITE_SMOKE=true node test/smoke/macos-write.smoke.mjs`. It replaces that test text after a single-use approval and verifies the result without sending screen data to a model. Discard the scratch document afterward.
-
-REST/Socket.IO callers can connect their workspace using `POST /v1/workspaces/:id/computer` with `{ "target": "browser" }` and the workspace bearer token. These routes also require an actual loopback connection, an exact local `Origin`/`Host` pair, and `Sec-Fetch-Site: same-origin`; they are intended for the local playground, not a remotely hosted API. Use `/computer/observe` with `{}` or `{ "app": "com.apple.TextEdit" }`, and `/computer/stop` to revoke. The model only proposes actions through the existing workspace approval flow. The playground uses equivalent owner-authenticated thread routes so history threads cannot share computer access.
-
-### Local code sandbox
-
-Code execution requires human approval, a trusted local Docker installation, and `SANDBOX_ENABLED=true`. Install the pinned image before starting the API:
+**Code sandbox:** requires local Docker and `SANDBOX_ENABLED=true`. Pull the pinned image first:
 
 ```bash
 docker pull node:26.12.1-bookworm-slim@sha256:28147155d47dc31abe0a46e0d12b59b2fb3d0a2dcc5dc65fce76a074180b16fe
 ```
 
-JavaScript runs as a non-root user with no network, host mounts, credentials, or Linux capabilities. Limits include 0.5 CPU, 128 MiB memory, 32 processes, a read-only root, 16 MiB temporary storage, 32 KiB output, and an independent eight-second lifetime. Cleanup failures reserve capacity until removal succeeds. Containers share the Docker host kernel; this is not a hardened multi-tenant execution service. Compose disables execution because its application container has no Docker runner; do not mount the Docker socket into it.
-
-To check the actual isolation boundaries without an OpenAI request:
-
-```bash
-bun run build
-RUN_SANDBOX_SMOKE=true node test/smoke/sandbox.smoke.mjs
-```
-
-Expect `PASS` lines for the configured CPU/memory/PID quotas, blocked outbound network, read-only root, absent application credentials, memory exhaustion, eight-second timeout, output cap, and cancellation cleanup. This uses real short-lived Docker containers and leaves `SANDBOX_ENABLED` in `.env` unchanged.
-
-For the full approval flow, enable `SANDBOX_ENABLED=true` in `.env`, restart the API, and ask in the playground: **“Propose running exactly this JavaScript: console.log(2 + 2). Wait for my approval.”** Review the inline card and select **Approve once**. Ask for the result afterward. To check denial, repeat with different code and choose **Deny**; no container should run. For timeout behavior, propose `setInterval(() => {}, 1000)` and approve it. It must stop with a non-zero exit code, not a successful result.
+JavaScript runs after approval with no network or host mounts, a read-only root, 0.5 CPU, 128 MiB memory, and an eight-second lifetime. Try **“Propose running console.log(2 + 2), and wait for approval.”** Compose disables this feature; do not mount the Docker socket into the application container.
 
 ## Testing
 
-All tests live in categorized folders under `test/`.
+All tests live under `test/`.
 
 ```bash
 bun run format:check
@@ -252,47 +107,33 @@ bun run test:e2e
 bun run build
 ```
 
-Real-provider checks use credentials from `.env` and may incur charges:
+Explicit integration checks:
 
 ```bash
-bun run smoke:provider          # Structured response and usage
-bun run smoke:search            # Hosted search and citations
-bun run smoke:tools             # Enabled external provider APIs
-bun run smoke:tool-selection    # Model tool selection with fixture results
-RUN_VOICE_SMOKE=true node --env-file=.env test/smoke/voice.smoke.mjs
-RUN_DELEGATION_SMOKE=true node --env-file=.env test/smoke/delegation.smoke.mjs
-RUN_WORKSPACE_SMOKE=true node --env-file=.env test/smoke/workspace.smoke.mjs
-bun run build
+bun run smoke:provider   # Real OpenAI response; provider charges apply.
+bun run smoke:tools      # Enabled web providers; provider charges may apply.
+bun run smoke:extensions # Public MCP server and bundled skill; no model call.
+# After building, with Docker and the pinned image installed:
 RUN_SANDBOX_SMOKE=true node test/smoke/sandbox.smoke.mjs
+# After building, with the API and voice worker running:
+RUN_VOICE_SMOKE=true node --env-file=.env test/smoke/voice.smoke.mjs
 ```
 
-Workspace, delegation, and sandbox smoke checks require a current build; the sandbox check also requires Docker and the pinned image. The voice check requires the API and worker. It verifies dispatch, a reply transcript, and received audio, not physical microphone or speaker operation.
+The voice smoke test checks dispatch, transcript, and received audio, not physical microphone/speaker operation. More opt-in checks are in [test/smoke](test/smoke); model and provider checks may incur charges.
 
-## Docker and releases
-
-`Dockerfile` builds the application image. `compose.yaml` runs the API and optional voice worker with runtime credentials from `.env`.
+## Docker and deployment
 
 ```bash
 docker compose up --build -d --wait                 # API
 docker compose --profile voice up --build -d --wait # API and voice
-docker compose logs -f api voice
 docker compose --profile voice down
 ```
 
-The API binds to `localhost:3001`. Stop any standalone worker before switching to Compose if only one worker should accept jobs. Compose does not start a self-hosted LiveKit media server or capture your microphone. Use the browser or native voice console for microphone input.
+Compose uses `.env` and binds the API to localhost:3001. It does not start a self-hosted LiveKit media server. Stop a standalone voice worker before switching to Compose.
 
-Set `AGENTIC_ENV_FILE` to select another environment file or `AGENTIC_HTTP_PORT` to change the host port. Update CORS origins when changing ports. API restarts lose in-memory sessions.
+[CI](.github/workflows/ci.yml) runs checks and image scans. The [release workflow](.github/workflows/release.yml) publishes images for semantic-version tags; configure production environment protections before releasing.
 
-[CI](.github/workflows/ci.yml) checks formatting, types, tests, dependencies, and the container image. The [release workflow](.github/workflows/release.yml) publishes AMD64/ARM64 images to GHCR for semantic-version tags, with an SBOM and provenance attestation. Configure the repository's `production` environment protections before releasing.
-
-## Production readiness
-
-Reviewed against [OpenAI's production guidance](https://developers.openai.com/api/docs/guides/production-best-practices). The application already has server-side keys, validated input, streaming, timeouts, economical routing, usage estimates, approval boundaries, and CI checks. This is still a single-instance development platform, not a completed production deployment.
-
-- Main chat runs omit prompt, response, and tool content from Agents SDK traces, matching specialist runs. This does not disable provider processing, response storage, or abuse-monitoring retention; review [OpenAI data controls](https://developers.openai.com/api/docs/guides/your-data) before accepting sensitive data.
-- `MODEL_MAX_OUTPUT_TOKENS=8192` caps each main-agent model call, including reasoning tokens. The existing eight-turn limit still applies; this is not a total token or dollar budget. Specialists keep their separate, tighter shared budget. Billing-quota failures are non-retryable application errors, while transient rate limits remain retryable. Do not blindly replay a tool workflow after failure.
-- Before public deployment: require user authentication and per-user quotas for chat, workspace issuance, and voice; terminate TLS; disable development UIs unless access-controlled; and configure latency/error/cost alerts. Use separate staging/production OpenAI projects and scoped service-account keys with expiration and rotation. Set account spend alerts and an appropriate hard spend limit in the OpenAI dashboard.
-- Keep one API instance until shared session, approval, and rate-limit storage is implemented. Current memory-only state disappears on restart and is not coordinated across replicas. Database/Redis and production evaluation/load tests remain in the roadmap.
+This is a single-instance development platform. Before public deployment, add authentication, tenant isolation, quotas, persistent state, TLS, and access controls for developer UIs. Model costs are estimates, and in-memory state is not durable.
 
 ## Project structure
 
@@ -300,31 +141,24 @@ Reviewed against [OpenAI's production guidance](https://developers.openai.com/ap
 src/
 ├── app/                  # Root application and health endpoints.
 ├── bootstrap/            # Security, validation, docs, and startup.
-├── cli/                  # Terminal application context.
-├── config/               # Runtime configuration and application setup.
-│   ├── agent/            # Shared instructions and tools/ policies, web setup, sandbox limits.
-│   ├── files/            # Bounded document/image parsing worker.
-│   ├── livekit/          # Voice agent, worker, and console setup.
-│   ├── openai/           # Model routing, delegation budgets, and provider errors.
-│   ├── schema/           # Zod schemas and categorized types/.
-│   └── playground/       # Chat UI, computer panel, ChatKit transport, previews, and voice.
-├── dto/                  # API input and output contracts.
-├── lib/                  # Provider adapters, browser/, macos/, and ChatKit protocol adapter.
+├── cli/                  # Terminal interface.
+├── config/               # Instructions, tools, skills, schemas/types, playground, and voice setup.
+├── dto/                  # API input/output contracts.
+├── lib/                  # External provider integrations.
 ├── middleware/           # Filters, interceptors, errors, and shared utilities.
-├── modules/              # Chat, workspaces, computer/, and voice in v1/; clean v2/ boundary.
-├── cli.ts                # Text CLI entry point.
-├── dev.ts                # Shared development startup and shutdown for API and voice.
-├── main.ts               # HTTP and Socket.IO entry point.
-└── voice.ts              # LiveKit worker entry point.
-test/                     # Categorized unit/, e2e/, and smoke/ tests.
-AGENTS.md                 # Development rules and conventions.
-compose.yaml              # API and optional worker services.
-Dockerfile                # Shared application image.
+├── modules/              # Feature modules in v1/; reserved v2/ boundary.
+└── main.ts               # HTTP entry point; cli.ts, dev.ts, and voice.ts serve other runtimes.
+test/                     # Unit, end-to-end, and opt-in smoke tests.
+skills/                   # Reusable SKILL.md instructions and references.
+agent-extensions.json     # MCP allowlists and registered skills.
+compose.yaml              # Local services built with Dockerfile.
+AGENTS.md                 # Architecture and contribution rules.
 ```
 
-Use public barrel imports such as `@/config`, `@/lib`, `@/dto`, and `@/middleware`. See [AGENTS.md](AGENTS.md) for architecture and contribution rules.
+## Roadmap
 
-## Agent platform roadmap
+<details>
+<summary>View completed work and upcoming capabilities</summary>
 
 Ordered from foundations to advanced capabilities. ✅ Verified complete · ⬜ Remaining work.
 
@@ -384,7 +218,11 @@ Ordered from foundations to advanced capabilities. ✅ Verified complete · ⬜ 
 - ✅ Enforce token and turn limits, and summarize context before it exceeds its budget.
 - ✅ Test concurrent session isolation and malformed model output.
 
-### 5. Hosted tools: web, files, and code
+### 5. Tools, skills, web, files, and code
+
+- ✅ Add configured MCP HTTP/stdio tools with allowlists, timeouts, cancellation, bounded outputs, audits, and single-use approvals.
+- ✅ Load registered SKILL.md instructions and scoped references across chat, CLI, and voice without executing skill scripts.
+- ✅ Verify public documentation MCP discovery/search and local skill loading (`bun run smoke:extensions`).
 
 - ✅ Add web search with citations, source metadata, domain controls, and timeout limits.
 - ✅ Add optional Context.dev web search through its official SDK.
@@ -519,3 +357,5 @@ Ordered from foundations to advanced capabilities. ✅ Verified complete · ⬜ 
 - ⬜ Add audit-log integrity, redaction tests, secret rotation, dependency response, and incident runbooks.
 - ⬜ Load-test backpressure, cancellation, retries, graceful shutdown, and degraded dependencies.
 - ⬜ Define service objectives, alerts, canary releases, rollback, disaster recovery, and data recovery exercises.
+
+</details>

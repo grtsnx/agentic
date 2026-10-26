@@ -1,0 +1,14 @@
+{
+  "servers": [
+    {
+      "id": "openai_docs",
+      "description": "Search and read official OpenAI documentation.",
+      "transport": "http",
+      "url": "https://developers.openai.com/mcp",
+      "allowedTools": ["search_openai_docs", "fetch_openai_doc"],
+      "safeReadTools": ["search_openai_docs", "fetch_openai_doc"],
+      "timeoutMs": 10000
+    }
+  ],
+  "skills": ["skills/code-review"]
+}

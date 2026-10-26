@@ -92,6 +92,10 @@ export const environmentSchema = z
     REALTIME_PLAYGROUND_ENABLED: booleanValue(
       'REALTIME_PLAYGROUND_ENABLED',
     ).optional(),
+    AGENT_EXTENSIONS_ENABLED: booleanValue('AGENT_EXTENSIONS_ENABLED').default(
+      false,
+    ),
+    AGENT_EXTENSIONS_FILE: z.string().min(1).default('agent-extensions.json'),
     COMPUTER_ENABLED: booleanValue('COMPUTER_ENABLED').default(false),
     COMPUTER_ALLOWED_APPS: z
       .preprocess(

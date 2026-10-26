@@ -153,11 +153,13 @@ export class ChatkitAdapterService {
       {
         type: 'Text',
         value:
-          approval.action.tool === 'computer_action'
-            ? describeComputerAction(approval.action)
-            : approval.action.tool === 'execute_code'
-            ? approval.action.code
-            : `File: ${approval.action.fileId}`,
+          approval.action.tool === 'mcp_call_tool'
+            ? `${approval.action.server} / ${approval.action.name}\n${approval.action.argumentsJson}`
+            : approval.action.tool === 'computer_action'
+              ? describeComputerAction(approval.action)
+              : approval.action.tool === 'execute_code'
+                ? approval.action.code
+                : `File: ${approval.action.fileId}`,
       },
       {
         type: 'Text',

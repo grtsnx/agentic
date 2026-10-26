@@ -1,3 +1,6 @@
+// Initialize capability providers before playground exports re-enter library modules.
+export { AgentExtensionsModule } from './agent/tools/extensions.module.js';
+export { AgentExtensionsService } from './agent/tools/extensions.service.js';
 export * from './schema/index.js';
 export { validateEnvironment } from './environment.js';
 export { runLiveKitVoiceWorker } from './livekit/livekit-voice-worker.js';
@@ -49,4 +52,7 @@ export {
   CLEF_INPUT_USD_PER_MILLION,
 } from './openai/clef-routing.js';
 
-export { createComputerTools, describeComputerAction } from './agent/tools/computer-tools.js';
+export {
+  createComputerTools,
+  describeComputerAction,
+} from './agent/tools/computer-tools.js';

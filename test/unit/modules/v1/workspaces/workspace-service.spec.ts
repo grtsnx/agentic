@@ -3,7 +3,7 @@ import { WorkspaceService } from '../../../../../src/modules/v1/workspaces/works
 import { WorkspaceStore } from '../../../../../src/modules/v1/workspaces/workspace-store.service.js';
 import { WorkspaceFilesService } from '../../../../../src/modules/v1/workspaces/workspace-files.service.js';
 import type { OpenaiService, SandboxService, DelegationService } from '@/lib';
-import { WebToolsService } from '@/config';
+import { WebToolsService, AgentExtensionsService } from '@/config';
 
 describe('workspace decisions after turn limits', () => {
   it('allows approval of the final turn action without replay', async () => {
@@ -24,6 +24,7 @@ describe('workspace decisions after turn limits', () => {
       {} as DelegationService,
       WebToolsService.fromEnvironment({}),
       {} as ComputerService,
+      AgentExtensionsService.fromEnvironment({}),
     );
     try {
       const pending = store.propose(scope, {
