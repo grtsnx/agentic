@@ -64,16 +64,67 @@ For terminal voice, install the [LiveKit CLI](https://docs.livekit.io/reference/
 
 Cloud traces are available under **Sessions → Agent insights** when Agent Observability is enabled. Worker audio/transcript retention is disabled. Telephony still requires an approved number purchase and SIP setup; `LIVEKIT_PHONE_NUMBER` only prints an already-provisioned number.
 
-## MCP and skills
+## Installing MCP servers and skills
 
-Set `AGENT_EXTENSIONS_ENABLED=true`. Register trusted servers and skill folders in [agent-extensions.json](agent-extensions.json), then restart. The included configuration provides OpenAI documentation search and a [code-review skill](skills/code-review/SKILL.md).
+**The playground can use registered MCP tools and skills, but has no installation or management screen yet.** Install/register them on the machine running Agentic, restart, then use them in chat. Uploading a `SKILL.md` as a chat attachment does not install it.
 
-- MCP supports Streamable HTTP and stdio. `allowedTools` limits access; only configured `safeReadTools` run automatically. Other calls require workspace approval. Voice cannot approve privileged actions.
-- Reference credentials from `.env`, for example `"headersEnv": {"Authorization": "MY_MCP_AUTHORIZATION"}`. Stdio uses a trusted, preinstalled `command`, `args`, and optional environment references.
-- Skills use `SKILL.md` with YAML `name` and `description`. Relative Markdown/text references are allowed; script execution and automatic installation are not.
-- Calls have timeouts and budgets. MCP connection-local state is not retained between operations. OAuth, MCP resources/prompts, and remote skill installation are not supported.
+Enable extensions in the existing `.env`:
 
-Try: **“Use the code-review skill to review this code.”**
+```env
+AGENT_EXTENSIONS_ENABLED=true
+AGENT_EXTENSIONS_FILE=agent-extensions.json
+```
+
+### Add an MCP server
+
+**Remote server:** no local package is needed. Add its Streamable HTTP endpoint to the `servers` array in [agent-extensions.json](agent-extensions.json). The included OpenAI documentation entry is a working example. Use the provider's exact tool names in `allowedTools`. For authenticated servers, add an environment reference:
+
+```json
+"headersEnv": { "Authorization": "MY_MCP_AUTHORIZATION" }
+```
+
+Store the complete header value in `.env`, for example `MY_MCP_AUTHORIZATION="Bearer your-token"`. OAuth-only connections are not supported yet.
+
+**Local stdio server:** install the server on the same machine as Agentic using its publisher's instructions and a pinned version. For a Node package, the command template is `bun add --exact PACKAGE@VERSION`. Then append a server entry like this, replacing the example package path, tool name, and credential variable with the publisher's values:
+
+```json
+{
+  "id": "my_integration",
+  "description": "Describe what this integration does.",
+  "transport": "stdio",
+  "command": "node",
+  "args": ["node_modules/your-mcp-package/dist/index.js"],
+  "env": { "API_KEY": "MY_MCP_API_KEY" },
+  "allowedTools": ["your_tool_name"],
+  "safeReadTools": [],
+  "timeoutMs": 10000
+}
+```
+
+`env` maps the server's variable names to variables in Agentic's `.env`; omit it when unnecessary. Python or native servers use their installed executable and arguments instead. Use a trusted, preinstalled server: starting a local MCP process executes its code, independently of tool approvals.
+
+Only tools you explicitly put in `safeReadTools` run automatically. Other calls require workspace approval. In the CLI, enter `/workspace`, inspect `/actions`, then use `/approve ID` or `/deny ID`. Voice cannot approve privileged actions. Calls have timeouts and budgets; MCP connection-local state is not retained between operations.
+
+### Add a skill
+
+Copy a reviewed skill folder into `skills/`, including its reference files, or create `skills/my-skill/SKILL.md`:
+
+```markdown
+---
+name: my-skill
+description: Explain when the agent should use this skill.
+---
+
+Write focused instructions here. Reference supporting files with relative paths.
+```
+
+Append `"skills/my-skill"` to the manifest's existing `skills` array. Keep the included `"skills/code-review"` entry if wanted. Names must be unique lowercase letters, numbers, hyphens, or underscores. The agent can read relative `.md` and `.txt` references inside the registered folder. Skill scripts, automatic downloads, and remote installation are not supported.
+
+### Restart and try it
+
+Restart `bun run start:dev` after changing `.env` or the manifest. In the playground, try **“Use the code-review skill to review this code”** or **“Use the documentation integration to find the Responses API streaming guide.”** The agent loads relevant skill instructions and discovers the configured MCP tools on demand.
+
+`bun run smoke:extensions` checks the bundled documentation server and code-review skill; it does not validate every custom integration. Test each new integration with a harmless read before approving actions. For Docker, packages and skill folders must exist inside the container: rebuild the image or mount configuration/skills read-only at the configured paths.
 
 ## Computer access and code execution
 
