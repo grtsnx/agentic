@@ -4,6 +4,8 @@ const fake = vi.hoisted(() => ({
   options: vi.fn(),
   logger: vi.fn(),
   cli: vi.fn(),
+  on: vi.fn(),
+  off: vi.fn(),
 }));
 vi.mock('@livekit/agents', async (original) => {
   const actual = await original<typeof import('@livekit/agents')>();
@@ -17,6 +19,7 @@ vi.mock('@livekit/agents', async (original) => {
       }
       run = fake.run;
       close = fake.close;
+      event = { on: fake.on, off: fake.off };
     },
   };
 });
@@ -48,6 +51,7 @@ describe('supervised LiveKit development worker', () => {
       return process;
     }) as typeof process.on);
     vi.spyOn(process, 'removeListener').mockReturnValue(process);
+    vi.spyOn(console, 'info').mockImplementation(() => {});
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -57,7 +61,19 @@ describe('supervised LiveKit development worker', () => {
 
   it('uses readable logging and loopback ephemeral health without production pooling', async () => {
     const running = runLiveKitVoiceWorker('local');
-    expect(fake.logger).toHaveBeenCalledWith({ pretty: true, level: 'info' });
+    expect(fake.logger).toHaveBeenCalledWith({ pretty: true, level: 'warn' });
+    expect(console.info).not.toHaveBeenCalled();
+    expect(fake.on).toHaveBeenCalledWith(
+      'worker_registered',
+      expect.any(Function),
+    );
+    fake.on.mock.calls[0]![1]({
+      id: 'AW_private',
+      server_info: { region: 'private' },
+    });
+    expect(console.info).toHaveBeenCalledExactlyOnceWith(
+      '[Voice] Connected to LiveKit.',
+    );
     expect(fake.options).toHaveBeenCalledWith(
       expect.objectContaining({
         production: false,

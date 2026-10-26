@@ -41,7 +41,7 @@ const deadline = setTimeout(killTree, 30000);
 for (const stream of [child.stdout, child.stderr]) {
   stream.on('data', (chunk) => {
     output = (output + chunk.toString()).slice(-64000);
-    if (!stopping && output.includes('registered worker')) {
+    if (!stopping && output.includes('[Voice] Connected to LiveKit.')) {
       stopping = true;
       child.kill('SIGTERM');
     }
@@ -55,14 +55,12 @@ try {
   assert.equal(forced, false, 'Worker exceeded its deadline');
   assert.equal(code, 0, 'Worker did not stop cleanly');
   assert.ok(stopping, 'Worker did not register');
-  assert.doesNotMatch(output, /dev mode is deprecated|\{"level":/);
-  const port = Number(output.match(/Server is listening on port (\d+)/)?.[1]);
-  assert.ok(
-    port > 0 && port !== 8081,
-    'Expected an ephemeral development health port',
+  assert.doesNotMatch(
+    output,
+    /dev mode is deprecated|\{"level":|server_info|agentNameIsEnv|registered worker/,
   );
   console.log(
-    'PASS: Cloud registration, readable logs, no deprecation warning, dynamic health port, and clean shutdown. No room or microphone opened.',
+    'PASS: Cloud registration, concise status without SDK metadata, no deprecation warning, and clean shutdown. No room or microphone opened.',
   );
 } finally {
   clearTimeout(deadline);

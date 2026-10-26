@@ -26,7 +26,8 @@ export async function runLiveKitVoiceWorker(
   // Nest already supervises reloads. Run the SDK server directly so development
   // logging, pooling and ports do not depend on the CLI's production/dev modes.
   process.env.LIVEKIT_DEV_MODE = '1';
-  initializeLogger({ pretty: true, level: 'info' });
+  // Keep SDK diagnostics, but replace verbose info payloads with a concise status.
+  initializeLogger({ pretty: true, level: 'warn' });
   const server = new AgentServer(
     new ServerOptions({
       agent: agentPath,
@@ -38,6 +39,8 @@ export async function runLiveKitVoiceWorker(
       numIdleProcesses: 0,
     }),
   );
+  const connected = () => console.info('[Voice] Connected to LiveKit.');
+  server.event.on('worker_registered', connected);
   let closing: Promise<void> | undefined;
   let deadline: ReturnType<typeof setTimeout> | undefined;
   const stop = () => {
@@ -62,6 +65,7 @@ export async function runLiveKitVoiceWorker(
       await stop();
     } finally {
       clearTimeout(deadline);
+      server.event.off('worker_registered', connected);
       process.removeListener('SIGINT', interrupt);
       process.removeListener('SIGTERM', interrupt);
     }
