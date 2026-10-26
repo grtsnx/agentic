@@ -3,6 +3,7 @@ import {
   Injectable,
   ConflictException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { tool, type Tool } from '@openai/agents';
@@ -93,6 +94,7 @@ export class WorkspaceService {
     scope: WorkspaceScope,
     id: string,
     decision: 'approve' | 'deny' | 'cancel',
+    localApproval = false,
   ) {
     if (scope.active)
       throw new ConflictException(
@@ -100,6 +102,15 @@ export class WorkspaceService {
       );
     const run = this.begin(scope, undefined, true);
     try {
+      if (
+        decision === 'approve' &&
+        !localApproval &&
+        this.store.approvals(scope).find((action) => action.id === id)?.action
+          .tool === 'install_skill'
+      )
+        throw new ForbiddenException(
+          'Install skills from the localhost playground or local CLI only.',
+        );
       const approval = this.store.consume(scope, id, decision);
       if (approval.status !== 'consumed') return { status: approval.status };
       const result = await auditedTool(
@@ -109,13 +120,15 @@ export class WorkspaceService {
         approval.action,
         (event) => this.store.append(scope, event),
         async () =>
-          approval.action.tool === 'mcp_call_tool'
-            ? this.extensions.executeApproved(approval.action, run.signal)
-            : approval.action.tool === 'computer_action'
-              ? this.computer.execute(scope.id, approval.action, run.signal)
-              : approval.action.tool === 'execute_code'
-                ? this.sandbox.execute(approval.action.code, run.signal)
-                : this.files.delete(scope, approval.action.fileId),
+          approval.action.tool === 'install_skill'
+            ? this.extensions.installApproved(approval.action, run.signal)
+            : approval.action.tool === 'mcp_call_tool'
+              ? this.extensions.executeApproved(approval.action, run.signal)
+              : approval.action.tool === 'computer_action'
+                ? this.computer.execute(scope.id, approval.action, run.signal)
+                : approval.action.tool === 'execute_code'
+                  ? this.sandbox.execute(approval.action.code, run.signal)
+                  : this.files.delete(scope, approval.action.fileId),
       );
       run.signal.throwIfAborted();
       await scope.session.addItems([

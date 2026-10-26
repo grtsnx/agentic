@@ -25,3 +25,5 @@ export { clefResponseSchema, modelRoutingSchema } from './clef/clef.schema.js';
 export * from './computer/computer.schema.js';
 
 export * from './extensions/extensions.schema.js';
+
+export * from './extensions/skill-install.schema.js';

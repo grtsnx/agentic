@@ -59,3 +59,6 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 # Private local computer adapters and temporary runtime data
 /.computer-venv/
 /.computer-runtime/
+
+# Skills installed through the local agent, including staged downloads.
+/skills/installed/

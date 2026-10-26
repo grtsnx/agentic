@@ -20,3 +20,7 @@ export interface ExtensionContext {
   audit?: (event: ToolAudit) => void;
   propose?: (action: WorkspaceAction) => ActionApproval;
 }
+
+export type SkillInstallAction = z.infer<
+  typeof import('../../extensions/skill-install.schema.js').skillInstallActionSchema
+>;

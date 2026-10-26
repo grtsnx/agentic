@@ -1,3 +1,4 @@
+import { isLocalPlaygroundRequest } from '@/middleware';
 import { LocalComputerGuard } from '@/middleware';
 import { ComputerConnectDto, ComputerObserveDto } from '@/dto';
 import {
@@ -183,7 +184,15 @@ export class ChatkitController {
       throw new NotFoundException();
     const owner = this.service.authorize(id, request.headers.authorization);
     const abort = new AbortController();
-    const result = this.service.process(body, owner, abort.signal);
+    const result = this.service.process(
+      body,
+      owner,
+      abort.signal,
+      isLocalPlaygroundRequest(
+        request,
+        this.config.get<number>('PORT') ?? 3001,
+      ),
+    );
     if (!result.stream)
       return new StreamableFile(Buffer.from(JSON.stringify(result.json)), {
         type: 'application/json',

@@ -92,6 +92,9 @@ export const environmentSchema = z
     REALTIME_PLAYGROUND_ENABLED: booleanValue(
       'REALTIME_PLAYGROUND_ENABLED',
     ).optional(),
+    AGENT_SKILL_INSTALL_ENABLED: booleanValue(
+      'AGENT_SKILL_INSTALL_ENABLED',
+    ).default(false),
     AGENT_EXTENSIONS_ENABLED: booleanValue('AGENT_EXTENSIONS_ENABLED').default(
       false,
     ),

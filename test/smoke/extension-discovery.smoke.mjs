@@ -42,13 +42,13 @@ assert(
   'Must discover configured integrations before answering',
 );
 assert(
-  !/go[- ]ahead|shall I|want me to|would you like me|permission to|approval to|can check|could check/i.test(
+  !/go[- ]ahead|shall I|want me to|would you like me|permission to|approval to|can check|could check|if you want|I can list/i.test(
     response.message,
   ),
   'Must not ask again for permission to discover integrations',
 );
 assert(
-  !/search_openai_docs|fetch_openai_doc|argumentsJson|inputSchema|"query"|"anchor"/.test(
+  !/openai_docs|search_openai_docs|fetch_openai_doc|argumentsJson|inputSchema|"query"|"anchor"/.test(
     response.message,
   ),
   'Do not dump internal identifiers or schemas',

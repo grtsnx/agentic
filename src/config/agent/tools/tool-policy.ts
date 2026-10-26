@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 
 export const TOOL_PERMISSIONS: Readonly<Record<string, PermissionTier>> =
   Object.freeze({
+    install_skill: 'write',
     mcp_list_tools: 'safe_read',
     mcp_read_tool: 'safe_read',
     mcp_call_tool: 'write',

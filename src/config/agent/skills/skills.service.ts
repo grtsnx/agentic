@@ -20,6 +20,12 @@ export async function readCapabilityFile(path: string, maxBytes = 64000) {
   }
 }
 
+export function parseSkillMetadata(content: string) {
+  const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content);
+  if (!match) throw new Error('SKILL_FRONT_MATTER_REQUIRED');
+  return skillMetadataSchema.parse(parse(match[1]!, { maxAliasCount: 0 }));
+}
+
 @Injectable()
 export class SkillsService {
   private async catalog(paths: string[]) {
@@ -27,11 +33,7 @@ export class SkillsService {
       paths.map(async (path) => {
         const root = await realpath(resolve(path));
         const content = await this.readWithin(root, 'SKILL.md');
-        const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content);
-        if (!match) throw new Error('SKILL_FRONT_MATTER_REQUIRED');
-        const { name, description } = skillMetadataSchema.parse(
-          parse(match[1]!, { maxAliasCount: 0 }),
-        );
+        const { name, description } = parseSkillMetadata(content);
         return { root, name, description };
       }),
     );

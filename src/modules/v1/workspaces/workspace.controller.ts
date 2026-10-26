@@ -1,4 +1,5 @@
-import { LocalComputerGuard } from '@/middleware';
+import { ConfigService } from '@nestjs/config';
+import { LocalComputerGuard, isLocalPlaygroundRequest } from '@/middleware';
 import {
   Body,
   Controller,
@@ -43,7 +44,10 @@ import { WorkspaceService } from './workspace.service.js';
 @UseGuards(WorkspaceGuard)
 @Controller({ path: 'workspaces', version: '1' })
 export class WorkspaceController {
-  constructor(private readonly service: WorkspaceService) {}
+  constructor(
+    private readonly service: WorkspaceService,
+    private readonly config: ConfigService,
+  ) {}
   @Post()
   @Header('Cache-Control', 'no-store')
   @ApiOperation({
@@ -230,7 +234,12 @@ export class WorkspaceController {
     @Param('approvalId', new ParseUUIDPipe()) id: string,
     @Body() body: WorkspaceDecisionDto,
   ) {
-    return this.service.decide(req.workspace, id, body.decision);
+    return this.service.decide(
+      req.workspace,
+      id,
+      body.decision,
+      isLocalPlaygroundRequest(req, this.config.get<number>('PORT') ?? 3001),
+    );
   }
   @Post(':id/cancel')
   @HttpCode(200)

@@ -1,3 +1,4 @@
+import { WorkspaceService } from '@/modules';
 import { type INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
@@ -6,7 +7,7 @@ import { docxFixture, pdfFixture } from '../../fixtures/files/documents.js';
 import sharp from 'sharp';
 import { AppModule } from '@/app';
 import { configureApplication } from '@/bootstrap';
-import { validateEnvironment } from '@/config';
+import { AgentExtensionsService, validateEnvironment } from '@/config';
 import { SandboxService } from '@/lib';
 
 describe('workspaces API security', () => {
@@ -198,6 +199,51 @@ describe('workspaces API security', () => {
         }),
       ]),
     );
+  });
+  it('requires local same-origin approval for a project-wide skill install', async () => {
+    const a = await create();
+    const service = app.get(WorkspaceService);
+    const scope = service.store.authorize(a.id, a.token);
+    const install = vi
+      .spyOn(app.get(AgentExtensionsService), 'installApproved')
+      .mockResolvedValue({
+        status: 'installed',
+        name: 'example',
+        source: 'https://github.com/owner/repo',
+        destination: 'skills/installed/example',
+        omittedFiles: 0,
+      });
+    try {
+      const approval = service.store.propose(scope, {
+        tool: 'install_skill',
+        repository: 'owner/repo',
+        commit: 'a'.repeat(40),
+        directory: 'skills/example',
+        name: 'example',
+        description: 'Example',
+        preview: 'Instructions',
+        files: [{ path: 'SKILL.md', sha256: 'b'.repeat(64), bytes: 12 }],
+        omittedFiles: 0,
+      });
+      const url = `/v1/workspaces/${a.id}/approvals/${approval.id}`;
+      await request(app.getHttpServer())
+        .post(url)
+        .set('Authorization', `Bearer ${a.token}`)
+        .send({ decision: 'approve' })
+        .expect(403);
+      expect(install).not.toHaveBeenCalled();
+      await request(app.getHttpServer())
+        .post(url)
+        .set('Authorization', `Bearer ${a.token}`)
+        .set('Host', 'localhost:3001')
+        .set('Origin', 'http://localhost:3001')
+        .set('Sec-Fetch-Site', 'same-origin')
+        .send({ decision: 'approve' })
+        .expect(200);
+      expect(install).toHaveBeenCalledTimes(1);
+    } finally {
+      install.mockRestore();
+    }
   });
   it('denial and deletion never execute a proposed action', async () => {
     execute.mockClear();

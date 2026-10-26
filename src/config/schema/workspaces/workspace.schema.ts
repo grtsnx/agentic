@@ -1,3 +1,4 @@
+import { skillInstallActionSchema } from '../extensions/skill-install.schema.js';
 import { mcpActionSchema } from '../extensions/extensions.schema.js';
 import { computerApprovedActionSchema } from '../computer/computer.schema.js';
 import { z } from 'zod';
@@ -13,6 +14,7 @@ export const permissionTierSchema = z.enum([
 export const workspaceActionSchema = z.discriminatedUnion('tool', [
   computerApprovedActionSchema,
   mcpActionSchema,
+  skillInstallActionSchema,
   z
     .object({
       tool: z.literal('execute_code'),

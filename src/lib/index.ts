@@ -36,3 +36,6 @@ export { MacosService } from './macos/macos.service.js';
 
 export { McpModule } from './mcp/mcp.module.js';
 export { McpService } from './mcp/mcp.service.js';
+
+export { SkillInstallerModule } from './skill-installer/skill-installer.module.js';
+export { SkillInstallerService } from './skill-installer/skill-installer.service.js';

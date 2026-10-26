@@ -88,6 +88,19 @@ export const extensionInputSchema = z
       z.object({ kind: z.literal('list_skills') }).strict(),
       z
         .object({
+          kind: z.literal('install_skill'),
+          source: z.string().url().max(1000),
+          skill: z
+            .string()
+            .max(200)
+            .nullable()
+            .describe(
+              'Skill name when selecting from a repository, otherwise null.',
+            ),
+        })
+        .strict(),
+      z
+        .object({
           kind: z.literal('read_skill'),
           name: id,
           file: z

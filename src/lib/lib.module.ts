@@ -1,3 +1,4 @@
+import { SkillInstallerModule } from './skill-installer/skill-installer.module.js';
 import { McpModule } from './mcp/mcp.module.js';
 import { BrowserModule } from './browser/browser.module.js';
 import { MacosModule } from './macos/macos.module.js';
@@ -15,6 +16,7 @@ import { ValyuModule } from './valyu/valyu.module.js';
 @Module({
   imports: [
     McpModule,
+    SkillInstallerModule,
     BrowserModule,
     MacosModule,
     ChatkitAdapterModule,
@@ -29,6 +31,7 @@ import { ValyuModule } from './valyu/valyu.module.js';
   ],
   exports: [
     McpModule,
+    SkillInstallerModule,
     BrowserModule,
     MacosModule,
     ChatkitAdapterModule,

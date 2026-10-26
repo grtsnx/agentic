@@ -41,8 +41,12 @@ export class ChatkitService implements OnModuleDestroy {
     );
   }
 
-  computerScope(owner: WorkspaceScope, id: string) { return this.requireThread(id, owner).scope; }
-  get computer() { return this.workspaces.computer; }
+  computerScope(owner: WorkspaceScope, id: string) {
+    return this.requireThread(id, owner).scope;
+  }
+  get computer() {
+    return this.workspaces.computer;
+  }
 
   async upload(owner: WorkspaceScope, file: UploadedDocument) {
     const uploaded = await this.workspaces.files.upload(owner, file);
@@ -94,7 +98,12 @@ export class ChatkitService implements OnModuleDestroy {
     return files;
   }
 
-  process(body: unknown, owner: WorkspaceScope, signal: AbortSignal) {
+  process(
+    body: unknown,
+    owner: WorkspaceScope,
+    signal: AbortSignal,
+    localApproval = false,
+  ) {
     const parsed = chatkitRequestSchema.safeParse(body);
     if (!parsed.success)
       throw new BadRequestException('Invalid or unsupported ChatKit request.');
@@ -128,7 +137,11 @@ export class ChatkitService implements OnModuleDestroy {
       );
       // Child threads cannot outlive the browser capability that owns them.
       scope.expiresAt = Math.min(scope.expiresAt, owner.expiresAt);
-      owner.abort.signal.addEventListener('abort',()=>this.workspaces.store.remove(scope),{once:true});
+      owner.abort.signal.addEventListener(
+        'abort',
+        () => this.workspaces.store.remove(scope),
+        { once: true },
+      );
       const thread: ChatkitThread = {
         ownerId: owner.id,
         ownerSignal: owner.abort.signal,
@@ -218,7 +231,7 @@ export class ChatkitService implements OnModuleDestroy {
         this.requireIdle(thread);
         if (!thread.approvals.has(request.params.item_id))
           throw new NotFoundException('Action not found.');
-        return { stream: this.decide(thread, request) };
+        return { stream: this.decide(thread, request, localApproval) };
     }
   }
 
@@ -409,6 +422,7 @@ export class ChatkitService implements OnModuleDestroy {
   private async *decide(
     thread: ChatkitThread,
     request: Extract<ChatkitRequest, { type: 'threads.custom_action' }>,
+    localApproval: boolean,
   ): AsyncGenerator<ChatkitEvent> {
     this.requireIdle(thread);
     thread.busy = true;
@@ -419,6 +433,7 @@ export class ChatkitService implements OnModuleDestroy {
         thread.scope,
         approvalId,
         request.params.action.payload.decision,
+        localApproval,
       );
       const approval = this.workspaces.store
         .approvals(thread.scope)

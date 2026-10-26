@@ -169,7 +169,7 @@ export class CliService {
       command === '/cancel'
     ) {
       const decision = command.slice(1) as 'approve' | 'deny' | 'cancel';
-      const result = await service.decide(scope, argument, decision);
+      const result = await service.decide(scope, argument, decision, true);
       output.write(JSON.stringify(result, null, 2) + '\n');
     } else output.write('Workspace active. Files expire with this session.\n');
     this.showApprovals(scope, output);
@@ -179,7 +179,7 @@ export class CliService {
       (item) => item.status === 'pending',
     ))
       output.write(
-        `Approval ${action.id}\nTarget: ${action.target}\nScope: this CLI workspace\nRisk: ${action.risk}\nExpires: ${new Date(action.expiresAt).toISOString()}\n${JSON.stringify(action.action, null, 2)}\nUse /approve, /deny, or /cancel followed by this ID.\n`,
+        `Approval ${action.id}\nTarget: ${action.target}\nScope: ${action.action.tool === 'install_skill' ? 'all local chats and voice' : 'this CLI workspace'}\nRisk: ${action.risk}\nExpires: ${new Date(action.expiresAt).toISOString()}\n${JSON.stringify(action.action, null, 2)}\nUse /approve, /deny, or /cancel followed by this ID.\n`,
       );
   }
 

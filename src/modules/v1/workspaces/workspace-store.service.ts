@@ -85,21 +85,25 @@ export class WorkspaceStore implements OnModuleDestroy {
       expiresAt: Math.min(scope.expiresAt, Date.now() + 300_000),
       status: 'pending',
       target:
-        action.tool === 'mcp_call_tool'
-          ? `MCP ${action.server}: ${action.name}`
-          : action.tool === 'computer_action'
-            ? `Local ${action.target}: ${action.app ?? 'dedicated Chrome profile'}`
-            : action.tool === 'execute_code'
-              ? 'Isolated JavaScript container'
-              : `File ${action.fileId}`,
+        action.tool === 'install_skill'
+          ? `Install ${action.name} into skills/installed/${action.name}`
+          : action.tool === 'mcp_call_tool'
+            ? `MCP ${action.server}: ${action.name}`
+            : action.tool === 'computer_action'
+              ? `Local ${action.target}: ${action.app ?? 'dedicated Chrome profile'}`
+              : action.tool === 'execute_code'
+                ? 'Isolated JavaScript container'
+                : `File ${action.fileId}`,
       risk:
-        action.tool === 'mcp_call_tool'
-          ? 'Sends the exact arguments shown to this configured server. It may change data or take an external action. Approve once only; a failed or cancelled call can have an uncertain outcome.'
-          : action.tool === 'computer_action'
-            ? 'Controls your actual Mac. This action may change data or submit information in the shown app or website. Review the exact input before approving. No automatic retry.'
-            : action.tool === 'execute_code'
-              ? 'Runs the exact code shown. Network is disabled; only temporary sandbox files can be written.'
-              : 'Permanently removes this uploaded file from the workspace.',
+        action.tool === 'install_skill'
+          ? 'Adds third-party instructions for all local chats and voice. Review the pinned source and preview. Only Markdown/text files are installed; scripts are omitted. No existing skill is overwritten.'
+          : action.tool === 'mcp_call_tool'
+            ? 'Sends the exact arguments shown to this configured server. It may change data or take an external action. Approve once only; a failed or cancelled call can have an uncertain outcome.'
+            : action.tool === 'computer_action'
+              ? 'Controls your actual Mac. This action may change data or submit information in the shown app or website. Review the exact input before approving. No automatic retry.'
+              : action.tool === 'execute_code'
+                ? 'Runs the exact code shown. Network is disabled; only temporary sandbox files can be written.'
+                : 'Permanently removes this uploaded file from the workspace.',
     };
     scope.approvals.set(record.id, record);
     this.audit(scope, {
