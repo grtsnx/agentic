@@ -24,7 +24,7 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"*.{ts,json,md,yaml}\" \".github/**/*.{yml,yaml}\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"*.{ts,json,md,yaml}\" \".github/**/*.{yml,yaml}\"",
     "start": "nest start --env-file .env",
-    "start:dev": "nest start --watch --env-file .env",
+    "start:dev": "nest start --watch --entryFile dev --env-file .env",
     "start:debug": "nest start --debug --watch --env-file .env",
     "start:prod": "node dist/main",
     "lint": "oxlint src/ test/",
@@ -39,7 +39,8 @@
     "smoke:tool-selection": "NODE_ENV=test RUN_TOOL_SELECTION_SMOKE=true node --env-file=.env node_modules/vitest/vitest.mjs run --config ./vitest.config.smoke.ts",
     "smoke:search": "NODE_ENV=test RUN_SEARCH_SMOKE=true node --env-file=.env node_modules/vitest/vitest.mjs run --config ./vitest.config.smoke.ts test/smoke/search.smoke-spec.ts",
     "benchmark:routing": "NODE_ENV=test RUN_CLEF_BENCHMARK=true node --env-file=.env node_modules/vitest/vitest.mjs run --config ./vitest.config.smoke.ts test/smoke/clef-routing.smoke-spec.ts",
-    "benchmark:latency": "NODE_ENV=test RUN_LATENCY_BENCHMARK=true node --env-file=.env node_modules/vitest/vitest.mjs run --config ./vitest.config.smoke.ts test/smoke/latency.smoke-spec.ts"
+    "benchmark:latency": "NODE_ENV=test RUN_LATENCY_BENCHMARK=true node --env-file=.env node_modules/vitest/vitest.mjs run --config ./vitest.config.smoke.ts test/smoke/latency.smoke-spec.ts",
+    "start:dev:api": "nest start --watch --env-file .env"
   },
   "dependencies": {
     "@livekit/agents": "1.9.4",

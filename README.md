@@ -17,6 +17,8 @@ Add `OPENAI_API_KEY` to `.env`, then start the API:
 bun run start:dev
 ```
 
+This starts the API and automatically starts the LiveKit worker when `VOICE_ENABLED=true` in `.env`. One Nest watcher rebuilds and restarts both on source changes. Ctrl+C stops both; an unexpected service exit stops its sibling and reports a failure. Use `bun run start:dev:api` for API-only development. Restart the command after changing `.env`. Do not also run `voice:dev` when the combined command owns the worker.
+
 | Interface  | URL or command                   |
 | ---------- | -------------------------------- |
 | Playground | http://localhost:3001/playground |
@@ -114,11 +116,7 @@ Use `lk cloud auth` to connect first if needed. Keep all local settings in `.env
 
 ### Browser voice
 
-Keep the API running and start the worker in a second terminal:
-
-```bash
-bun run voice:dev
-```
+Set `VOICE_ENABLED=true` and run `bun run start:dev`; it starts both the API and voice worker. If you intentionally use `bun run start:dev:api`, start the worker separately with `bun run voice:dev`.
 
 Open the playground, select **Voice** in the composer, and allow microphone access. Both processes must run for voice replies. If playback is blocked, select **Tap to hear Agentic**. After changing voice settings, restart the worker and start a new conversation.
 
@@ -278,6 +276,7 @@ src/
 ├── middleware/           # Filters, interceptors, errors, and shared utilities.
 ├── modules/              # Chat, ChatKit, workspaces, and voice in v1/; clean v2/ boundary.
 ├── cli.ts                # Text CLI entry point.
+├── dev.ts                # Shared development startup and shutdown for API and voice.
 ├── main.ts               # HTTP and Socket.IO entry point.
 └── voice.ts              # LiveKit worker entry point.
 test/                     # Categorized unit/, e2e/, and smoke/ tests.
