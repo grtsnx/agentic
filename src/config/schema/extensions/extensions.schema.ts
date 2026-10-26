@@ -5,6 +5,7 @@ const envName = z.string().regex(/^[A-Z][A-Z0-9_]*$/);
 const serverFields = {
   id,
   description: z.string().min(1).max(500),
+  displayName: z.string().min(1).max(100).optional(),
   allowedTools: z.array(z.string().min(1).max(128)).min(1).max(50),
   safeReadTools: z.array(z.string().min(1).max(128)).max(50).default([]),
   timeoutMs: z.number().int().min(1000).max(30000).default(10000),
@@ -89,7 +90,8 @@ export const extensionInputSchema = z
       z
         .object({
           kind: z.literal('install_skill'),
-          source: z.string().url().max(1000),
+          // The provider validates the URL; OpenAI rejects JSON Schema's uri format.
+          source: z.string().min(1).max(1000),
           skill: z
             .string()
             .max(200)

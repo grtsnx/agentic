@@ -72,6 +72,13 @@ export class OpenaiService {
   ): Promise<OpenaiResponse> {
     const startedAt = performance.now();
     const signal = this.runSignal(options.signal);
+    const inventory = await this.capabilityReply(
+      message,
+      options,
+      signal,
+      startedAt,
+    );
+    if (inventory) return inventory;
     const routing = await this.selectModel(message, { ...options, signal });
     const model = routing.model;
     const searchEnabled = this.setting('WEB_SEARCH_ENABLED', true);
@@ -128,6 +135,29 @@ export class OpenaiService {
     options: OpenaiStreamOptions = {},
   ): AsyncGenerator<OpenaiStreamEvent> {
     const startedAt = performance.now();
+    const inventory = await this.capabilityReply(
+      message,
+      options,
+      this.runSignal(options.signal),
+      startedAt,
+    );
+    if (inventory) {
+      yield {
+        type: 'status',
+        phase: 'tool',
+        message: 'Checking available capabilities',
+      };
+      yield { type: 'delta', delta: inventory.message };
+      yield {
+        type: 'completed',
+        response: openaiStreamResponseSchema.parse({
+          message: inventory.message,
+          runtime: inventory.runtime,
+          sources: [],
+        }),
+      };
+      return;
+    }
     let lastStatus = '';
     const thinking = {
       type: 'status',
@@ -269,6 +299,58 @@ export class OpenaiService {
     } catch (error) {
       throw mapProviderError(error);
     }
+  }
+
+  private async capabilityReply(
+    message: string,
+    options: OpenaiReplyOptions,
+    signal: AbortSignal,
+    startedAt: number,
+  ): Promise<OpenaiResponse | undefined> {
+    if (options.hasAttachments) return undefined;
+    const summary = await this.extensions?.describeAvailable(message, signal, {
+      scopeId: options.scopeId,
+      traceId: options.traceId,
+      audit: options.onToolAudit,
+    });
+    if (summary === undefined) return undefined;
+    signal.throwIfAborted();
+    // Keep deterministic replies in conversation context without inventing model usage.
+    await options.session?.addItems([
+      { role: 'user', content: message },
+      {
+        role: 'assistant',
+        status: 'completed',
+        content: [{ type: 'output_text', text: summary }],
+      },
+    ]);
+    return openaiResponseSchema.parse({
+      status: 'completed',
+      message: summary,
+      summary: 'Configured capabilities',
+      keyPoints: [],
+      suggestedActions: [],
+      followUpQuestions: [],
+      sources: [],
+      runtime: {
+        durationMs: Math.round(performance.now() - startedAt),
+        tokens: {
+          input: 0,
+          output: 0,
+          total: 0,
+          cachedInput: 0,
+          reasoningOutput: 0,
+        },
+        cost: {
+          estimatedUsd: 0,
+          currency: 'USD',
+          exact: false,
+          includesToolCosts: true,
+        },
+        models: [],
+        tools: [],
+      },
+    });
   }
 
   private createTools(

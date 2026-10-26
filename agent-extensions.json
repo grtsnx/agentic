@@ -7,7 +7,8 @@
       "url": "https://developers.openai.com/mcp",
       "allowedTools": ["search_openai_docs", "fetch_openai_doc"],
       "safeReadTools": ["search_openai_docs", "fetch_openai_doc"],
-      "timeoutMs": 10000
+      "timeoutMs": 10000,
+      "displayName": "OpenAI documentation"
     }
   ],
   "skills": ["skills/code-review"]

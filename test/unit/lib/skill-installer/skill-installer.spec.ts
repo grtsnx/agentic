@@ -1,3 +1,9 @@
+import { writeFile } from 'node:fs/promises';
+import { ConfigService } from '@nestjs/config';
+import { AgentExtensionsService } from '@/config';
+import { McpService } from '../../../../src/lib/mcp/mcp.service.js';
+import { SkillsService } from '../../../../src/config/agent/skills/skills.service.js';
+import { WorkspaceStore } from '../../../../src/modules/v1/workspaces/workspace-store.service.js';
 import { mkdtemp, readFile, rm, readdir, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -71,6 +77,59 @@ describe('approved skill installation', () => {
     await expect(service.install(action, signal)).rejects.toThrow(
       'ALREADY_INSTALLED',
     );
+  });
+  it('proposes before writing and discovers the approved skill without restarting', async () => {
+    fixture();
+    const manifest = join(root, 'extensions.json');
+    await writeFile(manifest, JSON.stringify({ servers: [], skills: [] }));
+    const installer = new SkillInstallerService(join(root, 'installed'));
+    const extensions = new AgentExtensionsService(
+      new ConfigService({
+        AGENT_EXTENSIONS_ENABLED: true,
+        AGENT_SKILL_INSTALL_ENABLED: true,
+        NODE_ENV: 'test',
+        AGENT_EXTENSIONS_FILE: manifest,
+      }),
+      new McpService(),
+      new SkillsService(),
+      installer,
+    );
+    const store = new WorkspaceStore(),
+      issued = store.create(),
+      scope = store.authorize(issued.id, issued.token);
+    try {
+      const [tool] = extensions.createTools({
+        propose: (action) => store.propose(scope, action),
+      });
+      await tool!.execute(
+        {
+          action: {
+            kind: 'install_skill',
+            source: 'https://skills.sh/owner/repo/example',
+            skill: null,
+          },
+        },
+        scope.abort.signal,
+      );
+      expect(await installer.installedPaths()).toEqual([]);
+      const pending = store.approvals(scope)[0]!;
+      expect(pending.status).toBe('pending');
+      const approved = store.consume(scope, pending.id, 'approve');
+      if (approved.action.tool !== 'install_skill')
+        throw new Error('Wrong action');
+      await extensions.installApproved(approved.action, scope.abort.signal);
+      await expect(
+        tool!.execute({ action: { kind: 'list_skills' } }, scope.abort.signal),
+      ).resolves.toMatchObject({ skills: [{ name: 'example' }] });
+      await expect(
+        tool!.execute(
+          { action: { kind: 'read_skill', name: 'example', file: 'SKILL.md' } },
+          scope.abort.signal,
+        ),
+      ).resolves.toMatchObject({ text: skill });
+    } finally {
+      store.onModuleDestroy();
+    }
   });
   it('rejects changed content and cancellation without registering a partial skill', async () => {
     fixture();

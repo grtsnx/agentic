@@ -66,14 +66,21 @@ Cloud traces are available under **Sessions → Agent insights** when Agent Obse
 
 ## Installing MCP servers and skills
 
-**The playground can use registered MCP tools and skills, but has no installation or management screen yet.** Install/register them on the machine running Agentic, restart, then use them in chat. Uploading a `SKILL.md` as a chat attachment does not install it.
+**Install skills through playground chat:** paste a public GitHub skill-folder link or a [skills.sh](https://skills.sh) skill link and ask the agent to install it. Review the source, pinned commit, file list, and instruction preview, then choose **Approve once**. MCP servers still require manual registration. Uploading a `SKILL.md` as an attachment does not install it.
 
 Enable extensions in the existing `.env`:
 
 ```env
 AGENT_EXTENSIONS_ENABLED=true
 AGENT_EXTENSIONS_FILE=agent-extensions.json
+AGENT_SKILL_INSTALL_ENABLED=true
 ```
+
+For example: **“Install https://skills.sh/vercel-labs/agent-skills/web-design-guidelines.”** GitHub links such as `https://github.com/vercel-labs/agent-skills/tree/main/skills/web-design-guidelines` also work. Repository-only links need a skill name when they contain multiple skills.
+
+Installation is available only in development, with approval from the localhost playground or local CLI workspace. It writes Markdown/text files under `skills/installed/`, available to all local chats and voice immediately. Scripts and other assets are omitted; existing skills are never overwritten. Public repositories only, with at most 32 document files, 64 KB each and 256 KB total. These limits mean some skill packages are not supported. Inspect third-party instructions before approving; installation does not grant tools or permissions. [skills.sh documentation](https://skills.sh/docs) explains the source format.
+
+If an interrupted process leaves `skills/installed/.install.lock`, stop the API/worker before removing that lock and any `.pending-*` folders. Installed skill folders persist locally and are ignored by Git.
 
 ### Add an MCP server
 
@@ -105,7 +112,7 @@ Store the complete header value in `.env`, for example `MY_MCP_AUTHORIZATION="Be
 
 Only tools you explicitly put in `safeReadTools` run automatically. Other calls require workspace approval. In the CLI, enter `/workspace`, inspect `/actions`, then use `/approve ID` or `/deny ID`. Voice cannot approve privileged actions. Calls have timeouts and budgets; MCP connection-local state is not retained between operations.
 
-### Add a skill
+### Add a skill manually
 
 Copy a reviewed skill folder into `skills/`, including its reference files, or create `skills/my-skill/SKILL.md`:
 
@@ -118,11 +125,11 @@ description: Explain when the agent should use this skill.
 Write focused instructions here. Reference supporting files with relative paths.
 ```
 
-Append `"skills/my-skill"` to the manifest's existing `skills` array. Keep the included `"skills/code-review"` entry if wanted. Names must be unique lowercase letters, numbers, hyphens, or underscores. The agent can read relative `.md` and `.txt` references inside the registered folder. Skill scripts, automatic downloads, and remote installation are not supported.
+Append `"skills/my-skill"` to the manifest's existing `skills` array. Keep the included `"skills/code-review"` entry if wanted. Names must be unique lowercase letters, numbers, hyphens, or underscores. The agent can read relative `.md` and `.txt` references inside the registered folder. Skill scripts do not execute. Remote installation uses the approval flow above.
 
 ### Restart and try it
 
-Restart `bun run start:dev` after changing `.env` or the manifest. In the playground, try **“Use the code-review skill to review this code”** or **“Use the documentation integration to find the Responses API streaming guide.”** The agent loads relevant skill instructions and discovers the configured MCP tools on demand.
+Restart `bun run start:dev` after changing `.env` or the manifest. In the playground, try **“Use the code-review skill to review this code”** or **“Use the documentation integration to find the Responses API streaming guide.”** The agent loads relevant skill instructions and discovers configured MCP tools on demand. Simple availability questions are answered directly from configuration without model charges; configured access does not certify live server reachability.
 
 `bun run smoke:extensions` checks the bundled documentation server and code-review skill; it does not validate every custom integration. Test each new integration with a harmless read before approving actions. For Docker, packages and skill folders must exist inside the container: rebuild the image or mount configuration/skills read-only at the configured paths.
 
@@ -166,6 +173,8 @@ bun run smoke:tools      # Enabled web providers; provider charges may apply.
 bun run smoke:extensions # Public MCP server and bundled skill; no model call.
 # After building, with Docker and the pinned image installed:
 RUN_SANDBOX_SMOKE=true node test/smoke/sandbox.smoke.mjs
+# After building, import a public skill into a temporary directory:
+node test/smoke/skill-install.smoke.mjs
 # After building, with the API and voice worker running:
 RUN_VOICE_SMOKE=true node --env-file=.env test/smoke/voice.smoke.mjs
 ```
@@ -200,7 +209,7 @@ src/
 ├── modules/              # Feature modules in v1/; reserved v2/ boundary.
 └── main.ts               # HTTP entry point; cli.ts, dev.ts, and voice.ts serve other runtimes.
 test/                     # Unit, end-to-end, and opt-in smoke tests.
-skills/                   # Reusable SKILL.md instructions and references.
+skills/                   # Bundled skills and approved local installs in installed/.
 agent-extensions.json     # MCP allowlists and registered skills.
 compose.yaml              # Local services built with Dockerfile.
 AGENTS.md                 # Architecture and contribution rules.
@@ -273,6 +282,7 @@ Ordered from foundations to advanced capabilities. ✅ Verified complete · ⬜ 
 
 - ✅ Add configured MCP HTTP/stdio tools with allowlists, timeouts, cancellation, bounded outputs, audits, and single-use approvals.
 - ✅ Load registered SKILL.md instructions and scoped references across chat, CLI, and voice without executing skill scripts.
+- ✅ Verify approved GitHub and skills.sh installation, pinned content, atomic writes, and localhost-only approval.
 - ✅ Verify public documentation MCP discovery/search and local skill loading (`bun run smoke:extensions`).
 
 - ✅ Add web search with citations, source metadata, domain controls, and timeout limits.
