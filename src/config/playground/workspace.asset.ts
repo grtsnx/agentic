@@ -64,6 +64,10 @@ export const WORKSPACE_STYLES = `
 .approval-card {width:calc(100% - 32px);box-sizing:border-box;max-width:720px;margin:12px auto 20px;padding:20px;border:1px solid var(--border);border-radius:18px;background:var(--surface-subtle);color:var(--text);overflow-wrap:anywhere;}
 .approval-card header {display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;}
 .approval-card header svg {width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;}
+.approval-card details {margin-top:14px;font-size:13px;}
+.approval-card summary {cursor:pointer;padding:8px 0;font-weight:600;}
+.approval-card a {color:inherit;text-underline-offset:3px;}
+.approval-card .approval-source {display:inline-block;font-size:12px;margin-top:10px;}
 .approval-card p {font-size:13px;line-height:1.6;margin:10px 0;}
 .approval-card small {display:block;color:var(--muted);font-size:12px;line-height:1.6;}
 .approval-card pre {max-height:240px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);font:12px/1.6 monospace;}
@@ -78,6 +82,25 @@ export const WORKSPACE_STYLES = `
 
 `;
 export const WORKSPACE_APP = `
+function renderSkillApproval(card, approval) {
+  const action=approval.action;
+  const text=(tag,value)=>{const node=document.createElement(tag);node.textContent=value;return node;};
+  card.append(text('header','Install '+action.name+'?'),text('p',action.description));
+  card.append(text('small','All local chats and voice · One installation · Expires '+new Date(approval.expiresAt).toLocaleTimeString()));
+  const source=text('a',action.repository+' · '+action.commit.slice(0,7));
+  // Construct the link from validated repository components, never preview HTML.
+  source.href='https://github.com/'+action.repository+'/tree/'+action.commit+'/'+action.directory;
+  source.target='_blank';source.rel='noopener noreferrer';source.className='approval-source';
+  card.append(source,text('p',approval.risk));
+  const details=document.createElement('details');
+  details.append(text('summary','Review instructions and files ('+action.files.length+')'));
+  details.append(text('small','Destination: skills/installed/'+action.name));
+  const files=document.createElement('ul');
+  for(const file of action.files)files.append(text('li',file.path+' ('+file.bytes+' bytes)'));
+  details.append(files);
+  if(action.omittedFiles)details.append(text('small',action.omittedFiles+' non-document files excluded.'));
+  details.append(text('pre',action.preview));card.append(details);
+}
 function createWorkspacePanel() {
   const fileIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H5v20h14V7Z M14 2v6h5 M8 12h8 M8 16h6"/></svg>';
   let credentials;
@@ -284,8 +307,11 @@ function createWorkspacePanel() {
     heading.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6Z"/><path d="M12 8v5m0 3v1"/></svg>';
     heading.append(text('span',action.action.tool==='install_skill'?'Install this skill?':action.action.tool==='mcp_call_tool'?'Allow integration action?':action.action.tool==='computer_action'?'Allow computer action?':action.action.tool==='execute_code'?'Allow code execution?':'Allow file removal?'));
     const target=action.action.tool==='delete_file'?(attachedFiles.find(file=>file.id===action.action.fileId)?.filename??action.target):action.target;
-    card.append(heading,text('p',target),text('small',(action.action.tool==='install_skill'?'All local chats and voice':'This chat only')+' · One action · Expires '+new Date(action.expiresAt).toLocaleTimeString()),text('p',action.risk));
-    card.append(text('pre',action.action.tool==='install_skill'?JSON.stringify(action.action,null,2):action.action.tool==='mcp_call_tool'?action.action.argumentsJson:action.action.tool==='computer_action'?JSON.stringify(action.action,null,2):action.action.tool==='execute_code'?action.action.code:'Remove '+target));
+    if(action.action.tool==='install_skill')renderSkillApproval(card,action);
+    else {
+      card.append(heading,text('p',target),text('small','This chat only · One action · Expires '+new Date(action.expiresAt).toLocaleTimeString()),text('p',action.risk));
+      card.append(text('pre',action.action.tool==='mcp_call_tool'?action.action.argumentsJson:action.action.tool==='computer_action'?JSON.stringify(action.action,null,2):action.action.tool==='execute_code'?action.action.code:'Remove '+target));
+    }
     const footer=text('footer','');const status=text('p','Waiting for your approval.');status.className='approval-status';status.setAttribute('role','status');
     const state={busy:false,settled:false,finish(message){state.settled=true;card.setAttribute('data-settled','');for(const button of footer.children)button.disabled=true;status.textContent=message;clearTimeout(timer);approvalTimers.delete(timer);}};
     const timer=setTimeout(()=>state.finish('Request expired. Ask for a new proposal.'),Math.max(0,action.expiresAt-Date.now()));approvalTimers.add(timer);

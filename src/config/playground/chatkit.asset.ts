@@ -117,11 +117,14 @@ function renderChatkitWidget(item) {
   const card=document.createElement('article');card.className='approval-card';card.setAttribute('aria-label','Action approval');
   const status=document.createElement('p');status.setAttribute('role','status');
   const render=(node)=>{
-    if(node.type==='Text'){const text=document.createElement('p');text.textContent=node.value;return text;}
+    if(node.type==='Text'){const text=document.createElement('p');text.textContent=node.value;text.style.whiteSpace='pre-wrap';return text;}
     if(node.type==='Row'){const row=document.createElement('footer');for(const child of node.children??[]){const element=render(child);if(element)row.append(element);}return row;}
     if(node.type==='Button'&&node.onClickAction?.type==='approval.decide'){
       const button=document.createElement('button');button.type='button';button.textContent=node.label;
+      if(node.onClickAction.payload?.decision==='approve')button.setAttribute('data-approve','');
+      button.disabled=item.approval?.expiresAt<=Date.now();
       button.addEventListener('click',async()=>{
+        if(item.approval?.expiresAt<=Date.now()){button.disabled=true;status.textContent='Request expired. Ask for a new proposal.';return;}
         if(active||chatTransport.busy){status.textContent='Wait for the current response to finish.';return;}
         for(const sibling of card.querySelectorAll('button'))sibling.disabled=true;
         status.textContent='Submitting your decision…';
@@ -130,7 +133,13 @@ function renderChatkitWidget(item) {
       });return button;
     }
   };
-  for(const child of children){const element=render(child);if(element)card.append(element);}card.append(status);
+  const skill=item.approval?.action.tool==='install_skill';
+  if(skill)renderSkillApproval(card,item.approval);
+  // Standard widgets remain available to other ChatKit clients. Our UI uses
+  // structured fields so third-party instructions stay inert and collapsible.
+  for(const child of skill?children.slice(5):children){const element=render(child);if(element)card.append(element);}
+  if(item.approval?.status==='pending'&&item.approval.expiresAt<=Date.now())status.textContent='Request expired. Ask for a new proposal.';
+  card.append(status);
   const existing=chatkitWidgets.get(item.id);if(existing?.isConnected)existing.replaceWith(card);else document.querySelector('#messages').append(card);
   chatkitWidgets.set(item.id,card);
 }

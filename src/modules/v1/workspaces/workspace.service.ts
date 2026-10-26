@@ -25,6 +25,8 @@ import {
 import { WorkspaceStore } from './workspace-store.service.js';
 import { WorkspaceFilesService } from './workspace-files.service.js';
 
+const APPROVAL_NOTICE = 'Review the pending action to approve or deny it.';
+
 @Injectable()
 export class WorkspaceService {
   constructor(
@@ -49,6 +51,17 @@ export class WorkspaceService {
       scope.turns++;
       return {
         ...response,
+        ...(this.hasPendingAction(scope, run.traceId)
+          ? {
+              message: APPROVAL_NOTICE,
+              status: 'needs_input' as const,
+              summary: '',
+              keyPoints: [],
+              suggestedActions: [],
+              followUpQuestions: [],
+              sources: [],
+            }
+          : {}),
         approvals: this.store
           .approvals(scope)
           .filter((x) => x.status === 'pending'),
@@ -65,11 +78,36 @@ export class WorkspaceService {
     const run = this.begin(scope, external);
     try {
       await this.checkContext(scope);
+      let notified = false;
       for await (const event of this.openai.streamReply(
         message,
         this.options(scope, run),
-      ))
-        yield event;
+      )) {
+        // Approval details are authoritative server data, not model narration.
+        // Drain the provider stream to preserve usage accounting and cleanup.
+        if (!this.hasPendingAction(scope, run.traceId)) {
+          yield event;
+          continue;
+        }
+        if (!notified) {
+          yield {
+            type: 'status',
+            phase: 'approval',
+            message: 'Awaiting your approval',
+          };
+          yield { type: 'delta', delta: APPROVAL_NOTICE };
+          notified = true;
+        }
+        if (event.type === 'completed')
+          yield {
+            ...event,
+            response: {
+              ...event.response,
+              message: APPROVAL_NOTICE,
+              sources: [],
+            },
+          };
+      }
       scope.turns++;
     } finally {
       scope.active = undefined;
@@ -146,6 +184,17 @@ export class WorkspaceService {
     scope.active?.abort();
     void this.computer.disconnect(scope.id).catch(() => {});
     return { cancelled: true };
+  }
+
+  private hasPendingAction(scope: WorkspaceScope, traceId: string) {
+    for (const approval of scope.approvals.values())
+      if (
+        approval.traceId === traceId &&
+        approval.status === 'pending' &&
+        approval.expiresAt > Date.now()
+      )
+        return true;
+    return false;
   }
 
   private begin(scope: WorkspaceScope, external?: AbortSignal, action = false) {

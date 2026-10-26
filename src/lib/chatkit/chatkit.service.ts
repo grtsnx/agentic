@@ -200,6 +200,13 @@ export class ChatkitAdapterService {
       id,
       type: 'widget',
       widget: { type: 'Card', children },
+      approval: {
+        action: approval.action,
+        target: approval.target,
+        risk: approval.risk,
+        expiresAt: approval.expiresAt,
+        status: approval.status,
+      },
     };
   }
 }

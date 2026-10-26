@@ -2,7 +2,10 @@ import type { z } from 'zod';
 import type { Attachment, Widgets } from '@openai/chatkit';
 import type { chatkitRequestSchema } from '../../chatkit/chatkit.schema.js';
 import type { OpenaiStreamResponse } from '../openai/openai.types.js';
-import type { WorkspaceFile } from '../workspaces/workspace.types.js';
+import type {
+  ActionApproval,
+  WorkspaceFile,
+} from '../workspaces/workspace.types.js';
 import type { WorkspaceScope } from '../workspaces/workspace.types.js';
 
 export type ChatkitRequest = z.infer<typeof chatkitRequestSchema>;
@@ -37,7 +40,15 @@ export type ChatkitItem = {
       content: ChatkitContent[];
       agentic?: OpenaiStreamResponse;
     }
-  | { type: 'widget'; widget: Widgets.Card; copy_text?: string }
+  | {
+      type: 'widget';
+      widget: Widgets.Card;
+      copy_text?: string;
+      approval?: Pick<
+        ActionApproval,
+        'action' | 'target' | 'risk' | 'expiresAt' | 'status'
+      >;
+    }
 );
 export type ChatkitThread = {
   ownerId: string;
