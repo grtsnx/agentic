@@ -11,7 +11,7 @@ export const ACTIVITY_INDICATOR_VIEW =
 export const ACTIVITY_INDICATOR_APP = `
   const staticOrbGlyphs = ${JSON.stringify(staticGlyphs)};
   const activityStates = { thinking: 'working', reconnecting: 'connecting', searching: 'searching', reading: 'composing', reviewing: 'solving', organizing: 'weaving', tool: 'shaping', handoff: 'connecting', responding: 'composing', approval: 'breathing', stopping: 'breathing' };
-  const activityLabels = { Reconnecting: 'reconnecting', 'Searching the web': 'searching', 'Reading a page': 'reading', 'Reviewing sources': 'reviewing', 'Reviewing information': 'reviewing', 'Organizing context': 'organizing', 'Stopping': 'stopping' };
+  const activityLabels = { Reconnecting: 'reconnecting', 'Searching the web': 'searching', 'Reading a page': 'reading', 'Reading the screen': 'reading', 'Preparing an action for approval': 'approval', 'Reviewing sources': 'reviewing', 'Reviewing information': 'reviewing', 'Organizing context': 'organizing', 'Stopping': 'stopping' };
   let orbEnginePromise;
   function loadOrbEngine() {
     return orbEnginePromise ??= import('/playground/orb-engine.js');

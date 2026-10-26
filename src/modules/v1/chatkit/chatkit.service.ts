@@ -41,6 +41,9 @@ export class ChatkitService implements OnModuleDestroy {
     );
   }
 
+  computerScope(owner: WorkspaceScope, id: string) { return this.requireThread(id, owner).scope; }
+  get computer() { return this.workspaces.computer; }
+
   async upload(owner: WorkspaceScope, file: UploadedDocument) {
     const uploaded = await this.workspaces.files.upload(owner, file);
     return this.adapter.attachment(
@@ -125,6 +128,7 @@ export class ChatkitService implements OnModuleDestroy {
       );
       // Child threads cannot outlive the browser capability that owns them.
       scope.expiresAt = Math.min(scope.expiresAt, owner.expiresAt);
+      owner.abort.signal.addEventListener('abort',()=>this.workspaces.store.remove(scope),{once:true});
       const thread: ChatkitThread = {
         ownerId: owner.id,
         ownerSignal: owner.abort.signal,

@@ -21,3 +21,5 @@ export type * from './types/index.js';
 export * from './workspaces/workspace.schema.js';
 
 export { clefResponseSchema, modelRoutingSchema } from './clef/clef.schema.js';
+
+export * from './computer/computer.schema.js';

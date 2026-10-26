@@ -92,6 +92,11 @@ export const environmentSchema = z
     REALTIME_PLAYGROUND_ENABLED: booleanValue(
       'REALTIME_PLAYGROUND_ENABLED',
     ).optional(),
+    COMPUTER_ENABLED: booleanValue('COMPUTER_ENABLED').default(false),
+    COMPUTER_ACCESS_TOKEN: z.string().max(256).default(''),
+    COMPUTER_ALLOWED_APPS: z.preprocess(value => typeof value === 'string' ? value.split(',').map(x=>x.trim()).filter(Boolean) : value, z.array(z.string().regex(/^[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/)).max(20)).default([]),
+    COMPUTER_BROWSER_DOMAINS: z.preprocess(value => typeof value === 'string' ? value.split(',').map(x=>x.trim()).filter(Boolean) : value, z.array(z.string().regex(/^[a-z0-9.-]+\.[a-z]{2,}$/)).max(50)).default(['example.com']),
+    COMPUTER_MACOS_BINARY: z.string().default(''),
     SANDBOX_ENABLED: booleanValue('SANDBOX_ENABLED').default(false),
     CHATKIT_DOMAIN_KEY: z
       .string()
@@ -196,6 +201,7 @@ export const environmentSchema = z
         });
       }
     }
+    if (environment.COMPUTER_ENABLED && (environment.NODE_ENV === 'production' || environment.COMPUTER_ACCESS_TOKEN.length < 32)) context.addIssue({code:'custom',message:'Local computer access requires a 32+ character COMPUTER_ACCESS_TOKEN and a non-production environment.',path:['COMPUTER_ACCESS_TOKEN']});
     if (environment.CLEF_ROUTING_ENABLED) {
       for (const key of [
         'CLOUDFLARE_ACCOUNT_ID',

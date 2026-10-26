@@ -90,6 +90,7 @@ function createChatkitTransport() {
     do {const page=await json('items.list',{thread_id:id,order:'asc',limit:100,after});items.push(...page.data);after=page.has_more?page.after:null;}while(after);
     const thread=await json('threads.get_by_id',{thread_id:id});
     await workspacePanel.clearDrafts();
+    await computerPanel.stop();
     threadId=id;files=thread.files??[];
     workspacePanel.useFiles(files);
     deliver('chat.history',items);
@@ -99,10 +100,10 @@ function createChatkitTransport() {
   queueMicrotask(()=>deliver(connected?'connect':'disconnect'));
   return {
     on(name,handler){if(!handlers.has(name))handlers.set(name,[]);handlers.get(name).push(handler);},deliver,
-    get connected(){return connected;},get files(){return files;},get busy(){return !!controller;},
+    get threadId(){return threadId;},get connected(){return connected;},get files(){return files;},get busy(){return !!controller;},
     emit(name,data){if(name==='chat.send')void send(data);else if(name==='chat.cancel'){deliver('chat.cancelling');controller?.abort();}},
     disconnect(){controller?.abort();},connect(){deliver(connected?'connect':'disconnect');},
-    newThread(){threadId=undefined;files=[];},json,load,action,
+    newThread(){void computerPanel.stop().catch(()=>{});threadId=undefined;files=[];},json,load,action,
     async edit(itemId,message){if(!threadId)throw new Error('Conversation not found.');await send({itemId,message});},
     async deleteThread(id){await json('threads.delete',{thread_id:id});if(threadId===id)resetConversation();},
   };

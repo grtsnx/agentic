@@ -12,6 +12,8 @@ export const TOOL_PERMISSIONS: Readonly<Record<string, PermissionTier>> =
     retrieve_files: 'sensitive_read',
     inspect_image: 'sensitive_read',
     execute_code: 'write',
+    computer_observe: 'sensitive_read',
+    computer_action: 'write',
     delete_file: 'destructive',
     delegate_task: 'safe_read',
     send_message: 'message',
@@ -64,7 +66,7 @@ export async function auditedTool<T>(
   };
   try {
     const output = await execute();
-    event.output = auditSnapshot(output);
+    event.output = tool==='computer_observe' ? {observed:true,content:'Screen content omitted from audit'} : auditSnapshot(output);
     if (
       output &&
       typeof output === 'object' &&

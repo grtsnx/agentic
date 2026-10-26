@@ -1,3 +1,4 @@
+import { COMPUTER_BUTTON, COMPUTER_VIEW, COMPUTER_STYLES, COMPUTER_APP } from './computer.asset.js';
 import { MESSAGE_EDIT_APP, MESSAGE_EDIT_STYLES } from './message-edit.asset.js';
 import {
   CHATKIT_APP,
@@ -78,6 +79,7 @@ export const PLAYGROUND_PAGE = `<!doctype html>
       </main>
 
       ${WORKSPACE_SHEET}
+      ${COMPUTER_VIEW}
       <footer class="composer-wrap">
         <div class="composer">
           ${WORKSPACE_ATTACHMENTS}
@@ -86,6 +88,7 @@ export const PLAYGROUND_PAGE = `<!doctype html>
           <div class="composer-actions">
             <div class="composer-status">
               ${WORKSPACE_ATTACH_BUTTON}
+              ${COMPUTER_BUTTON}
               <span class="composer-hint">Enter to send · Shift + Enter for a new line</span>
               <span id="voice-status" class="voice-status" role="status" hidden>
                 <span class="voice-visualizer" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
@@ -133,6 +136,7 @@ export const PLAYGROUND_APP = `(() => {
   };
 
   ${WORKSPACE_APP}
+  ${COMPUTER_APP}
   let active = false;
   let assistantMessage;
   let elapsedTimer;
@@ -546,6 +550,7 @@ export const PLAYGROUND_STYLES = `
 ${CHATKIT_STYLES}
 ${MESSAGE_EDIT_STYLES}
 ${WORKSPACE_STYLES}
+${COMPUTER_STYLES}
 ${ANSWER_ACTIONS_STYLES}:root {
   color-scheme: light;
   --spacing: 0.25rem;

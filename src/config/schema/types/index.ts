@@ -39,3 +39,5 @@ export type {
 export type * from './workspaces/workspace.types.js';
 
 export type { ModelRoutingDecision } from './clef/clef.types.js';
+
+export type * from './computer/computer.types.js';

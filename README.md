@@ -181,6 +181,35 @@ Each workspace retains up to 300 redacted, size-limited audit events with tool i
 
 Use the pencil below a sent text message, edit it inline, then choose **Update**. **Cancel** (or Escape) keeps the original message. Updates retain that message's attachments and replace subsequent replies and model context. Pending approvals are cancelled; completed actions and their audit records are not undone. The composer draft stays untouched. Editing is unavailable while a response or action is running.
 
+### Local browser and Mac apps
+
+The computer icon in the playground connects **one conversation at a time** to your Mac. Send a first message, open the icon, enter `COMPUTER_ACCESS_TOKEN` from your local `.env`, and choose **Browser on this Mac** or **Mac apps**. Keep the key out of chat. It is cleared from the form after connecting and is never added to model context.
+
+```bash
+# Optional native desktop adapter, installed only in this project:
+uv venv .computer-venv --python 3.12
+uv pip install --python .computer-venv/bin/python macos-harness==0.2.1
+# Permission diagnostic only; does not request permissions:
+MACOS_HARNESS_HOME="$PWD/.computer-runtime/macos" DO_NOT_TRACK=1 .computer-venv/bin/macos-harness doctor --json
+```
+
+Set `COMPUTER_ENABLED=true` and generate `COMPUTER_ACCESS_TOKEN` with `openssl rand -hex 32`. `COMPUTER_ALLOWED_APPS` contains exact macOS bundle IDs, initially `com.apple.TextEdit`. `COMPUTER_BROWSER_DOMAINS` contains permitted public websites; the default is `example.com`. Restart the API after editing `.env`. Native app access requires Accessibility and Screen Recording for the application launching Agentic under **System Settings → Privacy & Security**. Run the diagnostic from your own terminal: permissions granted to Codex or ChatGPT do not prove your terminal is authorized. The integration does not change OS permissions automatically.
+
+Browser mode uses installed Google Chrome in a temporary profile, without copying your existing cookies, extensions, or tabs. It supports reading pages, screenshots, navigation, indexed clicks and input, limited keys, and scrolling. Native Mac mode uses macOS Harness accessibility reads and indexed actions on allowed apps; open TextEdit with a scratch document to test. It does not provide a native desktop screenshot stream yet. Screen/page content sent to the model is untrusted evidence. Each action requires an **Approve once** card; observations are bound to a ten-minute connection and a single conversation. If the page or app changes, the action is rejected and must be proposed again. This check reduces stale actions but cannot make external UI changes transactional.
+
+Try **“Read the connected browser and propose opening https://example.com.”** Approve the navigation, then ask **“Read the page and tell me its title.”** For TextEdit, ask **“Read TextEdit and propose replacing the scratch document text with Hello Agentic.”** Review the exact text before approval. Use **Refresh view** to inspect the current browser screenshot or app accessibility text. Use **Stop & disconnect** to revoke access; it closes only Agentic's dedicated browser. You can take over your Mac directly. The connection expires automatically, and pending actions cannot run after revocation. A lost network response is an uncertain outcome, never an instruction to replay the action.
+
+Local control is disabled in production and is **not a sandbox**: approved actions act on your real machine. Browser requests check permitted domains and reject private-IP destinations; downloads, popups, service workers, and WebSockets are blocked. These application checks are not a hardened network boundary against DNS rebinding or a browser exploit. Native app controls are app-scoped, not folder-scoped. Docker desktops, cloud VMs, existing browser-profile attachment, file transfer, and Windows/Linux desktop control remain roadmap work. No database or Redis is required; connections and approvals disappear on restart.
+
+```bash
+bun run build
+RUN_COMPUTER_SMOKE=true node test/smoke/computer.smoke.mjs
+# Also read an open TextEdit scratch document, without logging its contents:
+RUN_COMPUTER_SMOKE=true RUN_MACOS_READ_SMOKE=true node test/smoke/computer.smoke.mjs
+```
+
+REST/Socket.IO callers can connect their workspace using `POST /v1/workspaces/:id/computer` with `{ "accessToken": "LOCAL_OWNER_KEY", "target": "browser" }` and the workspace bearer token. Use `/computer/observe` with `{}` or `{ "app": "com.apple.TextEdit" }`, and `/computer/stop` to revoke. The model only proposes actions through the existing workspace approval flow. The playground uses equivalent owner-authenticated thread routes so history threads cannot share computer access.
+
 ### Local code sandbox
 
 Code execution requires human approval, a trusted local Docker installation, and `SANDBOX_ENABLED=true`. Install the pinned image before starting the API:
@@ -270,11 +299,11 @@ src/
 │   ├── livekit/          # Voice agent, worker, and console setup.
 │   ├── openai/           # Model routing, delegation budgets, and provider errors.
 │   ├── schema/           # Zod schemas and categorized types/.
-│   └── playground/       # Chat UI, inline editing, ChatKit transport, previews, and voice.
+│   └── playground/       # Chat UI, computer panel, ChatKit transport, previews, and voice.
 ├── dto/                  # API input and output contracts.
-├── lib/                  # Provider integrations, Clef routing, and ChatKit protocol adapter.
+├── lib/                  # Provider adapters, browser/, macos/, and ChatKit protocol adapter.
 ├── middleware/           # Filters, interceptors, errors, and shared utilities.
-├── modules/              # Chat, ChatKit, workspaces, and voice in v1/; clean v2/ boundary.
+├── modules/              # Chat, workspaces, computer/, and voice in v1/; clean v2/ boundary.
 ├── cli.ts                # Text CLI entry point.
 ├── dev.ts                # Shared development startup and shutdown for API and voice.
 ├── main.ts               # HTTP and Socket.IO entry point.
@@ -398,6 +427,10 @@ Ordered from foundations to advanced capabilities. ✅ Verified complete · ⬜ 
 - ⬜ Produce reproducible artifacts and a verification summary.
 
 ### 10. Browser and computer use
+
+- ✅ Verify local Chrome navigation, text/screenshot capture, single-use approval, blocked destinations, and Stop with a real browser smoke test.
+- ✅ Verify native TextEdit accessibility reads through the installed macOS adapter.
+- ⬜ Validate native Mac writes, broader app compatibility, and a live desktop screenshot view.
 
 - ⬜ Add browser navigation, page reading, screenshots, and accessible element inspection in an isolated browser session.
 - ⬜ Support clicking, typing, forms, uploads, and downloads through the existing permission tiers and human approvals.

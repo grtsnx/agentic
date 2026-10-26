@@ -1,3 +1,5 @@
+import { BrowserModule } from './browser/browser.module.js';
+import { MacosModule } from './macos/macos.module.js';
 import { ClefModule } from './clef/clef.module.js';
 import { ChatkitAdapterModule } from './chatkit/chatkit.module.js';
 import { DocumentsModule } from './documents/documents.module.js';
@@ -11,6 +13,8 @@ import { ValyuModule } from './valyu/valyu.module.js';
 
 @Module({
   imports: [
+    BrowserModule,
+    MacosModule,
     ChatkitAdapterModule,
     ClefModule,
     DocumentsModule,
@@ -22,6 +26,8 @@ import { ValyuModule } from './valyu/valyu.module.js';
     ValyuModule,
   ],
   exports: [
+    BrowserModule,
+    MacosModule,
     ChatkitAdapterModule,
     ClefModule,
     DocumentsModule,

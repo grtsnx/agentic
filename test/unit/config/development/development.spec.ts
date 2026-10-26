@@ -80,6 +80,25 @@ describe('development process lifecycle', () => {
     await expect(result).resolves.toBe(7);
   });
 
+  it('stops the API when the voice worker crashes', async () => {
+    vi.stubEnv('VOICE_ENABLED', 'true');
+    vi.stubEnv('LIVEKIT_URL', 'wss://example.livekit.cloud');
+    vi.stubEnv('LIVEKIT_API_KEY', 'test-key');
+    vi.stubEnv('LIVEKIT_API_SECRET', 'test-secret');
+    const result = runDevelopment();
+    children[1]!.emit('close', 1, null);
+    if (process.platform === 'win32')
+      expect(mocks.execFileSync).toHaveBeenCalledWith(
+        'taskkill',
+        ['/pid', String(children[0]!.pid), '/T', '/F'],
+        expect.any(Object),
+      );
+    else
+      expect(process.kill).toHaveBeenCalledWith(-children[0]!.pid, 'SIGTERM');
+    children[0]!.emit('close', 143, 'SIGTERM');
+    await expect(result).resolves.toBe(1);
+  });
+
   it('bounds shutdown when a service ignores the first signal', async () => {
     const result = runDevelopment();
     signals.get('SIGTERM')!();

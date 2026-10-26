@@ -410,7 +410,9 @@ export class OpenaiService {
       if (item.rawItem?.type === 'hosted_tool_call') return undefined;
       const name = item.toolName ?? item.rawItem?.name;
       const message =
-        name === 'firecrawl_read_page'
+        name === 'computer_observe' ? 'Reading the screen'
+          : name === 'computer_action' ? 'Preparing an action for approval'
+          : name === 'firecrawl_read_page'
           ? 'Reading a page'
           : ['web_search', 'context_dev_search', 'valyu_search'].includes(
                 name ?? '',

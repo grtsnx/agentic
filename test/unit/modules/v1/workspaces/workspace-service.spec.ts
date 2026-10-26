@@ -1,3 +1,4 @@
+import type { ComputerService } from '../../../../../src/modules/v1/computer/computer.service.js';
 import { WorkspaceService } from '../../../../../src/modules/v1/workspaces/workspace.service.js';
 import { WorkspaceStore } from '../../../../../src/modules/v1/workspaces/workspace-store.service.js';
 import { WorkspaceFilesService } from '../../../../../src/modules/v1/workspaces/workspace-files.service.js';
@@ -22,6 +23,7 @@ describe('workspace decisions after turn limits', () => {
       { execute } as unknown as SandboxService,
       {} as DelegationService,
       WebToolsService.fromEnvironment({}),
+      {} as ComputerService,
     );
     try {
       const pending = store.propose(scope, {

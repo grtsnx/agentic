@@ -1,3 +1,4 @@
+import { ComputerModule } from '../computer/computer.module.js';
 import { Module } from '@nestjs/common';
 import { LibModule } from '@/lib';
 import { WebToolsModule } from '@/config';
@@ -7,7 +8,7 @@ import { WorkspaceStore } from './workspace-store.service.js';
 import { WorkspaceFilesService } from './workspace-files.service.js';
 import { WorkspaceController } from './workspace.controller.js';
 @Module({
-  imports: [LibModule, WebToolsModule],
+  imports: [LibModule, WebToolsModule, ComputerModule],
   providers: [
     WorkspaceService,
     WorkspaceStore,

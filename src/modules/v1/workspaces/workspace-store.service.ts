@@ -85,11 +85,15 @@ export class WorkspaceStore implements OnModuleDestroy {
       expiresAt: Math.min(scope.expiresAt, Date.now() + 300_000),
       status: 'pending',
       target:
-        action.tool === 'execute_code'
+        action.tool === 'computer_action'
+          ? `Local ${action.target}: ${action.app ?? 'dedicated Chrome profile'}`
+          : action.tool === 'execute_code'
           ? 'Isolated JavaScript container'
           : `File ${action.fileId}`,
       risk:
-        action.tool === 'execute_code'
+        action.tool === 'computer_action'
+          ? 'Controls your actual Mac. This action may change data or submit information in the shown app or website. Review the exact input before approving. No automatic retry.'
+          : action.tool === 'execute_code'
           ? 'Runs the exact code shown. Network is disabled; only temporary sandbox files can be written.'
           : 'Permanently removes this uploaded file from the workspace.',
     };

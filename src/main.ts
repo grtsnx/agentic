@@ -10,6 +10,7 @@ if (environment.REALTIME_PLAYGROUND_ENABLED) {
   logger.log(`Playground: ${baseUrl}/playground`);
 }
 logger.log('CLI: bun run chat');
+if(environment.COMPUTER_ENABLED)logger.log(`Computer access: ${baseUrl}/playground (computer icon; local owner key required)`);
 
 if (environment.SWAGGER_ENABLED) {
   logger.log(`Swagger UI: ${baseUrl}/api`);

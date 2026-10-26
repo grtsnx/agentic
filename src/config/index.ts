@@ -48,3 +48,5 @@ export {
   CLEF_QUESTION,
   CLEF_INPUT_USD_PER_MILLION,
 } from './openai/clef-routing.js';
+
+export { createComputerTools, describeComputerAction } from './agent/tools/computer-tools.js';

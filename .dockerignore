@@ -11,3 +11,6 @@ node_modules
 test
 *.log
 *.tsbuildinfo
+
+.computer-venv
+.computer-runtime

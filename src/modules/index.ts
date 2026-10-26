@@ -11,3 +11,6 @@ export { ChatV1Gateway } from './v1/chat/chat.gateway.js';
 
 export { WorkspaceModule } from './v1/workspaces/workspace.module.js';
 export { WorkspaceService } from './v1/workspaces/workspace.service.js';
+
+export { ComputerModule } from './v1/computer/computer.module.js';
+export { ComputerService } from './v1/computer/computer.service.js';

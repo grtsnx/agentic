@@ -282,10 +282,10 @@ function createWorkspacePanel() {
     const card=text('article','');card.className='approval-card';card.setAttribute('aria-label','Action approval');
     const heading=text('header','');
     heading.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6Z"/><path d="M12 8v5m0 3v1"/></svg>';
-    heading.append(text('span',action.action.tool==='execute_code'?'Allow code execution?':'Allow file removal?'));
+    heading.append(text('span',action.action.tool==='computer_action'?'Allow computer action?':action.action.tool==='execute_code'?'Allow code execution?':'Allow file removal?'));
     const target=action.action.tool==='delete_file'?(attachedFiles.find(file=>file.id===action.action.fileId)?.filename??action.target):action.target;
     card.append(heading,text('p',target),text('small','This chat only · One action · Expires '+new Date(action.expiresAt).toLocaleTimeString()),text('p',action.risk));
-    card.append(text('pre',action.action.tool==='execute_code'?action.action.code:'Remove '+target));
+    card.append(text('pre',action.action.tool==='computer_action'?JSON.stringify(action.action,null,2):action.action.tool==='execute_code'?action.action.code:'Remove '+target));
     const footer=text('footer','');const status=text('p','Waiting for your approval.');status.className='approval-status';status.setAttribute('role','status');
     const state={busy:false,settled:false,finish(message){state.settled=true;card.setAttribute('data-settled','');for(const button of footer.children)button.disabled=true;status.textContent=message;clearTimeout(timer);approvalTimers.delete(timer);}};
     const timer=setTimeout(()=>state.finish('Request expired. Ask for a new proposal.'),Math.max(0,action.expiresAt-Date.now()));approvalTimers.add(timer);

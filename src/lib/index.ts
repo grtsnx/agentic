@@ -28,3 +28,8 @@ export { DocumentsModule } from './documents/documents.module.js';
 
 export { ClefModule } from './clef/clef.module.js';
 export { ClefService } from './clef/clef.service.js';
+
+export { BrowserModule } from './browser/browser.module.js';
+export { BrowserService } from './browser/browser.service.js';
+export { MacosModule } from './macos/macos.module.js';
+export { MacosService } from './macos/macos.service.js';

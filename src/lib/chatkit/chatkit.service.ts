@@ -1,3 +1,4 @@
+import { describeComputerAction } from '../../config/agent/tools/computer-tools.js';
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { Attachment, Widgets } from '@openai/chatkit';
@@ -152,7 +153,9 @@ export class ChatkitAdapterService {
       {
         type: 'Text',
         value:
-          approval.action.tool === 'execute_code'
+          approval.action.tool === 'computer_action'
+            ? describeComputerAction(approval.action)
+            : approval.action.tool === 'execute_code'
             ? approval.action.code
             : `File: ${approval.action.fileId}`,
       },
