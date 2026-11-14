@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # LiveKit RTC ships glibc bindings; Alpine/musl cannot load them.
-FROM oven/bun:1.4.3@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598 AS dependencies
+FROM oven/bun:1.4.4@sha256:1d22548f177f4ff38e0c15baa3c2c46c6c2060ba2d1bc573bb4720b407548f1d AS dependencies
 WORKDIR /app
 COPY package.json bun.lock ./
 RUN --mount=type=cache,id=agentic-bun,target=/root/.bun/install/cache,sharing=locked bun install --frozen-lockfile
@@ -11,7 +11,7 @@ COPY nest-cli.json tsconfig.json tsconfig.build.json ./
 COPY src ./src
 RUN bun run build
 
-FROM oven/bun:1.4.3@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598 AS production-dependencies
+FROM oven/bun:1.4.4@sha256:1d22548f177f4ff38e0c15baa3c2c46c6c2060ba2d1bc573bb4720b407548f1d AS production-dependencies
 WORKDIR /app
 COPY package.json bun.lock ./
 RUN --mount=type=cache,id=agentic-bun,target=/root/.bun/install/cache,sharing=locked bun install --frozen-lockfile --production
